@@ -20,6 +20,402 @@
       "dasName": "/StealthSHH_mStop-325_mSo-100_ctau-10mm100kEvts_v2/brlopesd-StealthSHH_mStop-325_mSo-100_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
       "dasInstance": "prod/phys03",
       "nFilesFor10k": 100
+    },
+    {
+      "name": "ZHToSSTodddd_tau1mm_M55_2018",
+      "dasName": "/ZH_HToSSTodddd_ZToLL_MH-125_MS-55_ctauS-1_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL18MiniAODv2-106X_upgrade2018_realistic_v16_L1v1-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 4
+    },
+    {
+      "name": "WplusHToSSTodddd_tau1mm_M55_2018",
+      "dasName": "/WplusH_HToSSTodddd_WToLNu_MH-125_MS-55_ctauS-1_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL18MiniAODv2-106X_upgrade2018_realistic_v16_L1v1-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 4
+    },
+    {
+      "name": "WminusHToSSTodddd_tau1mm_M55_2018",
+      "dasName": "/WminusH_HToSSTodddd_WToLNu_MH-125_MS-55_ctauS-1_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL18MiniAODv2-106X_upgrade2018_realistic_v16_L1v1-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 1
+    },
+    {
+      "name": "StealthSHH_mStop300_mSo100_ctau0p1mm_2024",
+      "dasName": "/StealthSHH_mStop-300_mSo-100_ctau-0p1mm100kEvts_v2/brlopesd-StealthSHH_mStop-300_mSo-100_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop300_mSo100_ctau1mm_2024",
+      "dasName": "/StealthSHH_mStop-300_mSo-100_ctau-1mm100kEvts_v2/brlopesd-StealthSHH_mStop-300_mSo-100_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop300_mSo100_ctau3mm_2024",
+      "dasName": "/StealthSHH_mStop-300_mSo-100_ctau-3mm100kEvts_v2/brlopesd-StealthSHH_mStop-300_mSo-100_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop300_mSo100_ctau10mm_2024",
+      "dasName": "/StealthSHH_mStop-300_mSo-100_ctau-10mm100kEvts_v2/brlopesd-StealthSHH_mStop-300_mSo-100_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop325_mSo100_ctau0p1mm_2024",
+      "dasName": "/StealthSHH_mStop-325_mSo-100_ctau-0p1mm100kEvts_v2/brlopesd-StealthSHH_mStop-325_mSo-100_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop325_mSo100_ctau1mm_2024",
+      "dasName": "/StealthSHH_mStop-325_mSo-100_ctau-1mm100kEvts_v2/brlopesd-StealthSHH_mStop-325_mSo-100_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop325_mSo100_ctau3mm_2024",
+      "dasName": "/StealthSHH_mStop-325_mSo-100_ctau-3mm100kEvts_v2/brlopesd-StealthSHH_mStop-325_mSo-100_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop500_mSo100_ctau0p1mm_2024",
+      "dasName": "/StealthSHH_mStop-500_mSo-100_ctau-0p1mm100kEvts_v2/brlopesd-StealthSHH_mStop-500_mSo-100_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop500_mSo100_ctau1mm_2024",
+      "dasName": "/StealthSHH_mStop-500_mSo-100_ctau-1mm100kEvts_v2/brlopesd-StealthSHH_mStop-500_mSo-100_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop500_mSo100_ctau3mm_2024",
+      "dasName": "/StealthSHH_mStop-500_mSo-100_ctau-3mm100kEvts_v2/brlopesd-StealthSHH_mStop-500_mSo-100_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop500_mSo100_ctau10mm_2024",
+      "dasName": "/StealthSHH_mStop-500_mSo-100_ctau-10mm100kEvts_v2/brlopesd-StealthSHH_mStop-500_mSo-100_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop500_mSo275_ctau0p1mm_2024",
+      "dasName": "/StealthSHH_mStop-500_mSo-275_ctau-0p1mm100kEvts_v2/brlopesd-StealthSHH_mStop-500_mSo-275_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop500_mSo275_ctau1mm_2024",
+      "dasName": "/StealthSHH_mStop-500_mSo-275_ctau-1mm100kEvts_v2/brlopesd-StealthSHH_mStop-500_mSo-275_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop500_mSo275_ctau3mm_2024",
+      "dasName": "/StealthSHH_mStop-500_mSo-275_ctau-3mm100kEvts_v2/brlopesd-StealthSHH_mStop-500_mSo-275_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop500_mSo275_ctau10mm_2024",
+      "dasName": "/StealthSHH_mStop-500_mSo-275_ctau-10mm100kEvts_v2/brlopesd-StealthSHH_mStop-500_mSo-275_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop700_mSo100_ctau0p1mm_2024",
+      "dasName": "/StealthSHH_mStop-700_mSo-100_ctau-0p1mm100kEvts_v2/brlopesd-StealthSHH_mStop-700_mSo-100_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop700_mSo100_ctau1mm_2024",
+      "dasName": "/StealthSHH_mStop-700_mSo-100_ctau-1mm100kEvts_v2/brlopesd-StealthSHH_mStop-700_mSo-100_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop700_mSo100_ctau3mm_2024",
+      "dasName": "/StealthSHH_mStop-700_mSo-100_ctau-3mm100kEvts_v2/brlopesd-StealthSHH_mStop-700_mSo-100_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop700_mSo100_ctau10mm_2024",
+      "dasName": "/StealthSHH_mStop-700_mSo-100_ctau-10mm100kEvts_v2/brlopesd-StealthSHH_mStop-700_mSo-100_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop700_mSo475_ctau0p1mm_2024",
+      "dasName": "/StealthSHH_mStop-700_mSo-475_ctau-0p1mm100kEvts_v2/brlopesd-StealthSHH_mStop-700_mSo-475_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop700_mSo475_ctau1mm_2024",
+      "dasName": "/StealthSHH_mStop-700_mSo-475_ctau-1mm100kEvts_v2/brlopesd-StealthSHH_mStop-700_mSo-475_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop700_mSo475_ctau3mm_2024",
+      "dasName": "/StealthSHH_mStop-700_mSo-475_ctau-3mm100kEvts_v2/brlopesd-StealthSHH_mStop-700_mSo-475_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop700_mSo475_ctau10mm_2024",
+      "dasName": "/StealthSHH_mStop-700_mSo-475_ctau-10mm100kEvts_v2/brlopesd-StealthSHH_mStop-700_mSo-475_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop900_mSo100_ctau0p1mm_2024",
+      "dasName": "/StealthSHH_mStop-900_mSo-100_ctau-0p1mm100kEvts_v2/brlopesd-StealthSHH_mStop-900_mSo-100_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop900_mSo100_ctau1mm_2024",
+      "dasName": "/StealthSHH_mStop-900_mSo-100_ctau-1mm100kEvts_v2/brlopesd-StealthSHH_mStop-900_mSo-100_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop900_mSo100_ctau3mm_2024",
+      "dasName": "/StealthSHH_mStop-900_mSo-100_ctau-3mm100kEvts_v2/brlopesd-StealthSHH_mStop-900_mSo-100_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop900_mSo100_ctau10mm_2024",
+      "dasName": "/StealthSHH_mStop-900_mSo-100_ctau-10mm100kEvts_v2/brlopesd-StealthSHH_mStop-900_mSo-100_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop900_mSo675_ctau0p1mm_2024",
+      "dasName": "/StealthSHH_mStop-900_mSo-675_ctau-0p1mm100kEvts_v2/brlopesd-StealthSHH_mStop-900_mSo-675_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop900_mSo675_ctau1mm_2024",
+      "dasName": "/StealthSHH_mStop-900_mSo-675_ctau-1mm100kEvts_v2/brlopesd-StealthSHH_mStop-900_mSo-675_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop900_mSo675_ctau3mm_2024",
+      "dasName": "/StealthSHH_mStop-900_mSo-675_ctau-3mm100kEvts_v2/brlopesd-StealthSHH_mStop-900_mSo-675_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSHH_mStop900_mSo675_ctau10mm_2024",
+      "dasName": "/StealthSHH_mStop-900_mSo-675_ctau-10mm100kEvts_v2/brlopesd-StealthSHH_mStop-900_mSo-675_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop300_mSo100_ctau0p1mm_2024",
+      "dasName": "/StealthSYY_mStop-300_mSo-100_ctau-0p1mm100kEvts_v2/brlopesd-StealthSYY_mStop-300_mSo-100_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop300_mSo100_ctau1mm_2024",
+      "dasName": "/StealthSYY_mStop-300_mSo-100_ctau-1mm100kEvts_v2/brlopesd-StealthSYY_mStop-300_mSo-100_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop300_mSo100_ctau3mm_2024",
+      "dasName": "/StealthSYY_mStop-300_mSo-100_ctau-3mm100kEvts_v2/brlopesd-StealthSYY_mStop-300_mSo-100_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop300_mSo100_ctau10mm_2024",
+      "dasName": "/StealthSYY_mStop-300_mSo-100_ctau-10mm100kEvts_v2/brlopesd-StealthSYY_mStop-300_mSo-100_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop325_mSo100_ctau0p1mm_2024",
+      "dasName": "/StealthSYY_mStop-325_mSo-100_ctau-0p1mm100kEvts_v2/brlopesd-StealthSYY_mStop-325_mSo-100_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop325_mSo100_ctau1mm_2024",
+      "dasName": "/StealthSYY_mStop-325_mSo-100_ctau-1mm100kEvts_v2/brlopesd-StealthSYY_mStop-325_mSo-100_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop325_mSo100_ctau3mm_2024",
+      "dasName": "/StealthSYY_mStop-325_mSo-100_ctau-3mm100kEvts_v2/brlopesd-StealthSYY_mStop-325_mSo-100_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop325_mSo100_ctau10mm_2024",
+      "dasName": "/StealthSYY_mStop-325_mSo-100_ctau-10mm100kEvts_v2/brlopesd-StealthSYY_mStop-325_mSo-100_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop500_mSo100_ctau0p1mm_2024",
+      "dasName": "/StealthSYY_mStop-500_mSo-100_ctau-0p1mm100kEvts_v2/brlopesd-StealthSYY_mStop-500_mSo-100_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop500_mSo100_ctau1mm_2024",
+      "dasName": "/StealthSYY_mStop-500_mSo-100_ctau-1mm100kEvts_v2/brlopesd-StealthSYY_mStop-500_mSo-100_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop500_mSo100_ctau3mm_2024",
+      "dasName": "/StealthSYY_mStop-500_mSo-100_ctau-3mm100kEvts_v2/brlopesd-StealthSYY_mStop-500_mSo-100_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop500_mSo100_ctau10mm_2024",
+      "dasName": "/StealthSYY_mStop-500_mSo-100_ctau-10mm100kEvts_v2/brlopesd-StealthSYY_mStop-500_mSo-100_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop500_mSo275_ctau0p1mm_2024",
+      "dasName": "/StealthSYY_mStop-500_mSo-275_ctau-0p1mm100kEvts_v2/brlopesd-StealthSYY_mStop-500_mSo-275_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop500_mSo275_ctau1mm_2024",
+      "dasName": "/StealthSYY_mStop-500_mSo-275_ctau-1mm100kEvts_v2/brlopesd-StealthSYY_mStop-500_mSo-275_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop500_mSo275_ctau3mm_2024",
+      "dasName": "/StealthSYY_mStop-500_mSo-275_ctau-3mm100kEvts_v2/brlopesd-StealthSYY_mStop-500_mSo-275_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop500_mSo275_ctau10mm_2024",
+      "dasName": "/StealthSYY_mStop-500_mSo-275_ctau-10mm100kEvts_v2/brlopesd-StealthSYY_mStop-500_mSo-275_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop700_mSo100_ctau0p1mm_2024",
+      "dasName": "/StealthSYY_mStop-700_mSo-100_ctau-0p1mm100kEvts_v2/brlopesd-StealthSYY_mStop-700_mSo-100_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop700_mSo100_ctau1mm_2024",
+      "dasName": "/StealthSYY_mStop-700_mSo-100_ctau-1mm100kEvts_v2/brlopesd-StealthSYY_mStop-700_mSo-100_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop700_mSo100_ctau3mm_2024",
+      "dasName": "/StealthSYY_mStop-700_mSo-100_ctau-3mm100kEvts_v2/brlopesd-StealthSYY_mStop-700_mSo-100_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop700_mSo100_ctau10mm_2024",
+      "dasName": "/StealthSYY_mStop-700_mSo-100_ctau-10mm100kEvts_v2/brlopesd-StealthSYY_mStop-700_mSo-100_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop700_mSo475_ctau0p1mm_2024",
+      "dasName": "/StealthSYY_mStop-700_mSo-475_ctau-0p1mm100kEvts_v2/brlopesd-StealthSYY_mStop-700_mSo-475_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop700_mSo475_ctau1mm_2024",
+      "dasName": "/StealthSYY_mStop-700_mSo-475_ctau-1mm100kEvts_v2/brlopesd-StealthSYY_mStop-700_mSo-475_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop700_mSo475_ctau3mm_2024",
+      "dasName": "/StealthSYY_mStop-700_mSo-475_ctau-3mm100kEvts_v2/brlopesd-StealthSYY_mStop-700_mSo-475_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop700_mSo475_ctau10mm_2024",
+      "dasName": "/StealthSYY_mStop-700_mSo-475_ctau-10mm100kEvts_v2/brlopesd-StealthSYY_mStop-700_mSo-475_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop900_mSo100_ctau0p1mm_2024",
+      "dasName": "/StealthSYY_mStop-900_mSo-100_ctau-0p1mm100kEvts_v2/brlopesd-StealthSYY_mStop-900_mSo-100_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop900_mSo100_ctau1mm_2024",
+      "dasName": "/StealthSYY_mStop-900_mSo-100_ctau-1mm100kEvts_v2/brlopesd-StealthSYY_mStop-900_mSo-100_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop900_mSo100_ctau3mm_2024",
+      "dasName": "/StealthSYY_mStop-900_mSo-100_ctau-3mm100kEvts_v2/brlopesd-StealthSYY_mStop-900_mSo-100_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop900_mSo100_ctau10mm_2024",
+      "dasName": "/StealthSYY_mStop-900_mSo-100_ctau-10mm100kEvts_v2/brlopesd-StealthSYY_mStop-900_mSo-100_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop900_mSo675_ctau0p1mm_2024",
+      "dasName": "/StealthSYY_mStop-900_mSo-675_ctau-0p1mm100kEvts_v2/brlopesd-StealthSYY_mStop-900_mSo-675_ctau-0p1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop900_mSo675_ctau1mm_2024",
+      "dasName": "/StealthSYY_mStop-900_mSo-675_ctau-1mm100kEvts_v2/brlopesd-StealthSYY_mStop-900_mSo-675_ctau-1mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop900_mSo675_ctau3mm_2024",
+      "dasName": "/StealthSYY_mStop-900_mSo-675_ctau-3mm100kEvts_v2/brlopesd-StealthSYY_mStop-900_mSo-675_ctau-3mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
+    },
+    {
+      "name": "StealthSYY_mStop900_mSo675_ctau10mm_2024",
+      "dasName": "/StealthSYY_mStop-900_mSo-675_ctau-10mm100kEvts_v2/brlopesd-StealthSYY_mStop-900_mSo-675_ctau-10mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "dasInstance": "prod/phys03",
+      "nFilesFor10k": 100
     }
   ]
 }
