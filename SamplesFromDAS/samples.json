@@ -4,6 +4,12 @@
   "sourceRedirector": "root://cms-xrd-global.cern.ch/",
   "samples": [
     {
+      "name": "ZH-2S-4D_mS55_ctau1mm_2024",
+      "dasName": "/ZH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 21
+    },
+    {
       "name": "ggH-2S-4D_mS55_ctau10mm_2024",
       "dasName": "/GluGluH-Hto2Sto4D_Par-ctauS-10-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAOD-140X_mcRun3_2024_realistic_v26-v2/MINIAODSIM",
       "dasInstance": "prod/global",
