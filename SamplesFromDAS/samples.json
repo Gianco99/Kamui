@@ -4,16 +4,328 @@
   "sourceRedirector": "root://cms-xrd-global.cern.ch/",
   "samples": [
     {
+      "name": "ggH-2S-4D_mS55_ctau10mm_2024",
+      "dasName": "/GluGluH-Hto2Sto4D_Par-ctauS-10-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 3
+    },
+    {
+      "name": "ggH-2S-4D_mS15_ctau0p1mm_2024",
+      "dasName": "/GluGluH-Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 5
+    },
+    {
+      "name": "ggH-2S-4D_mS15_ctau1mm_2024",
+      "dasName": "/GluGluH-Hto2Sto4D_Par-ctauS-1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 3
+    },
+    {
+      "name": "ggH-2S-4D_mS15_ctau10mm_2024",
+      "dasName": "/GluGluH-Hto2Sto4D_Par-ctauS-10-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 3
+    },
+    {
+      "name": "ggH-2S-4D_mS40_ctau0p1mm_2024",
+      "dasName": "/GluGluH-Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 4
+    },
+    {
+      "name": "ggH-2S-4D_mS40_ctau1mm_2024",
+      "dasName": "/GluGluH-Hto2Sto4D_Par-ctauS-1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 3
+    },
+    {
+      "name": "ggH-2S-4D_mS40_ctau10mm_2024",
+      "dasName": "/GluGluH-Hto2Sto4D_Par-ctauS-10-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 3
+    },
+    {
+      "name": "ggH-2S-4D_mS55_ctau0p1mm_2024",
+      "dasName": "/GluGluH-Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 3
+    },
+    {
+      "name": "ggH-2S-4D_mS55_ctau1mm_2024",
+      "dasName": "/GluGluH-Hto2Sto4D_Par-ctauS-1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 4
+    },
+    {
+      "name": "VBFH-2S-4D_mS15_ctau0p1mm_2024",
+      "dasName": "/VBFH-Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 1
+    },
+    {
+      "name": "VBFH-2S-4D_mS15_ctau1mm_2024",
+      "dasName": "/VBFH-Hto2Sto4D_Par-ctauS-1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 3
+    },
+    {
+      "name": "VBFH-2S-4D_mS15_ctau10mm_2024",
+      "dasName": "/VBFH-Hto2Sto4D_Par-ctauS-10-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 3
+    },
+    {
+      "name": "VBFH-2S-4D_mS40_ctau0p1mm_2024",
+      "dasName": "/VBFH-Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 1
+    },
+    {
+      "name": "VBFH-2S-4D_mS40_ctau1mm_2024",
+      "dasName": "/VBFH-Hto2Sto4D_Par-ctauS-1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 3
+    },
+    {
+      "name": "VBFH-2S-4D_mS40_ctau10mm_2024",
+      "dasName": "/VBFH-Hto2Sto4D_Par-ctauS-10-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 2
+    },
+    {
+      "name": "VBFH-2S-4D_mS55_ctau0p1mm_2024",
+      "dasName": "/VBFH-Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 5
+    },
+    {
+      "name": "VBFH-2S-4D_mS55_ctau1mm_2024",
+      "dasName": "/VBFH-Hto2Sto4D_Par-ctauS-1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 3
+    },
+    {
+      "name": "VBFH-2S-4D_mS55_ctau10mm_2024",
+      "dasName": "/VBFH-Hto2Sto4D_Par-ctauS-10-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 1
+    },
+    {
+      "name": "WplusH-2S-4D_mS15_ctau0p1mm_2024",
+      "dasName": "/WplusH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 8
+    },
+    {
+      "name": "WplusH-2S-4D_mS15_ctau1mm_2024",
+      "dasName": "/WplusH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 8
+    },
+    {
+      "name": "WplusH-2S-4D_mS15_ctau10mm_2024",
+      "dasName": "/WplusH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 4
+    },
+    {
+      "name": "WplusH-2S-4D_mS40_ctau0p1mm_2024",
+      "dasName": "/WplusH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 3
+    },
+    {
+      "name": "WplusH-2S-4D_mS40_ctau1mm_2024",
+      "dasName": "/WplusH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 17
+    },
+    {
+      "name": "WplusH-2S-4D_mS40_ctau10mm_2024",
+      "dasName": "/WplusH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 12
+    },
+    {
+      "name": "WplusH-2S-4D_mS55_ctau0p1mm_2024",
+      "dasName": "/WplusH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 11
+    },
+    {
+      "name": "WplusH-2S-4D_mS55_ctau1mm_2024",
+      "dasName": "/WplusH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 5
+    },
+    {
+      "name": "WplusH-2S-4D_mS55_ctau10mm_2024",
+      "dasName": "/WplusH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 15
+    },
+    {
+      "name": "WminusH-2S-4D_mS15_ctau0p1mm_2024",
+      "dasName": "/WminusH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 13
+    },
+    {
+      "name": "WminusH-2S-4D_mS15_ctau1mm_2024",
+      "dasName": "/WminusH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 3
+    },
+    {
+      "name": "WminusH-2S-4D_mS15_ctau10mm_2024",
+      "dasName": "/WminusH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 28
+    },
+    {
+      "name": "WminusH-2S-4D_mS40_ctau0p1mm_2024",
+      "dasName": "/WminusH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 3
+    },
+    {
+      "name": "WminusH-2S-4D_mS40_ctau1mm_2024",
+      "dasName": "/WminusH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 11
+    },
+    {
+      "name": "WminusH-2S-4D_mS40_ctau10mm_2024",
+      "dasName": "/WminusH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 9
+    },
+    {
+      "name": "WminusH-2S-4D_mS55_ctau0p1mm_2024",
+      "dasName": "/WminusH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 5
+    },
+    {
+      "name": "WminusH-2S-4D_mS55_ctau1mm_2024",
+      "dasName": "/WminusH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 2
+    },
+    {
+      "name": "WminusH-2S-4D_mS55_ctau10mm_2024",
+      "dasName": "/WminusH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 9
+    },
+    {
+      "name": "ZH-2S-4D_mS15_ctau0p1mm_2024",
+      "dasName": "/ZH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 24
+    },
+    {
+      "name": "ZH-2S-4D_mS15_ctau1mm_2024",
+      "dasName": "/ZH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 4
+    },
+    {
+      "name": "ZH-2S-4D_mS15_ctau10mm_2024",
+      "dasName": "/ZH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 36
+    },
+    {
+      "name": "ZH-2S-4D_mS40_ctau0p1mm_2024",
+      "dasName": "/ZH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 2
+    },
+    {
+      "name": "ZH-2S-4D_mS40_ctau1mm_2024",
+      "dasName": "/ZH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 27
+    },
+    {
+      "name": "ZH-2S-4D_mS40_ctau10mm_2024",
+      "dasName": "/ZH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 3
+    },
+    {
+      "name": "ZH-2S-4D_mS55_ctau0p1mm_2024",
+      "dasName": "/ZH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 24
+    },
+    {
+      "name": "ZH-2S-4D_mS55_ctau10mm_2024",
+      "dasName": "/ZH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 19
+    },
+    {
+      "name": "ttH-2S-4D_mS15_ctau0p1mm_2024",
+      "dasName": "/ttH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 2
+    },
+    {
+      "name": "ttH-2S-4D_mS15_ctau1mm_2024",
+      "dasName": "/ttH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 2
+    },
+    {
+      "name": "ttH-2S-4D_mS15_ctau10mm_2024",
+      "dasName": "/ttH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 5
+    },
+    {
+      "name": "ttH-2S-4D_mS40_ctau0p1mm_2024",
+      "dasName": "/ttH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 5
+    },
+    {
+      "name": "ttH-2S-4D_mS40_ctau1mm_2024",
+      "dasName": "/ttH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 6
+    },
+    {
+      "name": "ttH-2S-4D_mS40_ctau10mm_2024",
+      "dasName": "/ttH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 5
+    },
+    {
+      "name": "ttH-2S-4D_mS55_ctau0p1mm_2024",
+      "dasName": "/ttH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 7
+    },
+    {
+      "name": "ttH-2S-4D_mS55_ctau1mm_2024",
+      "dasName": "/ttH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 6
+    },
+    {
+      "name": "ttH-2S-4D_mS55_ctau10mm_2024",
+      "dasName": "/ttH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "dasInstance": "prod/global",
+      "nFilesFor10k": 6
+    },
+    {
       "name": "ZH-2S-4D_mS55_ctau1mm_2024",
       "dasName": "/ZH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
       "dasInstance": "prod/global",
       "nFilesFor10k": 21
-    },
-    {
-      "name": "ggH-2S-4D_mS55_ctau10mm_2024",
-      "dasName": "/GluGluH-Hto2Sto4D_Par-ctauS-10-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAOD-140X_mcRun3_2024_realistic_v26-v2/MINIAODSIM",
-      "dasInstance": "prod/global",
-      "nFilesFor10k": 1
     },
     {
       "name": "StopStopbar-2Dbar2D_M400_ctau10mm_2024",
