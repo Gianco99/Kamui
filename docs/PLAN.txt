@@ -1,0 +1,39 @@
+Kamui - plan
+============
+Written 2026-08-25.
+
+Why a rewrite
+-------------
+DVCode works, but its sample lists, event content and job submission are entangled across hundreds of files, so a change to "which branches do we save" touches C++, python configs and submission code at once. This rewrite keeps the same physics and splits it into layers that can each be read on their own. What to process lives in config/samples, as grids of datasets. What to save lives in config/content, as branch name plus expression plus type plus precision. Which triggers define a channel lives in config/triggers. How any of it runs lives in kamui and cmssw, and nobody should have to edit that to add a variable.
+
+Design decisions and why
+------------------------
+The primary output is a flat ROOT tree, not a slimmed EDM file. It is ten to sixty times smaller than MiniAOD and analysis code downstream never needs CMSSW. The cost is a fixed set of quantities per production, so if something is missing you re-run, which is the right trade when storage is the constraint. A slimmed MiniAOD can be written from the same job as a second output when you want the full EDM objects preserved, which is the escape hatch for that cost.
+
+The tree is built with CMSSW's NanoAOD table producers rather than a hand-written EDAnalyzer, which is what makes every branch a config line with no C++ to maintain, review or keep in sync with the config. Where a table needs real computation, such as the displaced vertexer at milestone 3, a plugin gets added and consumed the same way. The output is a plain flat tree; we are not adopting the NanoAOD workflow.
+
+CRAB is the default backend because it runs where the data is and retries, with local condor available for debugging and for reprocessing files already on our EOS. Both are driven from the same sample selection, so the same phrase picks the same set either way.
+
+Sample configs are grids rather than lists. The 54 exotic-Higgs points are three lines of axes, and adding an era is one line. This was verified on 2026-08-25 to reproduce all 122 datasets of the old samples.json exactly, and the Run 2 validation set was built the same way from DVCode's own Samples.py.
+
+The CMSSW release is chosen to be recent rather than campaign-matched, since newer releases read older files fine and the plugins this framework depends on keep working. It is then pinned. The version lives in config/sites.json, so bumping it is a one-line config change rather than a code change, but it should not be bumped without asking Gianfranco: a release change can introduce errors across the whole repository, and an unpinned framework breaks silently under the people using it.
+
+Milestones
+----------
+Milestone 1 is done as of 2026-08-25. DAS catalog, content configs, trigger configs, the cmsRun config, both submission backends, the slimmed MiniAOD output and the size benchmarks all exist and were tested end to end on real Summer24 and Run 2 UL files.
+
+Milestone 2 is the Run 2 validation, and it is the next thing to run. The configs are written and the machinery is verified; what remains is a grid proxy, a submission, and the comparison against DVCode. See VALIDATION.txt for the full procedure and for the numbers we currently predict. Passing this is what justifies trusting anything the framework says about Run 3.
+
+Once the read-through and the validation are both done, tag the result V1.0 and protect master on GitHub so nothing lands on it without review. That is the point at which the framework stops being a work in progress: reviewed line by line, and shown to reproduce a number DVCode already knows. Until then commits on master are marked WORK IN PROGRESS.
+
+Milestone 3 is a real Run 3 production. Submit the 54-point exotic-Higgs grid with dvSignal, confirm outputs and CPU and GB on EOS. This answers the questions that cannot be answered on paper: real per-sample runtime, CRAB failure modes, and whether dvFull is affordable across the whole grid or only for a vertexing subset.
+
+Milestone 4 is displaced vertexing. MiniAOD has no reco::Track in Run 2 and the IVF vertices we currently store are not the analysis object, so this needs a CMSSW plugin that refits vertices from packedPFCandidates and lostTracks, with DVCode's MFVVertexer as the reference, publishing a DV FlatTable. This is the one place C++ is unavoidable. Worth knowing before starting: Run 3 MiniAOD does carry a real displacedTracks collection of reco::Track, along with displaced muons and K0s/Lambda vertices, none of which Run 2 had and none of which we currently read.
+
+Milestone 5 is the Run 3 trigger definitions, which are blocked on the scope question below. Once the paths are fixed, the skim block stops being a placeholder and starts cutting real storage. Milestone 6 is selection, efficiency and limits, which is not started and runs off the flat trees.
+
+Open scope questions
+--------------------
+These gate milestones 5 and 6. Whether we go high-HT or low-HT decides the trigger set and therefore what statistics the central sample requests need. Which signal families stay in scope is still open: RPV has nothing at all in Run 3, exotic Higgs is well covered, Stealth SUSY is private and 2024 only, and glueballs have not been surveyed because that needs a proxy. Mixed and strange final states such as ttH to 2B2D and 4S have no Run 3 equivalent at all, so they are either dropped or requested.
+
+Nothing in milestones 1 and 2 depends on these answers, which is why they were built first.

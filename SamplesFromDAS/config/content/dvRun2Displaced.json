@@ -1,0 +1,29 @@
+{
+  "_doc": "Run 2 validation, displacement-triggered channel. Matches DVCode's choices closely enough that trigger yields can be compared directly.",
+  "_deltas": "Relative to dvFull: CHS jets (Run 2 used slimmedJets, not PUPPI); Run 2 electron IDs; DVCode's vertexer track preselection; the b-jet OR displaced-dijet HLT skim.",
+  "include": ["dvFull"],
+
+  "skim": {"triggers": "run2Displaced"},
+
+  "collections": {
+    "Jet": {
+      "_note": "Run 2 analysis used CHS slimmedJets. slimmedJetsPuppi exists in UL MiniAODv2 but is not what DVCode selected on.",
+      "src": "slimmedJets"
+    },
+    "Track": {
+      "_note": "DVCode mfvVertexTracks preselection (Vertexer_cfi.py, read 2026-08-25): min_track_pt 1, min_track_npxlayers 2, min_track_nstlayers 6. This is the cut that makes the track table affordable. The dxy-significance cut (min_track_rescaled_sigmadxy 4) is NOT applied - it needs the per-year track rescaling, which is a downstream step.",
+      "cut": "charge != 0 && hasTrackDetails() && pt > 1.0 && pixelLayersWithMeasurement() >= 2 && stripLayersWithMeasurement() >= 6"
+    },
+    "LostTrack": {
+      "cut": "charge != 0 && hasTrackDetails() && pt > 1.0 && pixelLayersWithMeasurement() >= 2 && stripLayersWithMeasurement() >= 6"
+    },
+    "Electron": {
+      "_note": "Winter22 IDs do not exist in Run 2 MiniAOD and electronID() THROWS on an unknown name, so these must be overridden per campaign.",
+      "variables": {
+        "cutBased":   {"expr": "electronID('cutBasedElectronID-Fall17-94X-V2-veto')+electronID('cutBasedElectronID-Fall17-94X-V2-loose')+electronID('cutBasedElectronID-Fall17-94X-V2-medium')+electronID('cutBasedElectronID-Fall17-94X-V2-tight')", "type": "uint8", "doc": "cut-based Fall17-94X-V2 ID: 0 fail, 1 veto, 2 loose, 3 medium, 4 tight"},
+        "mvaIsoWP90": {"expr": "electronID('mvaEleID-Fall17-iso-V2-wp90')", "type": "bool", "doc": "MVA iso Fall17-V2 wp90"},
+        "mvaIsoWP80": {"expr": "electronID('mvaEleID-Fall17-iso-V2-wp80')", "type": "bool", "doc": "MVA iso Fall17-V2 wp80"}
+      }
+    }
+  }
+}

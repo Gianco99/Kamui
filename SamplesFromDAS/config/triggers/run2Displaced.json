@@ -1,0 +1,60 @@
+{
+  "_doc": "Run 2 displacement-triggered channel.",
+  "process": "HLT",
+  "mode": "any",
+  "paths": [
+    "HLT_QuadJet45_TripleBTagCSV_p087_v*",
+    "HLT_DoubleJet90_Double30_TripleBTagCSV_p087_v*",
+    "HLT_DoubleJetsC100_DoubleBTagCSV_p014_DoublePFJetsC100MaxDeta1p6_v*",
+    "HLT_DoublePFJets100MaxDeta1p6_DoubleCaloBTagCSV_p33_v*",
+    "HLT_PFHT300PT30_QuadPFJet_75_60_45_40_TriplePFBTagCSV_3p0_v*",
+    "HLT_DoublePFJets116MaxDeta1p6_DoubleCaloBTagDeepCSV_p71_v*",
+    "HLT_PFHT330PT30_QuadPFJet_75_60_45_40_TriplePFBTagDeepCSV_4p5_v*",
+    "HLT_HT350_DisplacedDijet40_DisplacedTrack_v*",
+    "HLT_HT650_DisplacedDijet80_Inclusive_v*",
+    "HLT_HT430_DisplacedDijet40_DisplacedTrack_v*",
+    "HLT_HT650_DisplacedDijet60_Inclusive_v*"
+  ],
+  "vetoes": [
+    {
+      "_doc": "Orthogonality to EXO-19-013, the published high-HT DV search.",
+      "paths": [
+        "HLT_PFHT1050_v*"
+      ],
+      "offline": "HT of jets with pT > 40 GeV must exceed 1200 GeV (from the AN)."
+    },
+    {
+      "_doc": "Orthogonality to our own lepton-triggered channel.",
+      "paths": [
+        "HLT_Ele27_WPTight_Gsf_v*",
+        "HLT_Ele35_WPTight_Gsf_v*",
+        "HLT_Ele32_WPTight_Gsf_v*",
+        "HLT_IsoMu27_v*",
+        "HLT_IsoMu24_v*"
+      ],
+      "offline": "The matching offline lepton selection from the AN."
+    }
+  ],
+  "_pathsByEra": {
+    "_doc": "Which paths belong to which era's menu. Bookkeeping only.",
+    "2016": [
+      "HLT_QuadJet45_TripleBTagCSV_p087_v*",
+      "HLT_DoubleJet90_Double30_TripleBTagCSV_p087_v*",
+      "HLT_DoubleJetsC100_DoubleBTagCSV_p014_DoublePFJetsC100MaxDeta1p6_v*",
+      "HLT_HT350_DisplacedDijet40_DisplacedTrack_v*",
+      "HLT_HT650_DisplacedDijet80_Inclusive_v*"
+    ],
+    "2017": [
+      "HLT_DoublePFJets100MaxDeta1p6_DoubleCaloBTagCSV_p33_v*",
+      "HLT_PFHT300PT30_QuadPFJet_75_60_45_40_TriplePFBTagCSV_3p0_v*",
+      "HLT_HT430_DisplacedDijet40_DisplacedTrack_v*",
+      "HLT_HT650_DisplacedDijet60_Inclusive_v*"
+    ],
+    "2018": [
+      "HLT_DoublePFJets116MaxDeta1p6_DoubleCaloBTagDeepCSV_p71_v*",
+      "HLT_PFHT330PT30_QuadPFJet_75_60_45_40_TriplePFBTagDeepCSV_4p5_v*",
+      "HLT_HT430_DisplacedDijet40_DisplacedTrack_v*",
+      "HLT_HT650_DisplacedDijet60_Inclusive_v*"
+    ]
+  }
+}

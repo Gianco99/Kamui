@@ -1,0 +1,19 @@
+{
+  "_doc": "Default reco content: event, jets, leptons, IVF vertices. No tracks, no gen. Use for data.",
+  "include": [
+    "core",
+    "jets",
+    "leptons",
+    "vertices"
+  ],
+  "miniaod": {
+    "_doc": "Slimmed MiniAOD keep list. Only written when you ask for it (output=miniaod or both).",
+    "keep": [
+      "jets",
+      "leptons",
+      "met",
+      "vertices",
+      "triggerObjects"
+    ]
+  }
+}

@@ -1,4 +1,11 @@
-# Generated plots and dumps — too large/transient for version control
-Plotting/plots/*.png
-Plotting/plots/*.pdf
+# Personal working notes - reference only, not part of the repo
+docs/SampleProdPlan.txt
+
+# Saved edmDumpEventContent output - reference only, regenerable
 SamplesFromDAS/branchDumps/*.txt
+
+# Generated job areas, DAS cache, python bytecode
+SamplesFromDAS/jobs/
+SamplesFromDAS/.dasCache/
+__pycache__/
+*.pyc

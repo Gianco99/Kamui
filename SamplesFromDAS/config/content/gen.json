@@ -1,0 +1,52 @@
+{
+  "_doc": "Generator-level content. Every collection here is mcOnly, so the same preset works on data - the gen tables just disappear.",
+  "_note": "GenPart is stored UNCUT. genPartIdxMother is an index into the source collection, so any cut would silently corrupt the mother links. If GenPart size becomes a problem, prune with a GenParticlePruner upstream rather than with `cut`.",
+
+  "collections": {
+    "GenPart": {
+      "type": "genParticle",
+      "src": "prunedGenParticles",
+      "mcOnly": true,
+      "doc": "pruned generator particles",
+      "variables": {
+        "pt":     {"expr": "pt()", "type": "float", "doc": "pT [GeV]", "precision": 10},
+        "eta":    {"expr": "eta()", "type": "float", "doc": "pseudorapidity", "precision": 12},
+        "phi":    {"expr": "phi()", "type": "float", "doc": "azimuthal angle", "precision": 12},
+        "mass":   {"expr": "mass()", "type": "float", "doc": "mass [GeV]", "precision": 10},
+        "pdgId":  {"expr": "pdgId()", "type": "int", "doc": "PDG id"},
+        "status": {"expr": "status()", "type": "int16", "doc": "Pythia status code"},
+        "statusFlags": {"expr": "statusFlags().isLastCopyBeforeFSR()*16384+statusFlags().isLastCopy()*8192+statusFlags().isFirstCopy()*4096+statusFlags().fromHardProcessBeforeFSR()*2048+statusFlags().isDirectHardProcessTauDecayProduct()*1024+statusFlags().isHardProcessTauDecayProduct()*512+statusFlags().fromHardProcess()*256+statusFlags().isHardProcess()*128+statusFlags().isDirectHadronDecayProduct()*64+statusFlags().isDirectPromptTauDecayProduct()*32+statusFlags().isDirectTauDecayProduct()*16+statusFlags().isPromptTauDecayProduct()*8+statusFlags().isTauDecayProduct()*4+statusFlags().isDecayedLeptonHadron()*2+statusFlags().isPrompt()*1", "type": "uint16", "doc": "gen status flags, same bit order as NanoAOD GenPart_statusFlags"},
+        "genPartIdxMother": {"expr": "?numberOfMothers>0?motherRef(0).key():-1", "type": "int16", "doc": "index of the first mother in this collection"},
+        "vx":     {"expr": "vx()", "type": "float", "doc": "production vertex x [cm] - the LLP decay point for its daughters", "precision": 14},
+        "vy":     {"expr": "vy()", "type": "float", "doc": "production vertex y [cm]", "precision": 14},
+        "vz":     {"expr": "vz()", "type": "float", "doc": "production vertex z [cm]", "precision": 14}
+      }
+    },
+
+    "GenMET": {
+      "type": "patMET",
+      "src": "slimmedMETs",
+      "singleton": true,
+      "mcOnly": true,
+      "doc": "generator-level MET",
+      "variables": {
+        "pt":  {"expr": "genMET().pt()", "type": "float", "doc": "gen MET [GeV]", "precision": 10},
+        "phi": {"expr": "genMET().phi()", "type": "float", "doc": "gen MET phi", "precision": 10}
+      }
+    },
+
+    "Pileup": {
+      "type": "pileup",
+      "src": "slimmedAddPileupInfo",
+      "mcOnly": true,
+      "doc": "true and observed pileup (fixed content producer)"
+    },
+
+    "genWeight": {
+      "type": "genWeight",
+      "src": "generator",
+      "mcOnly": true,
+      "doc": "nominal generator weight plus LHE scale/PS/PDF weights (fixed content producer)"
+    }
+  }
+}

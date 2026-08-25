@@ -1,0 +1,131 @@
+{
+  "_doc": "Run 2 UL points for validating this framework against JMTucker. Caveats in CLAUDE.md, procedure in docs/VALIDATION.txt.",
+  "family": "run2Validation",
+  "defaults": {
+    "isMC": true,
+    "dasInstance": "prod/global",
+    "tags": [
+      "run2",
+      "validation"
+    ]
+  },
+  "grids": [
+    {
+      "_doc": "RPV SUSY stop->dd, displacement-triggered channel. 2 masses x 4 eras.",
+      "name": "rpvStopDD_M{mass}_ctau1mm_{era}",
+      "dataset": "/StopStopbarTo2Dbar2D_M-{mass}_CTau-1mm_TuneCP5_13TeV-pythia8/{campaign}/MINIAODSIM",
+      "content": "dvRun2Displaced",
+      "tags": [
+        "run2",
+        "validation",
+        "rpv",
+        "displacementTriggered"
+      ],
+      "axes": {
+        "mass": [
+          "400",
+          "600"
+        ],
+        "era": [
+          {
+            "era": "2016APV",
+            "campaign": "RunIISummer20UL16MiniAODAPVv2-106X_mcRun2_asymptotic_preVFP_v11-v2"
+          },
+          {
+            "era": "2016",
+            "campaign": "RunIISummer20UL16MiniAODv2-106X_mcRun2_asymptotic_v17-v2"
+          },
+          {
+            "era": "2017",
+            "campaign": "RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v2"
+          },
+          {
+            "era": "2018",
+            "campaign": "RunIISummer20UL18MiniAODv2-106X_upgrade2018_realistic_v16_L1v1-v2"
+          }
+        ]
+      }
+    },
+    {
+      "_doc": "ggH -> SS -> 4d, displacement-triggered channel. 4 eras. NOTE gen-HT>200 filter.",
+      "name": "ggHToSSTo4d_mS55_ctau1mm_{era}",
+      "dataset": "/ggH_HToSSTodddd_MH-125_MS-55_ctauS-1_TuneCP5_13TeV-powheg-pythia8/{campaign}/MINIAODSIM",
+      "content": "dvRun2Displaced",
+      "tags": [
+        "run2",
+        "validation",
+        "exoticHiggs",
+        "displacementTriggered"
+      ],
+      "axes": {
+        "era": [
+          {
+            "era": "2016APV",
+            "campaign": "RunIISummer20UL16MiniAODAPVv2-106X_mcRun2_asymptotic_preVFP_v11-v2"
+          },
+          {
+            "era": "2016",
+            "campaign": "RunIISummer20UL16MiniAODv2-106X_mcRun2_asymptotic_v17-v2"
+          },
+          {
+            "era": "2017",
+            "campaign": "RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v2"
+          },
+          {
+            "era": "2018",
+            "campaign": "RunIISummer20UL18MiniAODv2-106X_upgrade2018_realistic_v16_L1v1-v2"
+          }
+        ]
+      }
+    },
+    {
+      "_doc": "VH -> SS -> 4d with leptonic V, lepton-triggered channel. 3 modes x 4 eras.",
+      "name": "{mode}ToSSTo4d_mS55_ctau1mm_{era}",
+      "dataset": "/{stem}_HToSSTodddd_{vdecay}_MH-125_MS-55_ctauS-1_TuneCP5_13TeV-powheg-pythia8/{campaign}/MINIAODSIM",
+      "content": "dvRun2Lepton",
+      "tags": [
+        "run2",
+        "validation",
+        "exoticHiggs",
+        "leptonTriggered"
+      ],
+      "axes": {
+        "mode": [
+          {
+            "mode": "ZH",
+            "stem": "ZH",
+            "vdecay": "ZToLL"
+          },
+          {
+            "mode": "WplusH",
+            "stem": "WplusH",
+            "vdecay": "WToLNu"
+          },
+          {
+            "mode": "WminusH",
+            "stem": "WminusH",
+            "vdecay": "WToLNu"
+          }
+        ],
+        "era": [
+          {
+            "era": "2016APV",
+            "campaign": "RunIISummer20UL16MiniAODAPVv2-106X_mcRun2_asymptotic_preVFP_v11-v2"
+          },
+          {
+            "era": "2016",
+            "campaign": "RunIISummer20UL16MiniAODv2-106X_mcRun2_asymptotic_v17-v2"
+          },
+          {
+            "era": "2017",
+            "campaign": "RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v2"
+          },
+          {
+            "era": "2018",
+            "campaign": "RunIISummer20UL18MiniAODv2-106X_upgrade2018_realistic_v16_L1v1-v2"
+          }
+        ]
+      }
+    }
+  ]
+}

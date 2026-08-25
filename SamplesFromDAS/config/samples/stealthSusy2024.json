@@ -1,0 +1,71 @@
+{
+  "_doc": "Stealth SUSY SHH/SYY. Summer24. Private from Bruno. Caveats in CLAUDE.md.",
+  "family": "stealthSusy2024",
+  "defaults": {
+    "era": "Summer24",
+    "isMC": true,
+    "dasInstance": "prod/phys03",
+    "content": "dvSignal",
+    "tags": [
+      "signal",
+      "stealthSusy",
+      "private",
+      "run3"
+    ]
+  },
+  "grids": [
+    {
+      "_doc": "2 models x 8 (mStop,mSo) points x 4 ctau = 64 points.",
+      "name": "Stealth{model}_mStop{mStop}_mSo{mSo}_ctau{ctau}mm_2024",
+      "dataset": "/Stealth{model}_mStop-{mStop}_mSo-{mSo}_ctau-{ctau}mm100kEvts_v2/brlopesd-Stealth{model}_mStop-{mStop}_mSo-{mSo}_ctau-{ctau}mm_step4-miniAOD_100kEvts_v4-df1e99b50d14b85be33e7e4ab518ee3a/USER",
+      "axes": {
+        "model": [
+          "SHH",
+          "SYY"
+        ],
+        "massPoint": [
+          {
+            "mStop": "300",
+            "mSo": "100"
+          },
+          {
+            "mStop": "325",
+            "mSo": "100"
+          },
+          {
+            "mStop": "500",
+            "mSo": "100"
+          },
+          {
+            "mStop": "500",
+            "mSo": "275"
+          },
+          {
+            "mStop": "700",
+            "mSo": "100"
+          },
+          {
+            "mStop": "700",
+            "mSo": "475"
+          },
+          {
+            "mStop": "900",
+            "mSo": "100"
+          },
+          {
+            "mStop": "900",
+            "mSo": "675"
+          }
+        ],
+        "ctau": [
+          "0p1",
+          "1",
+          "3",
+          "10"
+        ]
+      },
+      "nFilesFor10k": 100
+    }
+  ],
+  "overrides": {}
+}

@@ -1,0 +1,44 @@
+{
+  "_doc": "Run 2 lepton-triggered channel.",
+  "process": "HLT",
+  "mode": "any",
+  "paths": [
+    "HLT_Ele27_WPTight_Gsf_v*",
+    "HLT_Ele35_WPTight_Gsf_v*",
+    "HLT_Ele32_WPTight_Gsf_v*",
+    "HLT_Ele115_CaloIdVT_GsfTrkIdT_v*",
+    "HLT_Ele50_CaloIdVT_GsfTrkIdT_PFJet165_v*",
+    "HLT_IsoMu27_v*",
+    "HLT_IsoMu24_v*",
+    "HLT_Mu50_v*"
+  ],
+  "vetoes": [
+    {
+      "_doc": "Orthogonality to EXO-19-013, the published high-HT DV search.",
+      "paths": [
+        "HLT_PFHT1050_v*"
+      ],
+      "offline": "HT of jets with pT > 40 GeV must exceed 1200 GeV (from the AN)"
+    }
+  ],
+  "_pathsByEra": {
+    "_doc": "Which paths belong to which era's menu. Bookkeeping only.",
+    "2016": [
+      "HLT_Ele27_WPTight_Gsf_v*",
+      "HLT_IsoMu24_v*"
+    ],
+    "2017": [
+      "HLT_Ele35_WPTight_Gsf_v*",
+      "HLT_IsoMu27_v*"
+    ],
+    "2018": [
+      "HLT_Ele32_WPTight_Gsf_v*",
+      "HLT_IsoMu24_v*"
+    ],
+    "allEras": [
+      "HLT_Ele115_CaloIdVT_GsfTrkIdT_v*",
+      "HLT_Ele50_CaloIdVT_GsfTrkIdT_PFJet165_v*",
+      "HLT_Mu50_v*"
+    ]
+  }
+}

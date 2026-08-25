@@ -1,0 +1,85 @@
+Validating this framework against DVCode
+========================================
+Written 2026-08-25.
+
+Why
+---
+Before trusting this framework on Run 3, where there is nothing to compare against, we reproduce a number DVCode already knows: how many events pass the trigger, per sample, per year, per channel. If our flat ntuples give the same trigger yields as DVCode on the same Run 2 UL datasets, then DAS resolution, file handling, event counting, HLT bit storage and the trigger logic are all correct. That is the whole point of the exercise. It is deliberately a narrow test of the plumbing, not of the physics.
+
+Scope is triggers only. No vertexing, no offline event filter, no analysis selection. The one place we do copy an offline cut is the track preselection, because DVCode applies it at ntupling time and it is what makes the track collection affordable to store. See below.
+
+What is in the validation set
+-----------------------------
+24 samples, in SamplesFromDAS/config/samples/run2Validation.json. Dataset paths and event counts were copied out of DVCode's JMTucker/Tools/python/Samples.py on 2026-08-25, so they are the same datasets DVCode ran on, not lookalikes.
+
+Displacement-triggered channel, content preset dvRun2Displaced:
+
+  rpvStopDD_M400_ctau1mm_{2016APV,2016,2017,2018}     RPV stop to dd, 1 mm
+  rpvStopDD_M600_ctau1mm_{2016APV,2016,2017,2018}     RPV stop to dd, 1 mm
+  ggHToSSTo4d_mS55_ctau1mm_{2016APV,2016,2017,2018}   exotic Higgs, gluon fusion
+
+Lepton-triggered channel, content preset dvRun2Lepton:
+
+  ZHToSSTo4d_mS55_ctau1mm_{2016APV,2016,2017,2018}       Z to ll
+  WplusHToSSTo4d_mS55_ctau1mm_{2016APV,2016,2017,2018}   W to lnu
+  WminusHToSSTo4d_mS55_ctau1mm_{2016APV,2016,2017,2018}  W to lnu
+
+The representative points are the ones the analysis actually cares about: mS 55 GeV at ctau 1 mm for exotic Higgs, and 400 and 600 GeV at ctau 1 mm for RPV.
+
+The triggers
+------------
+Taken verbatim from DVCode JMTucker/MFVNeutralino/python/TriggerFilter_cfi.py and stored in SamplesFromDAS/config/triggers/. The displacement channel is the OR of bjet_paths plus displaced_dijet_paths, 11 paths, matching mfvTriggerFilterBjetsORDisplacedDijet. The lepton channel is the OR of electron_paths plus muon_paths, 8 paths, matching mfvTriggerFilterLeptonsOnly.
+
+One detail worth understanding, because it looks like a bug and is not: DVCode uses a single path list for all four Run 2 eras and sets throw = False, so a path that is absent from a given year's menu simply never fires. We do exactly the same. That is why there is no per-year path list here. Adding one would change the answer relative to DVCode. Each trigger config does record which paths belong to which era's menu under _pathsByEra, but that is bookkeeping and is not used at runtime.
+
+What we deliberately do not reproduce
+-------------------------------------
+Both channels carry vetoes in the full analysis, and we apply neither. Per AN-21-201, both the lepton-triggered and displacement-triggered selections reject events firing the HT > 1050 GeV trigger with offline HT > 1200 GeV, for orthogonality to the published EXO-19-013 high-HT search. The displacement channel additionally vetoes events firing a single-lepton trigger that also pass the matching offline lepton selection, to keep it disjoint from the lepton channel.
+
+These live in DVCode at analysis-cut level, in plugins/AnalysisCuts.cc, not in the ntupling filters. The ntuple-level filter for the mode named 'veto leptons and HT' vetoes nothing, which is misleading if that is the only layer you read. Both vetoes are conjunctions of a trigger bit with an offline requirement, so vetoing on the raw bit alone over-subtracts.
+
+We store every HLT bit and the jet kinematics, so both are reproducible downstream. What matters for the comparison is matching layers: a trigger-level count from us should be compared against a trigger-level count from DVCode, before any preselection veto is applied.
+
+Likewise DVCode's lepton channel requires at least one offline lepton above a per-year pT threshold: muon 27 GeV, or 30 GeV in 2017, and electron 30, 38, 35 GeV for 2016, 2017, 2018. Not applied. Muon_pt and Electron_pt are in the tree, so that cut is reproducible downstream.
+
+The track preselection is copied, because it changes what is stored rather than what is counted. DVCode's mfvVertexTracks in Vertexer_cfi.py requires pT above 1 GeV, at least 2 pixel layers and at least 6 strip layers, and we apply the same cut in the Run 2 presets. The rescaled dxy significance cut, min_track_rescaled_sigmadxy = 4, is not applied, since it depends on the per-year track rescaling, which is a downstream step we have not written.
+
+Procedure
+---------
+First submit the validation set. Both channels come along automatically because each sample names its own content preset.
+
+  cd SamplesFromDAS
+  ./kamui query  --tag validation                    # sanity-check that DAS sees them
+  ./kamui submit --tag validation --task run2val
+
+When the jobs land, compute our yields.
+
+  python3 tools/triggerYields.py --task run2val
+
+It prints, per sample, the number of events processed, the number passing the channel OR, the efficiency, and a per-path breakdown so a disagreement can be localised to a single trigger rather than just showing up as a wrong total.
+
+Then get DVCode's numbers for the same samples and compare. The DVCode side needs ntuple.py run with use_btag_vetoLepHT_triggers for the displacement channel and use_Lepton_triggers for the lepton channel, or existing minitrees if they cover these points.
+
+What counts as agreement
+------------------------
+The comparison is on the same files with the same trigger bits, so the counts should match exactly, not statistically. Any difference at all is a real discrepancy and should be chased. The likely causes, in rough order of how often they bite: the veto being applied on one side and not the other; a different number of input files, so check the event denominator first, which is in the notes field for each sample in the family config and is printed by the tool; and DVCode's ntuple.py having an event filter enabled that we did not account for.
+
+Note that the denominators recorded in the sample config are DVCode's full dataset event counts. If a CRAB task loses a job, or you run over a subset, compare efficiencies rather than raw counts, and say which you are doing.
+
+Status
+------
+2026-08-25, where the review stands. The framework is being read through end to end before anything is submitted. Done so far: the CLI entry point, the imports and selection helpers in cli.py, the list and content commands, catalog.py, and the config directories for samples, triggers and sites.json, each with a README and a CLAUDE.md.
+
+Next, in order. Review config/content/, the last config directory and the largest at 13 files, since reading a config format before the code that consumes it has worked well twice now. Then back to cli.py for content.py, which the content command depends on, and the remaining seven commands. Only then submit.
+
+The vetoes described above are recorded in the trigger configs and not applied. Applying them is part of the validation and will be implemented when we get there, not before.
+
+2026-08-25, DAS check done. All 24 datasets exist, and every event count matched the DVCode number in JMTucker/Tools/python/Samples.py, 24 out of 24. The counts are not copied into the configs; ./kamui query reads them live from DAS. The set is 341 files and 2,358,763 events, 153.5 GB of input MiniAOD. That confirms the validation is running on the same data DVCode ran on, which is the premise the whole comparison rests on.
+
+Two things the file listing turned up that matter for submission. WminusH 2016APV and WminusH 2016 are single-file datasets, and WminusH 2018 and rpvStopDD_M600 2017 have two files each, so with FileBased splitting those become one or two jobs regardless of the filesPerJob setting; they will be the long poles. Everything else splits normally.
+
+Expected output volume, roughly 2 to 3 GB. That comes from about 500k lepton-channel input events at the measured 56 percent trigger pass rate, plus about 1.86M displacement-channel input events at a few percent, times the 6.4 kB per event measured on the lepton-skimmed Run 2 ZH file. Treat it as an order-of-magnitude estimate, not a budget: the displacement pass rate was only measured on ZH, and RPV and ggH will differ.
+
+2026-08-25, machinery verified. dvRun2Lepton runs end to end on a staged 2018 ZH file under CMSSW_16_1_2, which exercises the Run 2 electron IDs, the CHS jet collection, the track preselection and the lepton trigger skim together. On that file the lepton channel keeps 988 of 1768 events, 55.9 percent, and the skimmed ntuple contains exactly those 988 events. The displacement channel on the same file gives 35 events, 1.98 percent, and the displacement-skimmed ntuple contains exactly those 35. That 35 is the number to hold DVCode against; an earlier note quoting 11 events after a veto was wrong, since DVCode applies no veto. Those are our numbers and they are the ones to hold DVCode against; nothing has been compared yet.
+
+Still to do: submit, then compare. Test output during development goes to the session scratchpad in /tmp and is not preserved. Real jobs write to EOS under /store/user/lpcdisplacedvertices/$USER/ntuples/<task>/<sample>/ as configured in config/sites.json.

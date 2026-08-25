@@ -1,0 +1,18 @@
+{
+  "_doc": "Storage, site and CMSSW environment settings.",
+
+  "eosRedirector": "root://cmseos.fnal.gov/",
+  "sourceRedirector": "root://cms-xrd-global.cern.ch/",
+  "_sourceAlt": "root://cmsxrootd.fnal.gov/ is faster for datasets already cached at FNAL",
+
+  "stageoutBase": "/store/user/lpcdisplacedvertices/$USER",
+  "miniaodDir": "miniaod",
+  "_layout": "Raw MiniAOD copies go to <stageoutBase>/<miniaodDir>/<sample>/ ; job output to <stageoutBase>/ntuples/<task>/<sample>/",
+
+  "crabStorageSite": "T3_US_FNALLPC",
+  
+  "cmssw": {
+    "version": "CMSSW_16_1_2",
+    "scramArch": "el9_amd64_gcc13"
+  }
+}
