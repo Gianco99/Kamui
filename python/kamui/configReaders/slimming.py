@@ -1,17 +1,7 @@
 """
-Slimmed-MiniAOD output: which EDM collections survive.
-
-The flat tree is the analysis format, but it is a fixed set of quantities - if
-something turns out to be missing you have to go back to the grid. A slimmed
-MiniAOD alongside it keeps the full CMSSW objects, so re-vertexing or adding a
-variable later is a local reprocessing rather than a re-download.
-
-Groups are named after physics, not after EDM type names, for the same reason
-content configs are: nobody should have to know that vector<pat::Jet> is spelled
-"patJets" in an outputCommands string. Keeps are written label-first
-("keep *_slimmedJets_*_*") because that form is robust - getting a friendly class
-name slightly wrong silently keeps nothing.
+Turns the physics names in a preset's miniaod block into the EDM outputCommands that write a slimmed MiniAOD.
 """
+
 
 GROUPS = {
     # Always included; the file is not usable without these.
@@ -31,7 +21,6 @@ GROUPS = {
     "jets": [
         "keep *_slimmedJets_*_*",
         "keep *_slimmedJetsPuppi_*_*",
-        # tagInfos are per-jet track/vertex detail and dominate the jet size.
         "drop *_slimmedJets_tagInfos_*",
         "drop *_slimmedJetsPuppi_tagInfos_*",
     ],
@@ -47,7 +36,6 @@ GROUPS = {
         "keep *_slimmedElectrons_*_*",
     ],
     "displacedLeptons": [
-        # Run 3 MiniAOD only. Harmless on Run 2 - a keep that matches nothing.
         "keep *_slimmedDisplacedMuons_*_*",
         "keep *_displacedStandAloneMuons_*_*",
         "keep *_displacedGlobalMuons_*_*",
@@ -67,8 +55,6 @@ GROUPS = {
         "keep *_lostTracks_*_*",
     ],
     "displacedTracks": [
-        # reco::Track, with full track parameters rather than packed ones.
-        # Present in Run 3 MiniAOD; absent in Run 2 UL, where this keeps nothing.
         "keep *_displacedTracks_*_*",
     ],
     "vertices": [
@@ -86,7 +72,6 @@ GROUPS = {
         "keep *_genMetTrue_*_*",
     ],
     "egammaExtras": [
-        # Needed if electron IDs are to be recomputed downstream. Large.
         "keep *_reducedEgamma_*_*",
     ],
     "scouting": [

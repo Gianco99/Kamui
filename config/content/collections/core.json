@@ -1,0 +1,214 @@
+{
+  "_doc": "Event-level content every ntuple needs. Included by every preset.",
+  "collections": {
+    "PV": {
+      "type": "vertex",
+      "src": "offlineSlimmedPrimaryVertices",
+      "doc": "Offline primary vertices (all of them, so nPV is the true PV multiplicity)",
+      "variables": {
+        "x": {
+          "expr": "position().x()",
+          "type": "float",
+          "doc": "PV x [cm]",
+          "precision": 12
+        },
+        "y": {
+          "expr": "position().y()",
+          "type": "float",
+          "doc": "PV y [cm]",
+          "precision": 12
+        },
+        "z": {
+          "expr": "position().z()",
+          "type": "float",
+          "doc": "PV z [cm]",
+          "precision": 14
+        },
+        "xErr": {
+          "expr": "xError()",
+          "type": "float",
+          "doc": "PV x uncertainty [cm]",
+          "precision": 8
+        },
+        "yErr": {
+          "expr": "yError()",
+          "type": "float",
+          "doc": "PV y uncertainty [cm]",
+          "precision": 8
+        },
+        "zErr": {
+          "expr": "zError()",
+          "type": "float",
+          "doc": "PV z uncertainty [cm]",
+          "precision": 8
+        },
+        "ndof": {
+          "expr": "ndof()",
+          "type": "float",
+          "doc": "Number of degrees of freedom",
+          "precision": 8
+        },
+        "chi2": {
+          "expr": "normalizedChi2()",
+          "type": "float",
+          "doc": "chi2/ndof",
+          "precision": 8
+        },
+        "nTracks": {
+          "expr": "tracksSize()",
+          "type": "uint16",
+          "doc": "Number of tracks fitted to this PV"
+        },
+        "isFake": {
+          "expr": "isFake()",
+          "type": "bool",
+          "doc": "Vertex is a placeholder, not a real fit"
+        },
+        "isGood": {
+          "expr": "!isFake() && ndof() > 4 && abs(position().z()) <= 24 && position().Rho() <= 2",
+          "type": "bool",
+          "doc": "Standard good-PV definition"
+        }
+      }
+    },
+    "BeamSpot": {
+      "type": "beamSpot",
+      "src": "offlineBeamSpot",
+      "doc": "Offline beamspot - the reference for dxy of displaced tracks",
+      "variables": {
+        "x": {
+          "expr": "x0()",
+          "type": "float",
+          "doc": "Beamspot x at z=0 [cm]",
+          "precision": 14
+        },
+        "y": {
+          "expr": "y0()",
+          "type": "float",
+          "doc": "Beamspot y at z=0 [cm]",
+          "precision": 14
+        },
+        "z": {
+          "expr": "z0()",
+          "type": "float",
+          "doc": "Beamspot z [cm]",
+          "precision": 14
+        },
+        "sigmaZ": {
+          "expr": "sigmaZ()",
+          "type": "float",
+          "doc": "Beamspot length in z [cm]",
+          "precision": 10
+        },
+        "widthX": {
+          "expr": "BeamWidthX()",
+          "type": "float",
+          "doc": "Transverse width in x [cm]",
+          "precision": 10
+        },
+        "widthY": {
+          "expr": "BeamWidthY()",
+          "type": "float",
+          "doc": "Transverse width in y [cm]",
+          "precision": 10
+        },
+        "dxdz": {
+          "expr": "dxdz()",
+          "type": "float",
+          "doc": "Beam tilt dx/dz",
+          "precision": 10
+        },
+        "dydz": {
+          "expr": "dydz()",
+          "type": "float",
+          "doc": "Beam tilt dy/dz",
+          "precision": 10
+        }
+      }
+    },
+    "MET": {
+      "type": "patMET",
+      "src": "slimmedMETs",
+      "singleton": true,
+      "doc": "Type-1 corrected PF MET",
+      "variables": {
+        "pt": {
+          "expr": "pt()",
+          "type": "float",
+          "doc": "MET [GeV]",
+          "precision": 10
+        },
+        "phi": {
+          "expr": "phi()",
+          "type": "float",
+          "doc": "MET phi",
+          "precision": 10
+        },
+        "sumEt": {
+          "expr": "sumEt()",
+          "type": "float",
+          "doc": "Scalar sum ET [GeV]",
+          "precision": 10
+        },
+        "significance": {
+          "expr": "metSignificance()",
+          "type": "float",
+          "doc": "MET significance",
+          "precision": 10
+        },
+        "caloPt": {
+          "expr": "caloMETPt()",
+          "type": "float",
+          "doc": "Calo MET [GeV]",
+          "precision": 10
+        }
+      }
+    },
+    "PuppiMET": {
+      "type": "patMET",
+      "src": "slimmedMETsPuppi",
+      "singleton": true,
+      "doc": "PUPPI MET",
+      "variables": {
+        "pt": {
+          "expr": "pt()",
+          "type": "float",
+          "doc": "PUPPI MET [GeV]",
+          "precision": 10
+        },
+        "phi": {
+          "expr": "phi()",
+          "type": "float",
+          "doc": "PUPPI MET phi",
+          "precision": 10
+        },
+        "sumEt": {
+          "expr": "sumEt()",
+          "type": "float",
+          "doc": "PUPPI scalar sum ET [GeV]",
+          "precision": 10
+        }
+      }
+    },
+    "Rho": {
+      "type": "global",
+      "doc": "Pileup energy densities",
+      "variables": {
+        "fastjetAll": {
+          "src": "fixedGridRhoFastjetAll",
+          "type": "double",
+          "doc": "Rho from all PF candidates (used by JECs)"
+        },
+        "fastjetCentral": {
+          "src": "fixedGridRhoFastjetCentral",
+          "type": "double",
+          "doc": "Rho, |eta| < 2.5"
+        }
+      }
+    }
+  },
+  "triggerBits": {
+    "process": "HLT",
+    "keepAll": true
+  }
+}

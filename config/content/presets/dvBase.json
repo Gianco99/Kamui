@@ -1,0 +1,18 @@
+{
+  "_doc": "Event, jets, leptons, vertices. No tracks, no gen. Use for data.",
+  "include": [
+    "core",
+    "jets",
+    "leptons",
+    "vertices"
+  ],
+  "miniaod": {
+    "keep": [
+      "jets",
+      "leptons",
+      "met",
+      "vertices",
+      "triggerObjects"
+    ]
+  }
+}

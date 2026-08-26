@@ -1,10 +1,10 @@
 Pass 1 - the claims
 -------------------
-Read docs/PLAN.txt, then docs/VALIDATION.txt, then SamplesFromDAS/CLAUDE.md. Roughly 210 lines. README.txt and the root CLAUDE.md are already done.
+Read docs/PLAN.txt, then docs/VALIDATION.txt, then production/CLAUDE.md. Roughly 210 lines. README.txt and the root CLAUDE.md are already done.
 
 Read these first, because everything else either backs up what they say or contradicts it. You are checking whether the claims are ones you would make, in words you would use.
 
-SamplesFromDAS/CLAUDE.md is the big unreviewed one at 95 lines, and it is now the single largest piece of agent-facing prose in the repo. It is written as flowing paragraphs rather than the scannable bullets you used in the root CLAUDE.md, and by your own standard that CLAUDE.md files stay human-readable, the bullet form is better. Converting it is probably the single highest-value edit in this pass. It also carries the Run 3 jet ID table, moved there when Plotting was deleted, and the glueball survey.
+production/CLAUDE.md is the big unreviewed one at 95 lines, and it is now the single largest piece of agent-facing prose in the repo. It is written as flowing paragraphs rather than the scannable bullets you used in the root CLAUDE.md, and by your own standard that CLAUDE.md files stay human-readable, the bullet form is better. Converting it is probably the single highest-value edit in this pass. It also carries the Run 3 jet ID table, moved there when Plotting was deleted, and the glueball survey.
 
 docs/legacy/README.txt is new and short, 22 lines, stating the archiving convention. Worth a read to check the convention says what you meant, since the two CLAUDE.md references now point at it rather than restating it.
 
@@ -44,14 +44,14 @@ content.py has a 24-line module docstring. Line 35 reads "is boilerplate the use
 
 config.py line 4, "Two rules make the JSON files readable without a schema in your head", is the same problem in a smaller file.
 
-The real question underneath all three: is a module docstring the right place for schema documentation at all, or should the schema live once in SamplesFromDAS/CLAUDE.md and the docstrings shrink to one line each? I lean toward the latter but did not do it.
+The real question underneath all three: is a module docstring the right place for schema documentation at all, or should the schema live once in production/CLAUDE.md and the docstrings shrink to one line each? I lean toward the latter but did not do it.
 
 Design choice to decide here: the grid axis format. An axis entry can be a plain string or a dict carrying several substitutions at once, like {"mode": "ggH", "dasMode": "GluGluH-"}. It is the least elegant thing in the repo and it exists because the exotic Higgs dataset names are irregular. If you can see a cleaner encoding, this is the moment.
 
 
 Pass 4 - the CMSSW boundary
 ---------------------------
-SamplesFromDAS/cmssw/kamuiNtuple_cfg.py (152 lines), SamplesFromDAS/cmssw/kamuiTables.py (126), kamui/slimming.py (128). About 400 lines.
+production/cmssw/kamuiNtuple_cfg.py (152 lines), production/cmssw/kamuiTables.py (126), kamui/slimming.py (128). About 400 lines.
 
 kamuiNtuple_cfg.py is the cmsRun config and is wiring only, no content decisions. kamuiTables.py turns resolved JSON into table producers. slimming.py maps physics-facing group names to EDM outputCommands for the slimmed MiniAOD.
 
@@ -62,7 +62,7 @@ Design choice: the biggest structural bet in the repo is that the flat tree is b
 
 Pass 5 - submission and tooling
 -------------------------------
-kamui/cli.py (289 lines), kamui/submit/condor.py (155), kamui/submit/crab.py (133), kamui/das.py (113), kamui/submit/common.py (81), SamplesFromDAS/cmssw/inspectMiniAOD.py (81), kamui/fetch.py (76), SamplesFromDAS/tools/triggerYields.py (166). About 1090 lines.
+kamui/cli.py (289 lines), kamui/submit/condor.py (155), kamui/submit/crab.py (133), kamui/das.py (113), kamui/submit/common.py (81), production/cmssw/inspectMiniAOD.py (81), kamui/fetch.py (76), tools/triggerYields.py (166). About 1090 lines.
 
 Most mechanical, least likely to need rework, skim unless something looks wrong. The part worth actual attention is the CLI help text, since it is what you will read at the terminal for the next year. fetch.py line 4 calls itself "the *old* workflow, kept deliberately", which is a comment about the repo's history rather than about what the function does. submit/common.py is 13 percent module docstring, which is high but no longer the outlier it was.
 
@@ -96,6 +96,6 @@ Verified on real files under CMSSW_16_1_2: all presets produce readable flat tre
 
 Also verified 2026-08-25 against DAS: all 24 Run 2 validation datasets exist and every event count matches the DVCode number transcribed into the sample config, 24 out of 24. So the validation set itself is sound and pass 2 can take run2Validation.json at face value.
 
-The glueball DAS survey is done, 2026-08-25, and written up in SamplesFromDAS/CLAUDE.md. No CMS dataset is called a glueball; HAHM HTo2A is the closest Run 3 family and covers our mass range; GluGluHToDarkShowers is enormous but is a different phenomenology. No sample configs were added, since it was scoped as a survey. McM was not checked, as it needs interactive auth.
+The glueball DAS survey is done, 2026-08-25, and written up in production/CLAUDE.md. No CMS dataset is called a glueball; HAHM HTo2A is the closest Run 3 family and covers our mass range; GluGluHToDarkShowers is enormous but is a different phenomenology. No sample configs were added, since it was scoped as a survey. McM was not checked, as it needs interactive auth.
 
 Not verified: nothing has been submitted anywhere. Two EDM output modules in one CRAB task is untested and may be refused. The condor +DesiredOS value is a guess.

@@ -37,7 +37,7 @@ def loadJson(path):
             raise ValueError(f"{path}: {e}") from None
     return stripComments(raw)
 
-def resolvePath(nameOrPath, searchDir):
+def _resolvePath(nameOrPath, searchDir):
     """Accept 'jets', 'jets.json' or an explicit path; return an existing path."""
     if os.path.sep in nameOrPath or nameOrPath.endswith(".json"):
         cand = nameOrPath if os.path.isabs(nameOrPath) else os.path.join(searchDir, nameOrPath)
@@ -45,14 +45,16 @@ def resolvePath(nameOrPath, searchDir):
             return cand
         if os.path.exists(nameOrPath):
             return nameOrPath
-    cand = os.path.join(searchDir, nameOrPath + ".json")
-    if os.path.exists(cand):
-        return cand
+    ## Search searchDir itself, then one level of subdirectories, so a name resolves without having to say which folder it lives in
+    for d in [searchDir] + [os.path.join(searchDir, x) for x in sorted(os.listdir(searchDir)) if os.path.isdir(os.path.join(searchDir, x))]:
+        cand = os.path.join(d, nameOrPath + ".json")
+        if os.path.exists(cand):
+            return cand
     raise FileNotFoundError(f"no config '{nameOrPath}' under {searchDir}")
 
 def loadWithIncludes(nameOrPath, searchDir, _seen=None):
     """Load a config and flatten its "include" chain (depth-first, deep-merged)."""
-    path = resolvePath(nameOrPath, searchDir)
+    path = _resolvePath(nameOrPath, searchDir)
     _seen = _seen if _seen is not None else []
     real = os.path.realpath(path)
     if real in _seen:

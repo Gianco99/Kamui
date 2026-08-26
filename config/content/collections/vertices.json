@@ -1,0 +1,79 @@
+{
+  "_doc": "IVF secondary vertices from MiniAOD. Not the analysis displaced vertices.",
+  "collections": {
+    "SV": {
+      "type": "secondaryVertex",
+      "src": "slimmedSecondaryVertices",
+      "cut": "",
+      "maxLen": 30,
+      "doc": "Inclusive vertex finder (IVF) secondary vertices",
+      "variables": {
+        "x": {
+          "expr": "position().x()",
+          "type": "float",
+          "doc": "SV x [cm]",
+          "precision": 12
+        },
+        "y": {
+          "expr": "position().y()",
+          "type": "float",
+          "doc": "SV y [cm]",
+          "precision": 12
+        },
+        "z": {
+          "expr": "position().z()",
+          "type": "float",
+          "doc": "SV z [cm]",
+          "precision": 14
+        },
+        "pt": {
+          "expr": "pt()",
+          "type": "float",
+          "doc": "Vector-summed pT of the tracks [GeV]",
+          "precision": 10
+        },
+        "eta": {
+          "expr": "eta()",
+          "type": "float",
+          "doc": "Pseudorapidity of the track sum",
+          "precision": 12
+        },
+        "phi": {
+          "expr": "phi()",
+          "type": "float",
+          "doc": "Azimuth of the track sum",
+          "precision": 12
+        },
+        "mass": {
+          "expr": "mass()",
+          "type": "float",
+          "doc": "Invariant mass of the tracks [GeV]",
+          "precision": 10
+        },
+        "ndof": {
+          "expr": "vertexNdof()",
+          "type": "float",
+          "doc": "Degrees of freedom of the fit",
+          "precision": 8
+        },
+        "chi2": {
+          "expr": "vertexNormalizedChi2()",
+          "type": "float",
+          "doc": "chi2/ndof of the fit",
+          "precision": 8
+        },
+        "nTracks": {
+          "expr": "numberOfDaughters()",
+          "type": "uint8",
+          "doc": "Number of tracks in the vertex"
+        },
+        "rho": {
+          "expr": "vertex().Rho()",
+          "type": "float",
+          "doc": "Transverse distance from (0,0) [cm]",
+          "precision": 12
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,224 @@
+{
+  "_doc": "Exotic Higgs H->SS->4d. Summer24. Central production. Caveats in CLAUDE.md.",
+  "family": "exoticHiggs4d2024",
+  "defaults": {
+    "era": "Summer24",
+    "isMC": true,
+    "dasInstance": "prod/global",
+    "content": "dvSignal",
+    "tags": [
+      "signal",
+      "exoticHiggs",
+      "run3"
+    ]
+  },
+  "grids": [
+    {
+      "_doc": "Six production modes x mS {15,40,55} GeV x ctau {0.1,1,10} mm = 54 points.",
+      "name": "{mode}-2S-4D_mS{mS}_ctau{ctau}mm_2024",
+      "dataset": "/{dasMode}Hto2Sto4D_Par-ctauS-{ctau}-MH-125-MS-{mS}_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "axes": {
+        "mode": [
+          {
+            "mode": "ggH",
+            "dasMode": "GluGluH-"
+          },
+          {
+            "mode": "VBFH",
+            "dasMode": "VBFH-"
+          },
+          {
+            "mode": "WplusH",
+            "dasMode": "WplusH_"
+          },
+          {
+            "mode": "WminusH",
+            "dasMode": "WminusH_"
+          },
+          {
+            "mode": "ZH",
+            "dasMode": "ZH_"
+          },
+          {
+            "mode": "ttH",
+            "dasMode": "ttH_"
+          }
+        ],
+        "mS": [
+          "15",
+          "40",
+          "55"
+        ],
+        "ctau": [
+          "0p1",
+          "1",
+          "10"
+        ]
+      }
+    }
+  ],
+  "overrides": {
+    "ggH-2S-4D_mS15_ctau0p1mm_2024": {
+      "nFilesFor10k": 5
+    },
+    "ggH-2S-4D_mS15_ctau1mm_2024": {
+      "nFilesFor10k": 3
+    },
+    "ggH-2S-4D_mS15_ctau10mm_2024": {
+      "nFilesFor10k": 3
+    },
+    "ggH-2S-4D_mS40_ctau0p1mm_2024": {
+      "nFilesFor10k": 4
+    },
+    "ggH-2S-4D_mS40_ctau1mm_2024": {
+      "nFilesFor10k": 3
+    },
+    "ggH-2S-4D_mS40_ctau10mm_2024": {
+      "nFilesFor10k": 3
+    },
+    "ggH-2S-4D_mS55_ctau0p1mm_2024": {
+      "nFilesFor10k": 3
+    },
+    "ggH-2S-4D_mS55_ctau1mm_2024": {
+      "nFilesFor10k": 4
+    },
+    "ggH-2S-4D_mS55_ctau10mm_2024": {
+      "nFilesFor10k": 3
+    },
+    "VBFH-2S-4D_mS15_ctau0p1mm_2024": {
+      "nFilesFor10k": 1
+    },
+    "VBFH-2S-4D_mS15_ctau1mm_2024": {
+      "nFilesFor10k": 3
+    },
+    "VBFH-2S-4D_mS15_ctau10mm_2024": {
+      "nFilesFor10k": 3
+    },
+    "VBFH-2S-4D_mS40_ctau0p1mm_2024": {
+      "nFilesFor10k": 1
+    },
+    "VBFH-2S-4D_mS40_ctau1mm_2024": {
+      "nFilesFor10k": 3
+    },
+    "VBFH-2S-4D_mS40_ctau10mm_2024": {
+      "nFilesFor10k": 2
+    },
+    "VBFH-2S-4D_mS55_ctau0p1mm_2024": {
+      "nFilesFor10k": 5
+    },
+    "VBFH-2S-4D_mS55_ctau1mm_2024": {
+      "nFilesFor10k": 3
+    },
+    "VBFH-2S-4D_mS55_ctau10mm_2024": {
+      "nFilesFor10k": 1
+    },
+    "WplusH-2S-4D_mS15_ctau0p1mm_2024": {
+      "nFilesFor10k": 8
+    },
+    "WplusH-2S-4D_mS15_ctau1mm_2024": {
+      "nFilesFor10k": 8
+    },
+    "WplusH-2S-4D_mS15_ctau10mm_2024": {
+      "nFilesFor10k": 4
+    },
+    "WplusH-2S-4D_mS40_ctau0p1mm_2024": {
+      "nFilesFor10k": 3
+    },
+    "WplusH-2S-4D_mS40_ctau1mm_2024": {
+      "nFilesFor10k": 17
+    },
+    "WplusH-2S-4D_mS40_ctau10mm_2024": {
+      "nFilesFor10k": 12
+    },
+    "WplusH-2S-4D_mS55_ctau0p1mm_2024": {
+      "nFilesFor10k": 11
+    },
+    "WplusH-2S-4D_mS55_ctau1mm_2024": {
+      "nFilesFor10k": 5
+    },
+    "WplusH-2S-4D_mS55_ctau10mm_2024": {
+      "nFilesFor10k": 15
+    },
+    "WminusH-2S-4D_mS15_ctau0p1mm_2024": {
+      "nFilesFor10k": 13
+    },
+    "WminusH-2S-4D_mS15_ctau1mm_2024": {
+      "nFilesFor10k": 3
+    },
+    "WminusH-2S-4D_mS15_ctau10mm_2024": {
+      "nFilesFor10k": 28
+    },
+    "WminusH-2S-4D_mS40_ctau0p1mm_2024": {
+      "nFilesFor10k": 3
+    },
+    "WminusH-2S-4D_mS40_ctau1mm_2024": {
+      "nFilesFor10k": 11
+    },
+    "WminusH-2S-4D_mS40_ctau10mm_2024": {
+      "nFilesFor10k": 9
+    },
+    "WminusH-2S-4D_mS55_ctau0p1mm_2024": {
+      "nFilesFor10k": 5
+    },
+    "WminusH-2S-4D_mS55_ctau1mm_2024": {
+      "nFilesFor10k": 2
+    },
+    "WminusH-2S-4D_mS55_ctau10mm_2024": {
+      "nFilesFor10k": 9
+    },
+    "ZH-2S-4D_mS15_ctau0p1mm_2024": {
+      "nFilesFor10k": 24
+    },
+    "ZH-2S-4D_mS15_ctau1mm_2024": {
+      "nFilesFor10k": 4
+    },
+    "ZH-2S-4D_mS15_ctau10mm_2024": {
+      "nFilesFor10k": 36
+    },
+    "ZH-2S-4D_mS40_ctau0p1mm_2024": {
+      "nFilesFor10k": 2
+    },
+    "ZH-2S-4D_mS40_ctau1mm_2024": {
+      "nFilesFor10k": 27
+    },
+    "ZH-2S-4D_mS40_ctau10mm_2024": {
+      "nFilesFor10k": 3
+    },
+    "ZH-2S-4D_mS55_ctau0p1mm_2024": {
+      "nFilesFor10k": 24
+    },
+    "ZH-2S-4D_mS55_ctau1mm_2024": {
+      "nFilesFor10k": 21
+    },
+    "ZH-2S-4D_mS55_ctau10mm_2024": {
+      "nFilesFor10k": 19
+    },
+    "ttH-2S-4D_mS15_ctau0p1mm_2024": {
+      "nFilesFor10k": 2
+    },
+    "ttH-2S-4D_mS15_ctau1mm_2024": {
+      "nFilesFor10k": 2
+    },
+    "ttH-2S-4D_mS15_ctau10mm_2024": {
+      "nFilesFor10k": 5
+    },
+    "ttH-2S-4D_mS40_ctau0p1mm_2024": {
+      "nFilesFor10k": 5
+    },
+    "ttH-2S-4D_mS40_ctau1mm_2024": {
+      "nFilesFor10k": 6
+    },
+    "ttH-2S-4D_mS40_ctau10mm_2024": {
+      "nFilesFor10k": 5
+    },
+    "ttH-2S-4D_mS55_ctau0p1mm_2024": {
+      "nFilesFor10k": 7
+    },
+    "ttH-2S-4D_mS55_ctau1mm_2024": {
+      "nFilesFor10k": 6
+    },
+    "ttH-2S-4D_mS55_ctau10mm_2024": {
+      "nFilesFor10k": 6
+    }
+  }
+}

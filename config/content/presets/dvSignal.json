@@ -1,0 +1,17 @@
+{
+  "_doc": "Adds generator information to dvBase. The convention for MC families.",
+  "include": [
+    "dvBase",
+    "gen"
+  ],
+  "miniaod": {
+    "keep": [
+      "jets",
+      "leptons",
+      "met",
+      "vertices",
+      "triggerObjects",
+      "gen"
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "_doc": "Adds tracks to dvSignal. Needed for offline vertexing, and much larger.",
+  "include": [
+    "dvSignal",
+    "tracks"
+  ],
+  "miniaod": {
+    "keep": [
+      "jets",
+      "leptons",
+      "met",
+      "vertices",
+      "triggerObjects",
+      "gen",
+      "tracks",
+      "displacedTracks",
+      "displacedLeptons"
+    ]
+  }
+}

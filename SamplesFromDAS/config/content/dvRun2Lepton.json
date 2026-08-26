@@ -1,6 +1,0 @@
-{
-  "_doc": "Run 2 validation, lepton-triggered channel. Identical to dvRun2Displaced except for the HLT skim.",
-  "_note": "DVCode's lepton channel also applies an offline lepton pT cut (muon 27/30/27, electron 30/38/35 for 2016/2017/2018). Not applied - trigger only. Muon_pt / Electron_pt are in the tree, so that cut is reproducible downstream.",
-  "include": ["dvRun2Displaced"],
-  "skim": {"triggers": "run2Lepton"}
-}

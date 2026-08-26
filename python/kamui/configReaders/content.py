@@ -1,38 +1,19 @@
 """
-Content configs: "which kinematics do we save".
-
-A content config is a set of named *collections*. Each collection becomes one
-group of branches in the output tree (Jet_pt, Jet_eta, ...). You describe it
-physics-side; this module translates it into the CMSSW plugin that does the work,
-so no one editing config/content/*.json has to know a plugin name.
-
-Collection schema
------------------
-  "Jet": {
-    "type":      "patJet",              # see KIND_TO_PLUGIN below
-    "src":       "slimmedJetsPuppi",    # MiniAOD InputTag
-    "cut":       "pt > 20",             # optional, CMSSW string cut
-    "maxLen":    40,                    # optional, keep at most N objects
-    "mcOnly":    true,                  # optional, dropped when running on data
-    "doc":       "AK4 PUPPI jets",
-    "variables": { "pt": {"expr": "pt", "type": "float", "doc": "...", "precision": 10} }
-  }
-
-`expr` is a CMSSW string-object function evaluated on the object: any const
-method of the C++ class, with ?: ternaries, && || and arithmetic. Types:
-float, double, int, uint, int16, uint16, uint8, bool.
-`precision` is the number of retained mantissa bits (float only) - the main
-storage knob. 10 bits ~ 0.1% relative, plenty for pt/eta/phi.
+Turns a content config into a form the cmsRun config consumes.
+The file format is documented in config/content/README.txt, and its details in the CLAUDE.md beside it.
 """
 
+# Import Block
+
+## Standard Python imports
 import os
 
+## Kamui modules
 from ..foundations import paths
 from ..foundations.config import loadWithIncludes
 from .slimming import buildOutputCommands
 
-# Physics-facing kind -> CMSSW plugin. Everything after "Simple...FlatTableProducer"
-# is boilerplate the user should never have to type.
+# CMSSW plugin language
 KIND_TO_PLUGIN = {
     "patJet":           "SimplePATJetFlatTableProducer",
     "patMuon":          "SimplePATMuonFlatTableProducer",
@@ -40,22 +21,22 @@ KIND_TO_PLUGIN = {
     "patPhoton":        "SimplePATPhotonFlatTableProducer",
     "patTau":           "SimplePATTauFlatTableProducer",
     "patMET":           "SimplePATMETFlatTableProducer",
-    "packedCandidate":  "SimplePATCandidateFlatTableProducer",   # packedPFCandidates / lostTracks
+    "packedCandidate":  "SimplePATCandidateFlatTableProducer",
     "isolatedTrack":    "SimplePATIsolatedTrackFlatTableProducer",
-    "vertex":           "SimpleVertexFlatTableProducer",         # reco::Vertex (primary vertices)
-    "secondaryVertex":  "SimpleSecondaryVertexFlatTableProducer",# reco::VertexCompositePtrCandidate
+    "vertex":           "SimpleVertexFlatTableProducer",
+    "secondaryVertex":  "SimpleSecondaryVertexFlatTableProducer",
     "genParticle":      "SimpleGenParticleFlatTableProducer",
     "candidate":        "SimpleCandidateFlatTableProducer",
-    "beamSpot":         "SimpleBeamspotFlatTableProducer",       # always singleton
-    "genEvent":         "SimpleGenEventFlatTableProducer",       # always singleton
-    "global":           "GlobalVariablesTableProducer",          # event-level scalars from any product
-    "pileup":           "NPUTablesProducer",                     # fixed content, no variables
-    "genWeight":        "GenWeightsTableProducer",               # fixed content, no variables
+    "beamSpot":         "SimpleBeamspotFlatTableProducer",
+    "genEvent":         "SimpleGenEventFlatTableProducer",
+    "global":           "GlobalVariablesTableProducer",
+    "pileup":           "NPUTablesProducer",
+    "genWeight":        "GenWeightsTableProducer",
 }
 
-# Kinds whose producer takes no `src`/`cut`/`variables` in the usual form.
+# Kinds whose producer takes no `src`/`cut`/`variables`
 FIXED_CONTENT_KINDS = {"pileup", "genWeight"}
-# Kinds that are inherently one-per-event (no `cut`, no `singleton` parameter).
+# Kinds that are inherently one-per-event
 ALWAYS_SINGLETON_KINDS = {"beamSpot", "genEvent"}
 # `global` uses externalVariables-style entries (src/type/doc) instead of expr.
 EXTVAR_KINDS = {"global"}
@@ -64,16 +45,21 @@ VALID_TYPES = {"float", "double", "int", "uint", "int16", "uint16", "uint8", "bo
 
 
 def listPresets(contentDir=None):
+    """Every content config, grouped by the subdirectory it lives in. Returns {group: [names]}."""
     contentDir = contentDir or paths.CONTENT_DIR
-    return sorted(f[:-5] for f in os.listdir(contentDir) if f.endswith(".json"))
+    out = {}
+    for d in sorted(os.listdir(contentDir)):
+        full = os.path.join(contentDir, d)
+        if os.path.isdir(full):
+            out[d] = sorted(f[:-5] for f in os.listdir(full) if f.endswith(".json"))
+    loose = sorted(f[:-5] for f in os.listdir(contentDir) if f.endswith(".json"))
+    if loose:
+        out[""] = loose
+    return out
 
 
 def resolveContent(name, contentDir=None, isMC=True):
-    """
-    Flatten a content preset (following "include") and translate it into the
-    job-ready form the cmsRun config consumes:
-      {"name":..., "isMC":..., "collections": {name: {plugin, src, ...}}, "triggers":..., "skim":...}
-    """
+    """Flatten a preset's include chain and translate it into what a job receives: name, isMC, collections, triggerBits, skim, miniaod."""
     contentDir = contentDir or paths.CONTENT_DIR
     cfg = loadWithIncludes(name, contentDir)
 
@@ -91,8 +77,8 @@ def resolveContent(name, contentDir=None, isMC=True):
         "name":        name,
         "isMC":        isMC,
         "collections": collections,
-        "triggers":    cfg.get("triggers", {}),
-        "skim":        resolveSkim(cfg.get("skim", {})),
+        "triggerBits": cfg.get("triggerBits", {}),
+        "skim":        _resolveSkim(cfg.get("skim", {})),
         "miniaod":     _resolveMiniaod(cfg.get("miniaod", {}), isMC),
     }
 
@@ -107,12 +93,9 @@ def _resolveMiniaod(cfg, isMC):
     }
 
 
-def resolveSkim(skim):
+def _resolveSkim(skim):
     """
-    Expand a skim block. A skim may either spell its paths out inline, or - much
-    better - name a trigger config:  {"triggers": "run2Displaced"}
-    Trigger lists live in config/triggers/ so one channel definition is shared by
-    every preset that uses it, and there is exactly one place to correct it.
+    Expand a skim block.
     """
     if not skim:
         return {}
@@ -160,8 +143,7 @@ def _translate(cname, c):
 
     out["variables"] = _checkVars(cname, c.get("variables", {}))
     if kind in ALWAYS_SINGLETON_KINDS:
-        # These plugins are one-per-event by construction and reject a `singleton`
-        # parameter, so flag it separately for the config builder.
+        # These plugins are one-per-event by construction and reject a `singleton` parameter
         out["singleton"] = True
         out["singletonImplicit"] = True
     else:
@@ -223,7 +205,7 @@ def validateTriggers():
     for f in sorted(x for x in os.listdir(paths.TRIGGERS_DIR) if x.endswith(".json")):
         try:
             trig = loadWithIncludes(f[:-5], paths.TRIGGERS_DIR)
-        except Exception as e:                                        # noqa: BLE001
+        except Exception as e:
             problems.append(f"trigger config '{f}': {e}")
             continue
         if not trig.get("paths"):

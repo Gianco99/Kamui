@@ -1,0 +1,214 @@
+{
+  "_doc": "Tracks and lost tracks, the input to offline vertexing. Much the largest table.",
+  "collections": {
+    "Track": {
+      "type": "packedCandidate",
+      "src": "packedPFCandidates",
+      "cut": "charge != 0 && hasTrackDetails() && pt > 1.0",
+      "doc": "Charged packedPFCandidates with full track details, pT > 1 GeV",
+      "variables": {
+        "pt": {
+          "expr": "pt()",
+          "type": "float",
+          "doc": "Track pT [GeV]",
+          "precision": 10
+        },
+        "eta": {
+          "expr": "eta()",
+          "type": "float",
+          "doc": "Pseudorapidity",
+          "precision": 12
+        },
+        "phi": {
+          "expr": "phi()",
+          "type": "float",
+          "doc": "Azimuthal angle",
+          "precision": 12
+        },
+        "charge": {
+          "expr": "charge()",
+          "type": "int16",
+          "doc": "Electric charge"
+        },
+        "pdgId": {
+          "expr": "pdgId()",
+          "type": "int16",
+          "doc": "PF candidate PDG id"
+        },
+        "dxy": {
+          "expr": "dxy()",
+          "type": "float",
+          "doc": "dxy wrt the associated PV [cm]",
+          "precision": 12
+        },
+        "dxyErr": {
+          "expr": "dxyError()",
+          "type": "float",
+          "doc": "dxy uncertainty [cm]",
+          "precision": 10
+        },
+        "dz": {
+          "expr": "dz()",
+          "type": "float",
+          "doc": "dz wrt the associated PV [cm]",
+          "precision": 12
+        },
+        "dzErr": {
+          "expr": "dzError()",
+          "type": "float",
+          "doc": "dz uncertainty [cm]",
+          "precision": 10
+        },
+        "ptErr": {
+          "expr": "?hasTrackDetails()?pseudoTrack().ptError():-1",
+          "type": "float",
+          "doc": "pT uncertainty [GeV]",
+          "precision": 10
+        },
+        "normChi2": {
+          "expr": "?hasTrackDetails()?pseudoTrack().normalizedChi2():-1",
+          "type": "float",
+          "doc": "Track fit chi2/ndof",
+          "precision": 8
+        },
+        "nHits": {
+          "expr": "numberOfHits()",
+          "type": "uint8",
+          "doc": "Total tracker hits"
+        },
+        "nPixelHits": {
+          "expr": "numberOfPixelHits()",
+          "type": "uint8",
+          "doc": "Pixel hits"
+        },
+        "nPixelLayers": {
+          "expr": "pixelLayersWithMeasurement()",
+          "type": "uint8",
+          "doc": "Pixel layers with a measurement"
+        },
+        "nStripLayers": {
+          "expr": "stripLayersWithMeasurement()",
+          "type": "uint8",
+          "doc": "Strip layers with a measurement"
+        },
+        "highPurity": {
+          "expr": "trackHighPurity()",
+          "type": "bool",
+          "doc": "Track passes highPurity"
+        },
+        "fromPV": {
+          "expr": "fromPV()",
+          "type": "uint8",
+          "doc": "PV association quality (3 = used in PV fit, 0 = unrelated)"
+        },
+        "pvIdx": {
+          "expr": "vertexRef().key()",
+          "type": "int16",
+          "doc": "Index into the PV collection this track is associated with"
+        },
+        "lostInnerHits": {
+          "expr": "lostInnerHits()",
+          "type": "int16",
+          "doc": "-1 valid inner hit, 0 none lost, 1+ inner hits lost (displaced-track handle)"
+        }
+      }
+    },
+    "LostTrack": {
+      "type": "packedCandidate",
+      "src": "lostTracks",
+      "cut": "charge != 0 && hasTrackDetails() && pt > 1.0",
+      "doc": "Tracks not associated to any PF candidate - a large fraction of genuinely displaced tracks",
+      "variables": {
+        "pt": {
+          "expr": "pt()",
+          "type": "float",
+          "doc": "Track pT [GeV]",
+          "precision": 10
+        },
+        "ptErr": {
+          "expr": "?hasTrackDetails()?pseudoTrack().ptError():-1",
+          "type": "float",
+          "doc": "pT uncertainty [GeV]",
+          "precision": 10
+        },
+        "eta": {
+          "expr": "eta()",
+          "type": "float",
+          "doc": "Pseudorapidity",
+          "precision": 12
+        },
+        "phi": {
+          "expr": "phi()",
+          "type": "float",
+          "doc": "Azimuthal angle",
+          "precision": 12
+        },
+        "charge": {
+          "expr": "charge()",
+          "type": "int16",
+          "doc": "Electric charge"
+        },
+        "dxy": {
+          "expr": "dxy()",
+          "type": "float",
+          "doc": "dxy wrt the associated PV [cm]",
+          "precision": 12
+        },
+        "dxyErr": {
+          "expr": "dxyError()",
+          "type": "float",
+          "doc": "dxy uncertainty [cm]",
+          "precision": 10
+        },
+        "dz": {
+          "expr": "dz()",
+          "type": "float",
+          "doc": "dz wrt the associated PV [cm]",
+          "precision": 12
+        },
+        "dzErr": {
+          "expr": "dzError()",
+          "type": "float",
+          "doc": "dz uncertainty [cm]",
+          "precision": 10
+        },
+        "normChi2": {
+          "expr": "?hasTrackDetails()?pseudoTrack().normalizedChi2():-1",
+          "type": "float",
+          "doc": "Track fit chi2/ndof",
+          "precision": 8
+        },
+        "nHits": {
+          "expr": "numberOfHits()",
+          "type": "uint8",
+          "doc": "Total tracker hits"
+        },
+        "nPixelHits": {
+          "expr": "numberOfPixelHits()",
+          "type": "uint8",
+          "doc": "Pixel hits"
+        },
+        "nPixelLayers": {
+          "expr": "pixelLayersWithMeasurement()",
+          "type": "uint8",
+          "doc": "Pixel layers with a measurement"
+        },
+        "nStripLayers": {
+          "expr": "stripLayersWithMeasurement()",
+          "type": "uint8",
+          "doc": "Strip layers with a measurement"
+        },
+        "highPurity": {
+          "expr": "trackHighPurity()",
+          "type": "bool",
+          "doc": "Track passes highPurity"
+        },
+        "lostInnerHits": {
+          "expr": "lostInnerHits()",
+          "type": "int16",
+          "doc": "-1 valid inner hit, 0 none lost, 1+ inner hits lost"
+        }
+      }
+    }
+  }
+}

@@ -10,7 +10,7 @@ Scope is triggers only. No vertexing, no offline event filter, no analysis selec
 
 What is in the validation set
 -----------------------------
-24 samples, in SamplesFromDAS/config/samples/run2Validation.json. Dataset paths and event counts were copied out of DVCode's JMTucker/Tools/python/Samples.py on 2026-08-25, so they are the same datasets DVCode ran on, not lookalikes.
+24 samples, in config/samples/run2Validation.json. Dataset paths and event counts were copied out of DVCode's JMTucker/Tools/python/Samples.py on 2026-08-25, so they are the same datasets DVCode ran on, not lookalikes.
 
 Displacement-triggered channel, content preset dvRun2Displaced:
 
@@ -28,7 +28,7 @@ The representative points are the ones the analysis actually cares about: mS 55 
 
 The triggers
 ------------
-Taken verbatim from DVCode JMTucker/MFVNeutralino/python/TriggerFilter_cfi.py and stored in SamplesFromDAS/config/triggers/. The displacement channel is the OR of bjet_paths plus displaced_dijet_paths, 11 paths, matching mfvTriggerFilterBjetsORDisplacedDijet. The lepton channel is the OR of electron_paths plus muon_paths, 8 paths, matching mfvTriggerFilterLeptonsOnly.
+Taken verbatim from DVCode JMTucker/MFVNeutralino/python/TriggerFilter_cfi.py and stored in config/triggers/. The displacement channel is the OR of bjet_paths plus displaced_dijet_paths, 11 paths, matching mfvTriggerFilterBjetsORDisplacedDijet. The lepton channel is the OR of electron_paths plus muon_paths, 8 paths, matching mfvTriggerFilterLeptonsOnly.
 
 One detail worth understanding, because it looks like a bug and is not: DVCode uses a single path list for all four Run 2 eras and sets throw = False, so a path that is absent from a given year's menu simply never fires. We do exactly the same. That is why there is no per-year path list here. Adding one would change the answer relative to DVCode. Each trigger config does record which paths belong to which era's menu under _pathsByEra, but that is bookkeeping and is not used at runtime.
 
@@ -48,7 +48,7 @@ Procedure
 ---------
 First submit the validation set. Both channels come along automatically because each sample names its own content preset.
 
-  cd SamplesFromDAS
+  cd Kamui
   ./kamui query  --tag validation                    # sanity-check that DAS sees them
   ./kamui submit --tag validation --task run2val
 

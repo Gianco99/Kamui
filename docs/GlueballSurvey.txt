@@ -1,0 +1,17 @@
+Glueball sample survey
+======================
+Run 2026-08-25 against DAS, prod/global and prod/phys03. Reproduce with kamui find, for example ./kamui find '/*HAHM*/*/MINIAODSIM'.
+
+Headline: no dataset in CMS is called a glueball, in either prod/global or prod/phys03. Neither is there anything under HiddenValley, TwinHiggs, FoldedSUSY or NeutralNaturalness in Run 3 (HV_ has 327 Run 2 datasets and zero Run 3). Searching for the word is a dead end — the physics ships under other banners. Two of those matter to us.
+
+HAHM, the Hidden Abelian Higgs Model, is the closest thing to a glueball sample in Run 3. 128 Run 3 datasets, all five eras plus 21 in Summer24, named HAHM-HTo2A-ATo2B-ATo2G_Par-M-*. That is H to two scalars, each decaying to bb or gg, with the scalar mass scanned from 12 to 60 GeV. Both the topology and the mass range are what a Higgs-portal hidden glueball gives you, and the mass range straight-up covers our existing mS 15/40/55 grid. If glueballs enter scope, this is the family to look at first, not a new request.
+
+GluGluHToDarkShowers is much larger but is a different phenomenology. 959 central Run 3 datasets across Summer22, 22EE, 23, 23BPix and 24, plus 168 private ones in Summer24, under scenario names ScenarioA, ScenarioB1, ScenarioB2, ScenarioC, HP and GluP. The scanned parameters are the dark pion mass mpi from 1 to 10 GeV, mA from 0.25 to 8 GeV, and ctau from 0.1 mm out to 100 m. That is a high-multiplicity shower of soft dark hadrons rather than one heavy long-lived scalar, so it is adjacent to us rather than ours. Worth knowing it exists and is enormous before anyone requests anything in this space.
+
+One caveat with the same shape as our ggH filter problem: 288 of the 959 central dark shower datasets carry a PTH-80 filter (Higgs pT above 80 GeV) and the other 671 do not, and none of the 168 private Summer24 ones do. Mixing filtered and unfiltered points without noticing would be an easy and expensive mistake, exactly as with the Run 2 versus Run 3 ggH gen-HT filter.
+
+Also surveyed and less relevant: SUEP has 61 Run 3 datasets (GluGluToSUEP_T*, Summer22 through 23BPix, none seen in Summer24) but is soft and isotropic rather than displaced; DarkPhoton has 215 Run 3 datasets that are overwhelmingly monojet; and HToZdZd exists only in Run 2, with 87 datasets and no Run 3 equivalent.
+
+Tentative conclusion for the sample plan: a dedicated glueball request is probably not needed. The HAHM Hto2A grid plus our existing Hto2Sto4B grid already covers the glueball-like topology and mass range. What is genuinely missing depends on whether we want the dark-shower high-multiplicity regime, and that is already covered centrally about as well as anything in this analysis.
+
+Not checked: McM, for anything in production rather than on disk — it needs interactive auth. The DAS side is complete. Reproduce with kamui find, for example ./kamui find '/*HAHM*/*/MINIAODSIM' or ./kamui find '/*GluGluHToDarkShowers*/*/MINIAODSIM' --instance prod/phys03.

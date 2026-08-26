@@ -1,0 +1,9 @@
+{
+  "_doc": "Run 2 validation, lepton-triggered channel. dvRun2Displaced with a different skim.",
+  "include": [
+    "dvRun2Displaced"
+  ],
+  "skim": {
+    "triggers": "run2Lepton"
+  }
+}

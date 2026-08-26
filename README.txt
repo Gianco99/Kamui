@@ -5,7 +5,7 @@ A spiritual successor to JMTucker.
 
 The philosophy behind this repo is to utilize easy to edit, human-readable configuration files that compartmentalize the physics we want to study. It contains a CLI called Kamui which allows users to perform any task. It also utilizes CLAUDE.md and README.txt files in each subdirectory to track important design choices so that both the user or an AI helper are able to easily understand the code.
 
-Important Note: Even though AI is used in the development is this framework, every single commit and piece of written code MUST BE HUMAN-REVIEWED before it is merged!
+Important Note: Even though AI is used in the development of this framework, every single commit and piece of written code MUST BE HUMAN-REVIEWED before it is merged!
 
 
 Layout
@@ -14,11 +14,13 @@ The root directory holds this README.txt, a CLAUDE.md documenting general design
 
   kamui             The CLI entry point
   python/kamui/     The framework itself
-  SamplesFromDAS/   DAS catalog, content configs, trigger configs, job submission, cmsRun config
+  config/           Sample, content, trigger and site configs, shared by every stage
+  production/       Turning datasets into ntuples: the cmsRun config and the job areas
+  tools/            Standalone scripts for checking what came out
   docs/             Transient planning and reference documents
   CLAUDE.md         Conventions for the AI
 
-Each subdirectory carries its own CLAUDE.md holding the agent-facing context for it.
+Subdirectories carry their own CLAUDE.md where there is agent-facing context to record.
 
 
 Quick Start - CMSSW
@@ -43,4 +45,4 @@ Everything runs through one command, ./kamui, from the repo root.
 
   ./kamui --help                       List every command
 
-The full command reference are documented in detail in python/kamui/README.txt.
+The full command reference is in python/kamui/README.txt.

@@ -1,6 +1,6 @@
 """
-Reads the sample config files and filters them. 
-The file format is documented in SamplesFromDAS/config/samples/README.txt and the CLAUDE.md beside it.
+Reads the sample config files and filters them.
+The file format is documented in config/samples/README.txt and the CLAUDE.md beside it.
 """
 
 # Import Block
@@ -15,7 +15,7 @@ from ..foundations.config import deepMerge, loadJson
 
 # Classes and Functions
 
-## Every field a sample may carry. Documented in SamplesFromDAS/config/samples/README.txt
+## Every field a sample may carry. Documented in config/samples/README.txt
 SAMPLE_FIELDS = {"name", "dataset", "dasInstance", "isMC", "era", "family", "content", "tags", "nFilesFor10k", "unitsPerJob", "lumiMask", "notes"}
 
 class Sample(dict):

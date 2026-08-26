@@ -1,4 +1,0 @@
-{
-  "_doc": "Smallest useful ntuple: event + jets. For trigger/HT acceptance studies and quick kinematic plots.",
-  "include": ["core", "jets"]
-}

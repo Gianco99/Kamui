@@ -2,10 +2,10 @@
 docs/SampleProdPlan.txt
 
 # Saved edmDumpEventContent output - reference only, regenerable
-SamplesFromDAS/branchDumps/*.txt
+production/branchDumps/*.txt
 
 # Generated job areas, DAS cache, python bytecode
-SamplesFromDAS/jobs/
-SamplesFromDAS/.dasCache/
+production/jobs/
+production/.dasCache/
 __pycache__/
 *.pyc

@@ -8,7 +8,7 @@ DVCode works, but its sample lists, event content and job submission are entangl
 
 Design decisions and why
 ------------------------
-The primary output is a flat ROOT tree, not a slimmed EDM file. It is ten to sixty times smaller than MiniAOD and analysis code downstream never needs CMSSW. The cost is a fixed set of quantities per production, so if something is missing you re-run, which is the right trade when storage is the constraint. A slimmed MiniAOD can be written from the same job as a second output when you want the full EDM objects preserved, which is the escape hatch for that cost.
+The primary output is a flat ROOT tree. It is far smaller than MiniAOD, by a factor that depends on what a preset keeps, and analysis code downstream never needs CMSSW. The cost is a fixed set of quantities per production, so if something is missing you re-run, which is the right trade when storage is the constraint. A slimmed MiniAOD can be written from the same job as a second output when you want the full EDM objects preserved, which is the escape hatch for that cost.
 
 The tree is built with CMSSW's NanoAOD table producers rather than a hand-written EDAnalyzer, which is what makes every branch a config line with no C++ to maintain, review or keep in sync with the config. Where a table needs real computation, such as the displaced vertexer at milestone 3, a plugin gets added and consumed the same way. The output is a plain flat tree; we are not adopting the NanoAOD workflow.
 
