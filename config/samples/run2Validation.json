@@ -14,7 +14,7 @@
       "_doc": "RPV SUSY stop->dd, displacement-triggered channel. 2 masses x 4 eras.",
       "name": "rpvStopDD_M{mass}_ctau1mm_{era}",
       "dataset": "/StopStopbarTo2Dbar2D_M-{mass}_CTau-1mm_TuneCP5_13TeV-pythia8/{campaign}/MINIAODSIM",
-      "content": "dvRun2Displaced",
+      "content": "dvDisplaced",
       "tags": [
         "run2",
         "validation",
@@ -50,7 +50,7 @@
       "_doc": "ggH -> SS -> 4d, displacement-triggered channel. 4 eras. NOTE gen-HT>200 filter.",
       "name": "ggHToSSTo4d_mS55_ctau1mm_{era}",
       "dataset": "/ggH_HToSSTodddd_MH-125_MS-55_ctauS-1_TuneCP5_13TeV-powheg-pythia8/{campaign}/MINIAODSIM",
-      "content": "dvRun2Displaced",
+      "content": "dvDisplaced",
       "tags": [
         "run2",
         "validation",
@@ -82,7 +82,7 @@
       "_doc": "VH -> SS -> 4d with leptonic V, lepton-triggered channel. 3 modes x 4 eras.",
       "name": "{mode}ToSSTo4d_mS55_ctau1mm_{era}",
       "dataset": "/{stem}_HToSSTodddd_{vDecay}_MH-125_MS-55_ctauS-1_TuneCP5_13TeV-powheg-pythia8/{campaign}/MINIAODSIM",
-      "content": "dvRun2Lepton",
+      "content": "dvLepton",
       "tags": [
         "run2",
         "validation",

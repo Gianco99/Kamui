@@ -123,9 +123,9 @@ def contentStem(presetName):
     return stem[:-5] if stem.endswith(".json") else stem
 
 
-def writeResolvedContent(d, presetName, isMC):
+def writeResolvedContent(d, presetName, isMC, era="Summer24"):
     """Flatten a content preset into the job area and return its path."""
-    resolved = resolveContent(presetName, isMC=isMC)
+    resolved = resolveContent(presetName, isMC=isMC, era=era)
     suffix = "mc" if isMC else "data"
     stem = contentStem(presetName)
     out = os.path.join(d, f"{stem}.{suffix}.json")

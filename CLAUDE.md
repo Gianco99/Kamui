@@ -77,6 +77,6 @@ Nothing in the repo should hardcode a username - `sites.json` uses `$USER`, expa
 - Everything else lives in a subdirectory. Subdirectories carry their own CLAUDE.md where there is agent-facing context to record:
 - `python/kamui/` — The framework itself, shared by every analysis stage → `python/kamui/CLAUDE.md` for design notes, `python/kamui/README.txt` for the CLI reference
 - `config/` — Sample, content, trigger and site configs, read by every stage → `config/CLAUDE.md`
-- `production/` — Turning datasets into ntuples: the cmsRun config, the tables it builds, and the generated job areas → `production/CLAUDE.md`
+- `ntupleProduction/` — Turning datasets into ntuples: the cmsRun config, the tables it builds, and the generated job areas → `production/CLAUDE.md`
 - `tools/` — Standalone scripts for checking output, run by hand
 - `docs/` — Transient documentation for current studies; finished ones move to `docs/legacy/` → `docs/legacy/README.txt` for the archiving convention

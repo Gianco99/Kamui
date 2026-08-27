@@ -88,7 +88,7 @@ def yieldsFor(files, paths_):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--task", help="Task name under production/jobs/")
+    ap.add_argument("--task", help="Task name under ntupleProduction/jobs/")
     ap.add_argument("--files", nargs="+", help="Explicit ntuple files, in place of a task")
     ap.add_argument("--triggers", help="Trigger config name; required with --files")
     ap.add_argument("--sample", action="append", help="Restrict to these samples")
@@ -123,7 +123,7 @@ def main():
             if s is None:
                 print(f"  {name}: not in the catalog any more, skipping")
                 continue
-            skim = resolveContent(s["content"], isMC=bool(s["isMC"]))["skim"]
+            skim = resolveContent(s["content"], isMC=bool(s["isMC"]), era=s["era"])["skim"]
             if not skim.get("hltPaths"):
                 print(f"  {name}: content preset '{s['content']}' declares no trigger skim, skipping")
                 continue

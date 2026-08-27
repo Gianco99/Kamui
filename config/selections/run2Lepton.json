@@ -1,0 +1,227 @@
+{
+  "_doc": "Lepton-triggered channel for Run 2, matching JMTucker. Cuts apply in the order listed, which is also the cutflow order. There is no orthogonality veto here: in JMTucker that veto belongs to the displacement channel.",
+  "eras": [
+    "2016",
+    "2016APV",
+    "2017",
+    "2018"
+  ],
+  "cuts": [
+    {
+      "name": "trigger",
+      "type": "trigger",
+      "triggers": "run2Lepton",
+      "doc": "Fired at least one single-electron or single-muon path"
+    },
+    {
+      "name": "metFilters",
+      "type": "flags",
+      "flags": {
+        "2016APV": [
+          "Flag_goodVertices",
+          "Flag_globalSuperTightHalo2016Filter",
+          "Flag_HBHENoiseFilter",
+          "Flag_HBHENoiseIsoFilter",
+          "Flag_EcalDeadCellTriggerPrimitiveFilter",
+          "Flag_BadPFMuonFilter",
+          "Flag_BadPFMuonDzFilter",
+          "Flag_hfNoisyHitsFilter",
+          "Flag_eeBadScFilter"
+        ],
+        "2016": [
+          "Flag_goodVertices",
+          "Flag_globalSuperTightHalo2016Filter",
+          "Flag_HBHENoiseFilter",
+          "Flag_HBHENoiseIsoFilter",
+          "Flag_EcalDeadCellTriggerPrimitiveFilter",
+          "Flag_BadPFMuonFilter",
+          "Flag_BadPFMuonDzFilter",
+          "Flag_hfNoisyHitsFilter",
+          "Flag_eeBadScFilter"
+        ],
+        "2017": [
+          "Flag_goodVertices",
+          "Flag_globalSuperTightHalo2016Filter",
+          "Flag_HBHENoiseFilter",
+          "Flag_HBHENoiseIsoFilter",
+          "Flag_EcalDeadCellTriggerPrimitiveFilter",
+          "Flag_BadPFMuonFilter",
+          "Flag_BadPFMuonDzFilter",
+          "Flag_hfNoisyHitsFilter",
+          "Flag_eeBadScFilter",
+          "Flag_ecalBadCalibFilter"
+        ],
+        "2018": [
+          "Flag_goodVertices",
+          "Flag_globalSuperTightHalo2016Filter",
+          "Flag_HBHENoiseFilter",
+          "Flag_HBHENoiseIsoFilter",
+          "Flag_EcalDeadCellTriggerPrimitiveFilter",
+          "Flag_BadPFMuonFilter",
+          "Flag_BadPFMuonDzFilter",
+          "Flag_hfNoisyHitsFilter",
+          "Flag_eeBadScFilter",
+          "Flag_ecalBadCalibFilter"
+        ]
+      },
+      "doc": "Standard MET filters, all required. 2016 has no ecalBadCalibFilter, so its list is one shorter"
+    },
+    {
+      "name": "leptonPlateau",
+      "type": "object",
+      "doc": "At least one lepton on the plateau of the path that actually fired, identified, isolated and prompt. Each leg is gated by its own trigger, so a muon only counts when a muon path fired.",
+      "anyOf": [
+        {
+          "collection": "Muon",
+          "min": 1,
+          "triggers": {
+            "2016APV": [
+              "HLT_IsoMu24_v*"
+            ],
+            "2016": [
+              "HLT_IsoMu24_v*"
+            ],
+            "2017": [
+              "HLT_IsoMu27_v*"
+            ],
+            "2018": [
+              "HLT_IsoMu24_v*"
+            ]
+          },
+          "doc": "Muon leg",
+          "requirements": [
+            {
+              "variable": "pt",
+              "min": {
+                "2016APV": 27,
+                "2016": 27,
+                "2017": 30,
+                "2018": 27
+              }
+            },
+            {
+              "variable": "eta",
+              "absMax": 2.4
+            },
+            {
+              "variable": "mediumId",
+              "min": 1
+            },
+            {
+              "variable": "pfRelIso04",
+              "max": 0.15
+            },
+            {
+              "variable": "dxyBeamspot",
+              "absMax": 0.02
+            },
+            {
+              "variable": "dzPV",
+              "absMax": 0.5
+            }
+          ]
+        },
+        {
+          "collection": "Electron",
+          "min": 1,
+          "triggers": {
+            "2016APV": [
+              "HLT_Ele27_WPTight_Gsf_v*"
+            ],
+            "2016": [
+              "HLT_Ele27_WPTight_Gsf_v*"
+            ],
+            "2017": [
+              "HLT_Ele35_WPTight_Gsf_v*"
+            ],
+            "2018": [
+              "HLT_Ele32_WPTight_Gsf_v*"
+            ]
+          },
+          "doc": "Electron leg, barrel: the impact parameter requirement differs either side of |scEta| = 1.48",
+          "requirements": [
+            {
+              "variable": "pt",
+              "min": {
+                "2016APV": 30,
+                "2016": 30,
+                "2017": 38,
+                "2018": 35
+              }
+            },
+            {
+              "variable": "eta",
+              "absMax": 2.4
+            },
+            {
+              "variable": "cutBased",
+              "min": 4
+            },
+            {
+              "variable": "eta",
+              "absMax": 1.48
+            },
+            {
+              "variable": "dxyBeamspot",
+              "absMax": 0.05
+            },
+            {
+              "variable": "dzPV",
+              "absMax": 0.1
+            }
+          ]
+        },
+        {
+          "collection": "Electron",
+          "min": 1,
+          "triggers": {
+            "2016APV": [
+              "HLT_Ele27_WPTight_Gsf_v*"
+            ],
+            "2016": [
+              "HLT_Ele27_WPTight_Gsf_v*"
+            ],
+            "2017": [
+              "HLT_Ele35_WPTight_Gsf_v*"
+            ],
+            "2018": [
+              "HLT_Ele32_WPTight_Gsf_v*"
+            ]
+          },
+          "doc": "Electron leg, endcap: the impact parameter requirement differs either side of |scEta| = 1.48",
+          "requirements": [
+            {
+              "variable": "pt",
+              "min": {
+                "2016APV": 30,
+                "2016": 30,
+                "2017": 38,
+                "2018": 35
+              }
+            },
+            {
+              "variable": "eta",
+              "absMax": 2.4
+            },
+            {
+              "variable": "cutBased",
+              "min": 4
+            },
+            {
+              "variable": "eta",
+              "absMin": 1.48
+            },
+            {
+              "variable": "dxyBeamspot",
+              "absMax": 0.1
+            },
+            {
+              "variable": "dzPV",
+              "absMax": 0.2
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -38,19 +38,24 @@ def loadJson(path):
     return stripComments(raw)
 
 def _resolvePath(nameOrPath, searchDir):
-    """Accept 'jets', 'jets.json' or an explicit path; return an existing path."""
+    """Accept 'jets', 'jets.json' or an explicit path; return an existing path. searchDir may be one directory or an ordered list."""
+    dirs = [searchDir] if isinstance(searchDir, str) else list(searchDir)
     if os.path.sep in nameOrPath or nameOrPath.endswith(".json"):
-        cand = nameOrPath if os.path.isabs(nameOrPath) else os.path.join(searchDir, nameOrPath)
-        if os.path.exists(cand):
-            return cand
+        for d in dirs:
+            cand = nameOrPath if os.path.isabs(nameOrPath) else os.path.join(d, nameOrPath)
+            if os.path.exists(cand):
+                return cand
         if os.path.exists(nameOrPath):
             return nameOrPath
-    ## Search searchDir itself, then one level of subdirectories, so a name resolves without having to say which folder it lives in
-    for d in [searchDir] + [os.path.join(searchDir, x) for x in sorted(os.listdir(searchDir)) if os.path.isdir(os.path.join(searchDir, x))]:
-        cand = os.path.join(d, nameOrPath + ".json")
-        if os.path.exists(cand):
-            return cand
-    raise FileNotFoundError(f"no config '{nameOrPath}' under {searchDir}")
+    ## Each directory in order, then one level of subdirectories beneath it
+    for base in dirs:
+        if not os.path.isdir(base):
+            continue
+        for d in [base] + [os.path.join(base, x) for x in sorted(os.listdir(base)) if os.path.isdir(os.path.join(base, x))]:
+            cand = os.path.join(d, nameOrPath + ".json")
+            if os.path.exists(cand):
+                return cand
+    raise FileNotFoundError(f"no config '{nameOrPath}' under {', '.join(dirs)}")
 
 def loadWithIncludes(nameOrPath, searchDir, _seen=None):
     """Load a config and flatten its "include" chain (depth-first, deep-merged)."""

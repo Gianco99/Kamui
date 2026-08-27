@@ -1,0 +1,1144 @@
+{
+  "_doc": "Displacement-triggered channel for Run 2, matching JMTucker's apply_presel == 6 with leptonht_veto on. Cuts apply in the order listed, which is also the cutflow order, and that order follows AnalysisCuts.cc so the two cutflows can be compared line by line.",
+  "eras": [
+    "2016APV",
+    "2016",
+    "2017",
+    "2018"
+  ],
+  "cuts": [
+    {
+      "name": "trigger",
+      "type": "trigger",
+      "triggers": "run2Displaced",
+      "doc": "Fired at least one b-jet or displaced-dijet path"
+    },
+    {
+      "name": "htVeto",
+      "type": "veto",
+      "triggers": {
+        "2016APV": [
+          "HLT_PFHT800_v*",
+          "HLT_PFHT900_v*",
+          "HLT_PFJet450_v*",
+          "HLT_AK8PFJet450_v*"
+        ],
+        "2016": [
+          "HLT_PFHT800_v*",
+          "HLT_PFHT900_v*",
+          "HLT_PFJet450_v*",
+          "HLT_AK8PFJet450_v*"
+        ],
+        "2017": [
+          "HLT_PFHT1050_v*"
+        ],
+        "2018": [
+          "HLT_PFHT1050_v*"
+        ]
+      },
+      "conditions": [
+        {
+          "quantity": "HT40",
+          "min": {
+            "2016APV": 1000,
+            "2016": 1000,
+            "2017": 1200,
+            "2018": 1200
+          }
+        },
+        {
+          "quantity": "nJet20",
+          "min": 4
+        }
+      ],
+      "doc": "Drop events that fired a high-HT trigger and pass the matching offline requirement, for orthogonality with EXO-19-013. Which trigger existed and where the HT threshold sits both depend on the year"
+    },
+    {
+      "name": "leptonVeto",
+      "type": "object",
+      "invert": true,
+      "doc": "Orthogonality with the lepton-triggered channel: drop the event when a single-lepton path fired and an offline lepton sits on its plateau. The legs are the ones run2Lepton.json selects on, inverted, so the two channels cannot both claim an event. JMTucker skips Mu50, Ele115 and Ele50_PFJet165 in this veto, which is why they are absent here too.",
+      "anyOf": [
+        {
+          "collection": "Muon",
+          "min": 1,
+          "triggers": {
+            "2016APV": [
+              "HLT_IsoMu24_v*"
+            ],
+            "2016": [
+              "HLT_IsoMu24_v*"
+            ],
+            "2017": [
+              "HLT_IsoMu27_v*"
+            ],
+            "2018": [
+              "HLT_IsoMu24_v*"
+            ]
+          },
+          "doc": "Muon leg",
+          "requirements": [
+            {
+              "variable": "pt",
+              "min": {
+                "2016APV": 27,
+                "2016": 27,
+                "2017": 30,
+                "2018": 27
+              }
+            },
+            {
+              "variable": "eta",
+              "absMax": 2.4
+            },
+            {
+              "variable": "mediumId",
+              "min": 1
+            },
+            {
+              "variable": "pfRelIso04",
+              "max": 0.15
+            },
+            {
+              "variable": "dxyBeamspot",
+              "absMax": 0.02
+            },
+            {
+              "variable": "dzPV",
+              "absMax": 0.5
+            }
+          ]
+        },
+        {
+          "collection": "Electron",
+          "min": 1,
+          "triggers": {
+            "2016APV": [
+              "HLT_Ele27_WPTight_Gsf_v*"
+            ],
+            "2016": [
+              "HLT_Ele27_WPTight_Gsf_v*"
+            ],
+            "2017": [
+              "HLT_Ele35_WPTight_Gsf_v*"
+            ],
+            "2018": [
+              "HLT_Ele32_WPTight_Gsf_v*"
+            ]
+          },
+          "doc": "Electron leg, barrel: the impact parameter requirement differs either side of |scEta| = 1.48",
+          "requirements": [
+            {
+              "variable": "pt",
+              "min": {
+                "2016APV": 30,
+                "2016": 30,
+                "2017": 38,
+                "2018": 35
+              }
+            },
+            {
+              "variable": "eta",
+              "absMax": 2.4
+            },
+            {
+              "variable": "cutBased",
+              "min": 4
+            },
+            {
+              "variable": "eta",
+              "absMax": 1.48
+            },
+            {
+              "variable": "dxyBeamspot",
+              "absMax": 0.05
+            },
+            {
+              "variable": "dzPV",
+              "absMax": 0.1
+            }
+          ]
+        },
+        {
+          "collection": "Electron",
+          "min": 1,
+          "triggers": {
+            "2016APV": [
+              "HLT_Ele27_WPTight_Gsf_v*"
+            ],
+            "2016": [
+              "HLT_Ele27_WPTight_Gsf_v*"
+            ],
+            "2017": [
+              "HLT_Ele35_WPTight_Gsf_v*"
+            ],
+            "2018": [
+              "HLT_Ele32_WPTight_Gsf_v*"
+            ]
+          },
+          "doc": "Electron leg, endcap: the impact parameter requirement differs either side of |scEta| = 1.48",
+          "requirements": [
+            {
+              "variable": "pt",
+              "min": {
+                "2016APV": 30,
+                "2016": 30,
+                "2017": 38,
+                "2018": 35
+              }
+            },
+            {
+              "variable": "eta",
+              "absMax": 2.4
+            },
+            {
+              "variable": "cutBased",
+              "min": 4
+            },
+            {
+              "variable": "eta",
+              "absMin": 1.48
+            },
+            {
+              "variable": "dxyBeamspot",
+              "absMax": 0.1
+            },
+            {
+              "variable": "dzPV",
+              "absMax": 0.2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "displacedTriggerPresel",
+      "type": "anyOf",
+      "doc": "At least one displacement trigger fired and the offline requirements standing in for its online selection are met. One alternative per path, each gated to the eras the path ran in. JMTucker leaves require_trig_obj_match off, so no HLT object matching enters and these are pure offline emulations.",
+      "anyOf": [
+        {
+          "name": "quadJet45TripleBTag",
+          "eras": [
+            "2016APV",
+            "2016"
+          ],
+          "doc": "2016 tri-b-tag quad-jet path: four jets above 50 GeV and three loose b-tags",
+          "cuts": [
+            {
+              "name": "fired",
+              "type": "trigger",
+              "triggers": [
+                "HLT_QuadJet45_TripleBTagCSV_p087_v*"
+              ],
+              "doc": "HLT_QuadJet45_TripleBTagCSV_p087 fired"
+            },
+            {
+              "name": "fourJets",
+              "type": "quantity",
+              "doc": "At least four identified jets",
+              "conditions": [
+                {
+                  "quantity": "nJet20",
+                  "min": 4
+                }
+              ]
+            },
+            {
+              "name": "threeBtags",
+              "type": "object",
+              "doc": "Three loose b-tags",
+              "anyOf": [
+                {
+                  "collection": "Jet",
+                  "min": 3,
+                  "doc": "Three loose-tagged jets",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 20
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.5
+                    },
+                    {
+                      "variable": "tightLepVeto",
+                      "min": 1
+                    },
+                    {
+                      "variable": "btagDeepFlavB",
+                      "min": {
+                        "2016APV": 0.0508,
+                        "2016": 0.048
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "jetLadder",
+              "type": "object",
+              "doc": "Four jets above 50 GeV",
+              "anyOf": [
+                {
+                  "collection": "Jet",
+                  "min": 4,
+                  "doc": "Four jets, pT ordered 50/50/50/50",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 20
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.5
+                    },
+                    {
+                      "variable": "tightLepVeto",
+                      "min": 1
+                    }
+                  ],
+                  "orderedMinPt": [
+                    50,
+                    50,
+                    50,
+                    50
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "doubleJet90TripleBTag",
+          "eras": [
+            "2016APV",
+            "2016"
+          ],
+          "doc": "2016 tri-b-tag asymmetric path: 100/100/35/35 and three loose b-tags",
+          "cuts": [
+            {
+              "name": "fired",
+              "type": "trigger",
+              "triggers": [
+                "HLT_DoubleJet90_Double30_TripleBTagCSV_p087_v*"
+              ],
+              "doc": "HLT_DoubleJet90_Double30_TripleBTagCSV_p087 fired"
+            },
+            {
+              "name": "fourJets",
+              "type": "quantity",
+              "doc": "At least four identified jets",
+              "conditions": [
+                {
+                  "quantity": "nJet20",
+                  "min": 4
+                }
+              ]
+            },
+            {
+              "name": "threeBtags",
+              "type": "object",
+              "doc": "Three loose b-tags",
+              "anyOf": [
+                {
+                  "collection": "Jet",
+                  "min": 3,
+                  "doc": "Three loose-tagged jets",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 20
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.5
+                    },
+                    {
+                      "variable": "tightLepVeto",
+                      "min": 1
+                    },
+                    {
+                      "variable": "btagDeepFlavB",
+                      "min": {
+                        "2016APV": 0.0508,
+                        "2016": 0.048
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "jetLadder",
+              "type": "object",
+              "doc": "Jets ordered 100/100/35/35",
+              "anyOf": [
+                {
+                  "collection": "Jet",
+                  "min": 4,
+                  "doc": "Four jets, pT ordered 100/100/35/35",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 20
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.5
+                    },
+                    {
+                      "variable": "tightLepVeto",
+                      "min": 1
+                    }
+                  ],
+                  "orderedMinPt": [
+                    100,
+                    100,
+                    35,
+                    35
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "doubleJetsC100DoubleBTag",
+          "eras": [
+            "2016APV",
+            "2016"
+          ],
+          "doc": "2016 double-b-tag dijet path: two jets above 110 GeV close in eta, two loose b-tags above 80 GeV",
+          "cuts": [
+            {
+              "name": "fired",
+              "type": "trigger",
+              "triggers": [
+                "HLT_DoubleJetsC100_DoubleBTagCSV_p014_DoublePFJetsC100MaxDeta1p6_v*"
+              ],
+              "doc": "HLT_DoubleJetsC100_DoubleBTagCSV_p014_DoublePFJetsC100MaxDeta1p6 fired"
+            },
+            {
+              "name": "twoHardBtags",
+              "type": "object",
+              "doc": "Two loose b-tags above 80 GeV",
+              "anyOf": [
+                {
+                  "collection": "Jet",
+                  "min": 2,
+                  "doc": "Two loose-tagged jets above 80 GeV",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 20
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.5
+                    },
+                    {
+                      "variable": "tightLepVeto",
+                      "min": 1
+                    },
+                    {
+                      "variable": "pt",
+                      "min": 80
+                    },
+                    {
+                      "variable": "btagDeepFlavB",
+                      "min": {
+                        "2016APV": 0.0508,
+                        "2016": 0.048
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "dijet",
+              "type": "object",
+              "doc": "Two jets above 110 GeV within |deta| < 1.6",
+              "anyOf": [
+                {
+                  "collection": "Jet",
+                  "min": 2,
+                  "doc": "Two jets above 110 GeV, some pair within |deta| < 1.6",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 20
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.5
+                    },
+                    {
+                      "variable": "tightLepVeto",
+                      "min": 1
+                    },
+                    {
+                      "variable": "pt",
+                      "min": 110
+                    }
+                  ],
+                  "pairRequirements": [
+                    {
+                      "variable": "eta",
+                      "absDiffMax": 1.6
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "ht350DisplacedDijet40",
+          "eras": [
+            "2016APV",
+            "2016"
+          ],
+          "doc": "2016 displaced-dijet path, low HT leg. Calo quantities only, and no HLT track matching: JMTucker leaves require_trig_obj_match off",
+          "cuts": [
+            {
+              "name": "fired",
+              "type": "trigger",
+              "triggers": [
+                "HLT_HT350_DisplacedDijet40_DisplacedTrack_v*"
+              ],
+              "doc": "HLT_HT350_DisplacedDijet40_DisplacedTrack fired"
+            },
+            {
+              "name": "caloHt",
+              "type": "quantity",
+              "doc": "Calo HT above 470 GeV, at least two calo jets",
+              "conditions": [
+                {
+                  "quantity": "caloHT30",
+                  "min": 470
+                },
+                {
+                  "quantity": "nCaloJet",
+                  "min": 2
+                }
+              ]
+            },
+            {
+              "name": "caloDijet",
+              "type": "object",
+              "doc": "Two calo jets above 50 GeV",
+              "anyOf": [
+                {
+                  "collection": "CaloJet",
+                  "min": 2,
+                  "doc": "Two calo jets above 50 GeV within |eta| < 2.0, the trigger's dijet leg",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 50
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "ht650DisplacedDijet80",
+          "eras": [
+            "2016APV",
+            "2016"
+          ],
+          "doc": "2016 displaced-dijet path, high HT leg",
+          "cuts": [
+            {
+              "name": "fired",
+              "type": "trigger",
+              "triggers": [
+                "HLT_HT650_DisplacedDijet80_Inclusive_v*"
+              ],
+              "doc": "HLT_HT650_DisplacedDijet80_Inclusive fired"
+            },
+            {
+              "name": "caloHt",
+              "type": "quantity",
+              "doc": "Calo HT above 800 GeV, at least two calo jets",
+              "conditions": [
+                {
+                  "quantity": "caloHT30",
+                  "min": 800
+                },
+                {
+                  "quantity": "nCaloJet",
+                  "min": 2
+                }
+              ]
+            },
+            {
+              "name": "caloDijet",
+              "type": "object",
+              "doc": "Two calo jets above 100 GeV",
+              "anyOf": [
+                {
+                  "collection": "CaloJet",
+                  "min": 2,
+                  "doc": "Two calo jets above 100 GeV within |eta| < 2.0, the trigger's dijet leg",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 100
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "doublePFJets100",
+          "eras": [
+            "2017"
+          ],
+          "doc": "2017 double-b-tag dijet path: two jets above 125 GeV close in eta, two loose b-tags above 80 GeV",
+          "cuts": [
+            {
+              "name": "fired",
+              "type": "trigger",
+              "triggers": [
+                "HLT_DoublePFJets100MaxDeta1p6_DoubleCaloBTagCSV_p33_v*"
+              ],
+              "doc": "HLT_DoublePFJets100MaxDeta1p6_DoubleCaloBTagCSV_p33 fired"
+            },
+            {
+              "name": "twoHardBtags",
+              "type": "object",
+              "doc": "Two loose b-tags above 80 GeV",
+              "anyOf": [
+                {
+                  "collection": "Jet",
+                  "min": 2,
+                  "doc": "Two loose-tagged jets above 80 GeV",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 20
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.5
+                    },
+                    {
+                      "variable": "tightLepVeto",
+                      "min": 1
+                    },
+                    {
+                      "variable": "pt",
+                      "min": 80
+                    },
+                    {
+                      "variable": "btagDeepFlavB",
+                      "min": {
+                        "2017": 0.0532
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "dijet",
+              "type": "object",
+              "doc": "Two jets above 125 GeV within |deta| < 1.6",
+              "anyOf": [
+                {
+                  "collection": "Jet",
+                  "min": 2,
+                  "doc": "Two jets above 125 GeV, some pair within |deta| < 1.6",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 20
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.5
+                    },
+                    {
+                      "variable": "tightLepVeto",
+                      "min": 1
+                    },
+                    {
+                      "variable": "pt",
+                      "min": 125
+                    }
+                  ],
+                  "pairRequirements": [
+                    {
+                      "variable": "eta",
+                      "absDiffMax": 1.6
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "pfht300QuadPFJetTripleBTag",
+          "eras": [
+            "2017"
+          ],
+          "doc": "2017 tri-b-tag quad-jet path: HT above 350 GeV, jets ordered 90/75/55/55, three loose b-tags",
+          "cuts": [
+            {
+              "name": "fired",
+              "type": "trigger",
+              "triggers": [
+                "HLT_PFHT300PT30_QuadPFJet_75_60_45_40_TriplePFBTagCSV_3p0_v*"
+              ],
+              "doc": "HLT_PFHT300PT30_QuadPFJet_75_60_45_40_TriplePFBTagCSV_3p0 fired"
+            },
+            {
+              "name": "htAndCount",
+              "type": "quantity",
+              "doc": "HT(30) above 350 GeV and at least four identified jets",
+              "conditions": [
+                {
+                  "quantity": "HT30",
+                  "min": 350
+                },
+                {
+                  "quantity": "nJet20",
+                  "min": 4
+                }
+              ]
+            },
+            {
+              "name": "threeBtags",
+              "type": "object",
+              "doc": "Three loose b-tags",
+              "anyOf": [
+                {
+                  "collection": "Jet",
+                  "min": 3,
+                  "doc": "Three loose-tagged jets",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 20
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.5
+                    },
+                    {
+                      "variable": "tightLepVeto",
+                      "min": 1
+                    },
+                    {
+                      "variable": "btagDeepFlavB",
+                      "min": {
+                        "2017": 0.0532
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "jetLadder",
+              "type": "object",
+              "doc": "Jets ordered 90/75/55/55",
+              "anyOf": [
+                {
+                  "collection": "Jet",
+                  "min": 4,
+                  "doc": "Four jets, pT ordered 90/75/55/55",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 20
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.5
+                    },
+                    {
+                      "variable": "tightLepVeto",
+                      "min": 1
+                    }
+                  ],
+                  "orderedMinPt": [
+                    90,
+                    75,
+                    55,
+                    55
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "doublePFJets116",
+          "eras": [
+            "2018"
+          ],
+          "doc": "2018 double-b-tag dijet path: two jets above 140 GeV close in eta, two loose b-tags above 80 GeV",
+          "cuts": [
+            {
+              "name": "fired",
+              "type": "trigger",
+              "triggers": [
+                "HLT_DoublePFJets116MaxDeta1p6_DoubleCaloBTagDeepCSV_p71_v*"
+              ],
+              "doc": "HLT_DoublePFJets116MaxDeta1p6_DoubleCaloBTagDeepCSV_p71 fired"
+            },
+            {
+              "name": "twoHardBtags",
+              "type": "object",
+              "doc": "Two loose b-tags above 80 GeV",
+              "anyOf": [
+                {
+                  "collection": "Jet",
+                  "min": 2,
+                  "doc": "Two loose-tagged jets above 80 GeV",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 20
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.5
+                    },
+                    {
+                      "variable": "tightLepVeto",
+                      "min": 1
+                    },
+                    {
+                      "variable": "pt",
+                      "min": 80
+                    },
+                    {
+                      "variable": "btagDeepFlavB",
+                      "min": {
+                        "2018": 0.049
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "dijet",
+              "type": "object",
+              "doc": "Two jets above 140 GeV within |deta| < 1.6",
+              "anyOf": [
+                {
+                  "collection": "Jet",
+                  "min": 2,
+                  "doc": "Two jets above 140 GeV, some pair within |deta| < 1.6",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 20
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.5
+                    },
+                    {
+                      "variable": "tightLepVeto",
+                      "min": 1
+                    },
+                    {
+                      "variable": "pt",
+                      "min": 140
+                    }
+                  ],
+                  "pairRequirements": [
+                    {
+                      "variable": "eta",
+                      "absDiffMax": 1.6
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "pfht330QuadPFJetTripleBTag",
+          "eras": [
+            "2018"
+          ],
+          "doc": "2018 tri-b-tag quad-jet path: HT above 425 GeV, jets ordered 95/65/60/55, three loose b-tags",
+          "cuts": [
+            {
+              "name": "fired",
+              "type": "trigger",
+              "triggers": [
+                "HLT_PFHT330PT30_QuadPFJet_75_60_45_40_TriplePFBTagDeepCSV_4p5_v*"
+              ],
+              "doc": "HLT_PFHT330PT30_QuadPFJet_75_60_45_40_TriplePFBTagDeepCSV_4p5 fired"
+            },
+            {
+              "name": "htAndCount",
+              "type": "quantity",
+              "doc": "HT(30) above 425 GeV and at least four identified jets",
+              "conditions": [
+                {
+                  "quantity": "HT30",
+                  "min": 425
+                },
+                {
+                  "quantity": "nJet20",
+                  "min": 4
+                }
+              ]
+            },
+            {
+              "name": "threeBtags",
+              "type": "object",
+              "doc": "Three loose b-tags",
+              "anyOf": [
+                {
+                  "collection": "Jet",
+                  "min": 3,
+                  "doc": "Three loose-tagged jets",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 20
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.5
+                    },
+                    {
+                      "variable": "tightLepVeto",
+                      "min": 1
+                    },
+                    {
+                      "variable": "btagDeepFlavB",
+                      "min": {
+                        "2018": 0.049
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "jetLadder",
+              "type": "object",
+              "doc": "Jets ordered 95/65/60/55",
+              "anyOf": [
+                {
+                  "collection": "Jet",
+                  "min": 4,
+                  "doc": "Four jets, pT ordered 95/65/60/55",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 20
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.5
+                    },
+                    {
+                      "variable": "tightLepVeto",
+                      "min": 1
+                    }
+                  ],
+                  "orderedMinPt": [
+                    95,
+                    65,
+                    60,
+                    55
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "ht430DisplacedDijet40",
+          "eras": [
+            "2017",
+            "2018"
+          ],
+          "doc": "2017/18 displaced-dijet path, low HT leg",
+          "cuts": [
+            {
+              "name": "fired",
+              "type": "trigger",
+              "triggers": [
+                "HLT_HT430_DisplacedDijet40_DisplacedTrack_v*"
+              ],
+              "doc": "HLT_HT430_DisplacedDijet40_DisplacedTrack fired"
+            },
+            {
+              "name": "caloHt",
+              "type": "quantity",
+              "doc": "Calo HT above 430 GeV, at least two calo jets",
+              "conditions": [
+                {
+                  "quantity": "caloHT30",
+                  "min": 430
+                },
+                {
+                  "quantity": "nCaloJet",
+                  "min": 2
+                }
+              ]
+            },
+            {
+              "name": "caloDijet",
+              "type": "object",
+              "doc": "Two calo jets above 40 GeV",
+              "anyOf": [
+                {
+                  "collection": "CaloJet",
+                  "min": 2,
+                  "doc": "Two calo jets above 40 GeV within |eta| < 2.0, the trigger's dijet leg",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 40
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "ht650DisplacedDijet60",
+          "eras": [
+            "2017",
+            "2018"
+          ],
+          "doc": "2017/18 displaced-dijet path, high HT leg",
+          "cuts": [
+            {
+              "name": "fired",
+              "type": "trigger",
+              "triggers": [
+                "HLT_HT650_DisplacedDijet60_Inclusive_v*"
+              ],
+              "doc": "HLT_HT650_DisplacedDijet60_Inclusive fired"
+            },
+            {
+              "name": "caloHt",
+              "type": "quantity",
+              "doc": "Calo HT above 650 GeV, at least two calo jets",
+              "conditions": [
+                {
+                  "quantity": "caloHT30",
+                  "min": 650
+                },
+                {
+                  "quantity": "nCaloJet",
+                  "min": 2
+                }
+              ]
+            },
+            {
+              "name": "caloDijet",
+              "type": "object",
+              "doc": "Two calo jets above 60 GeV",
+              "anyOf": [
+                {
+                  "collection": "CaloJet",
+                  "min": 2,
+                  "doc": "Two calo jets above 60 GeV within |eta| < 2.0, the trigger's dijet leg",
+                  "requirements": [
+                    {
+                      "variable": "pt",
+                      "min": 60
+                    },
+                    {
+                      "variable": "eta",
+                      "absMax": 2.0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "metFilters",
+      "type": "flags",
+      "flags": {
+        "2016APV": [
+          "Flag_goodVertices",
+          "Flag_globalSuperTightHalo2016Filter",
+          "Flag_HBHENoiseFilter",
+          "Flag_HBHENoiseIsoFilter",
+          "Flag_EcalDeadCellTriggerPrimitiveFilter",
+          "Flag_BadPFMuonFilter",
+          "Flag_BadPFMuonDzFilter",
+          "Flag_hfNoisyHitsFilter",
+          "Flag_eeBadScFilter"
+        ],
+        "2016": [
+          "Flag_goodVertices",
+          "Flag_globalSuperTightHalo2016Filter",
+          "Flag_HBHENoiseFilter",
+          "Flag_HBHENoiseIsoFilter",
+          "Flag_EcalDeadCellTriggerPrimitiveFilter",
+          "Flag_BadPFMuonFilter",
+          "Flag_BadPFMuonDzFilter",
+          "Flag_hfNoisyHitsFilter",
+          "Flag_eeBadScFilter"
+        ],
+        "2017": [
+          "Flag_goodVertices",
+          "Flag_globalSuperTightHalo2016Filter",
+          "Flag_HBHENoiseFilter",
+          "Flag_HBHENoiseIsoFilter",
+          "Flag_EcalDeadCellTriggerPrimitiveFilter",
+          "Flag_BadPFMuonFilter",
+          "Flag_BadPFMuonDzFilter",
+          "Flag_hfNoisyHitsFilter",
+          "Flag_eeBadScFilter",
+          "Flag_ecalBadCalibFilter"
+        ],
+        "2018": [
+          "Flag_goodVertices",
+          "Flag_globalSuperTightHalo2016Filter",
+          "Flag_HBHENoiseFilter",
+          "Flag_HBHENoiseIsoFilter",
+          "Flag_EcalDeadCellTriggerPrimitiveFilter",
+          "Flag_BadPFMuonFilter",
+          "Flag_BadPFMuonDzFilter",
+          "Flag_hfNoisyHitsFilter",
+          "Flag_eeBadScFilter",
+          "Flag_ecalBadCalibFilter"
+        ]
+      },
+      "doc": "Standard MET filters, all required. 2016 has no ecalBadCalibFilter, so its list is one shorter"
+    }
+  ]
+}

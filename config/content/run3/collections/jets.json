@@ -1,0 +1,155 @@
+{
+  "_doc": "AK4 PUPPI jets. Energy fractions kept raw so jet ID is applied downstream.",
+  "collections": {
+    "Jet": {
+      "type": "patJet",
+      "src": "slimmedJetsPuppi",
+      "cut": "pt > 20 && abs(eta) < 5.0",
+      "maxLen": 40,
+      "doc": "AK4 PUPPI jets, pT > 20 GeV, |eta| < 5",
+      "variables": {
+        "pt": {
+          "expr": "pt()",
+          "type": "float",
+          "doc": "Corrected pT [GeV]",
+          "precision": -1
+        },
+        "eta": {
+          "expr": "eta()",
+          "type": "float",
+          "doc": "Pseudorapidity",
+          "precision": -1
+        },
+        "phi": {
+          "expr": "phi()",
+          "type": "float",
+          "doc": "Azimuthal angle",
+          "precision": -1
+        },
+        "mass": {
+          "expr": "mass()",
+          "type": "float",
+          "doc": "Corrected mass [GeV]",
+          "precision": 10
+        },
+        "rawFactor": {
+          "expr": "1.-jecFactor('Uncorrected')",
+          "type": "float",
+          "doc": "1 - (raw pT)/(corrected pT)",
+          "precision": 10
+        },
+        "area": {
+          "expr": "jetArea()",
+          "type": "float",
+          "doc": "Catchment area, for JECs",
+          "precision": 10
+        },
+        "chHEF": {
+          "expr": "chargedHadronEnergyFraction()",
+          "type": "float",
+          "doc": "Charged hadron energy fraction",
+          "precision": -1
+        },
+        "neHEF": {
+          "expr": "neutralHadronEnergyFraction()",
+          "type": "float",
+          "doc": "Neutral hadron energy fraction",
+          "precision": -1
+        },
+        "chEmEF": {
+          "expr": "chargedEmEnergyFraction()",
+          "type": "float",
+          "doc": "Charged EM energy fraction",
+          "precision": -1
+        },
+        "neEmEF": {
+          "expr": "neutralEmEnergyFraction()",
+          "type": "float",
+          "doc": "Neutral EM energy fraction",
+          "precision": -1
+        },
+        "muEF": {
+          "expr": "muonEnergyFraction()",
+          "type": "float",
+          "doc": "Muon energy fraction",
+          "precision": -1
+        },
+        "nConstituents": {
+          "expr": "numberOfDaughters()",
+          "type": "uint8",
+          "doc": "Number of PF constituents"
+        },
+        "chMultiplicity": {
+          "expr": "chargedMultiplicity()",
+          "type": "uint8",
+          "doc": "Charged constituent multiplicity"
+        },
+        "neMultiplicity": {
+          "expr": "neutralMultiplicity()",
+          "type": "uint8",
+          "doc": "Neutral constituent multiplicity"
+        },
+        "btagDeepFlavB": {
+          "expr": "bDiscriminator('pfDeepFlavourJetTags:probb')+bDiscriminator('pfDeepFlavourJetTags:probbb')+bDiscriminator('pfDeepFlavourJetTags:problepb')",
+          "type": "float",
+          "doc": "DeepJet b+bb+lepb",
+          "precision": -1
+        },
+        "btagUParTAK4B": {
+          "expr": "bDiscriminator('pfUnifiedParticleTransformerAK4DiscriminatorsJetTags:BvsAll')",
+          "type": "float",
+          "doc": "UnifiedParT b vs udscg (-1000 if the tagger is absent in this MiniAOD version)",
+          "precision": 10
+        },
+        "nSVs": {
+          "expr": "?hasOverlaps('vertices')?overlaps('vertices').size():0",
+          "type": "uint8",
+          "doc": "Number of IVF secondary vertices associated to this jet"
+        },
+        "nMuons": {
+          "expr": "?hasOverlaps('muons')?overlaps('muons').size():0",
+          "type": "uint8",
+          "doc": "Number of muons overlapping the jet"
+        },
+        "nElectrons": {
+          "expr": "?hasOverlaps('electrons')?overlaps('electrons').size():0",
+          "type": "uint8",
+          "doc": "Number of electrons overlapping the jet"
+        }
+      }
+    },
+    "CaloJet": {
+      "type": "candidate",
+      "src": "slimmedCaloJets",
+      "cut": "",
+      "maxLen": 40,
+      "doc": "Uncorrected AK4 calo jets, the full collection. The displaced-dijet triggers are emulated offline from these, and JMTucker uses their raw pT, so no correction is applied here either",
+      "variables": {
+        "pt": {
+          "expr": "pt()",
+          "type": "float",
+          "doc": "Uncorrected pT [GeV]",
+          "precision": -1
+        },
+        "eta": {
+          "expr": "eta()",
+          "type": "float",
+          "doc": "Pseudorapidity",
+          "precision": -1
+        },
+        "phi": {
+          "expr": "phi()",
+          "type": "float",
+          "doc": "Azimuth [rad]",
+          "precision": -1
+        },
+        "energy": {
+          "expr": "energy()",
+          "type": "float",
+          "doc": "Uncorrected energy [GeV]",
+          "precision": -1
+        }
+      }
+    }
+  }
+}

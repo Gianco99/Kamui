@@ -1,0 +1,21 @@
+{
+  "_doc": "Displacement-triggered channel for Run 2, matching JMTucker.",
+  "include": [
+    "dvFull"
+  ],
+  "skim": {
+    "triggers": "run2Displaced"
+  },
+  "collections": {
+    "Jet": {
+      "src": "slimmedJets"
+    },
+    "Track": {
+      "cut": "charge != 0 && hasTrackDetails() && pt > 1.0 && pixelLayersWithMeasurement() >= 2 && stripLayersWithMeasurement() >= 6"
+    },
+    "LostTrack": {
+      "cut": "charge != 0 && hasTrackDetails() && pt > 1.0 && pixelLayersWithMeasurement() >= 2 && stripLayersWithMeasurement() >= 6"
+    },
+    "CaloJet": {}
+  }
+}

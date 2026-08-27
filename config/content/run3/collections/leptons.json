@@ -12,19 +12,19 @@
           "expr": "pt()",
           "type": "float",
           "doc": "pT [GeV]",
-          "precision": 10
+          "precision": -1
         },
         "eta": {
           "expr": "eta()",
           "type": "float",
           "doc": "Pseudorapidity",
-          "precision": 12
+          "precision": -1
         },
         "phi": {
           "expr": "phi()",
           "type": "float",
           "doc": "Azimuthal angle",
-          "precision": 12
+          "precision": -1
         },
         "charge": {
           "expr": "charge()",
@@ -35,7 +35,7 @@
           "expr": "dB('PV2D')",
           "type": "float",
           "doc": "Signed dxy wrt first PV [cm]",
-          "precision": 12
+          "precision": -1
         },
         "dxyErr": {
           "expr": "edB('PV2D')",
@@ -47,13 +47,13 @@
           "expr": "dB('BS2D')",
           "type": "float",
           "doc": "Signed dxy wrt beamspot [cm]",
-          "precision": 12
+          "precision": -1
         },
         "dz": {
           "expr": "dB('PVDZ')",
           "type": "float",
           "doc": "Signed dz wrt first PV [cm]",
-          "precision": 10
+          "precision": -1
         },
         "dzErr": {
           "expr": "abs(edB('PVDZ'))",
@@ -65,7 +65,7 @@
           "expr": "abs(dB('PV3D')/edB('PV3D'))",
           "type": "float",
           "doc": "3D IP significance wrt first PV",
-          "precision": 10
+          "precision": -1
         },
         "isGlobal": {
           "expr": "isGlobalMuon()",
@@ -111,6 +111,30 @@
           "expr": "numberOfMatchedStations()",
           "type": "uint8",
           "doc": "Matched muon stations"
+        },
+        "pfRelIso04": {
+          "expr": "(pfIsolationR04().sumChargedHadronPt + max(0., pfIsolationR04().sumNeutralHadronEt + pfIsolationR04().sumPhotonEt - 0.5*pfIsolationR04().sumPUPt))/pt",
+          "type": "float",
+          "precision": -1,
+          "doc": "PF relative isolation, dR 0.4, delta-beta corrected"
+        },
+        "vx": {
+          "expr": "bestTrack().vx()",
+          "type": "float",
+          "precision": -1,
+          "doc": "Track reference point x [cm]"
+        },
+        "vy": {
+          "expr": "bestTrack().vy()",
+          "type": "float",
+          "precision": -1,
+          "doc": "Track reference point y [cm]"
+        },
+        "vz": {
+          "expr": "bestTrack().vz()",
+          "type": "float",
+          "precision": -1,
+          "doc": "Track reference point z [cm]"
         }
       }
     },
@@ -125,19 +149,19 @@
           "expr": "pt()",
           "type": "float",
           "doc": "pT [GeV]",
-          "precision": 10
+          "precision": -1
         },
         "eta": {
           "expr": "eta()",
           "type": "float",
           "doc": "Pseudorapidity",
-          "precision": 12
+          "precision": -1
         },
         "phi": {
           "expr": "phi()",
           "type": "float",
           "doc": "Azimuthal angle",
-          "precision": 12
+          "precision": -1
         },
         "charge": {
           "expr": "charge()",
@@ -148,13 +172,19 @@
           "expr": "superCluster().eta()",
           "type": "float",
           "doc": "Supercluster eta",
-          "precision": 12
+          "precision": -1
         },
         "dxy": {
           "expr": "dB('PV2D')",
           "type": "float",
           "doc": "Signed dxy wrt first PV [cm]",
-          "precision": 12
+          "precision": -1
+        },
+        "dxyBS": {
+          "expr": "dB('BS2D')",
+          "type": "float",
+          "precision": 12,
+          "doc": "Signed dxy wrt the beamspot [cm]"
         },
         "dxyErr": {
           "expr": "edB('PV2D')",
@@ -166,7 +196,7 @@
           "expr": "dB('PVDZ')",
           "type": "float",
           "doc": "Signed dz wrt first PV [cm]",
-          "precision": 10
+          "precision": -1
         },
         "dzErr": {
           "expr": "edB('PVDZ')",
@@ -178,7 +208,7 @@
           "expr": "abs(dB('PV3D')/edB('PV3D'))",
           "type": "float",
           "doc": "3D IP significance wrt first PV",
-          "precision": 10
+          "precision": -1
         },
         "convVeto": {
           "expr": "passConversionVeto()",
@@ -206,7 +236,7 @@
           "expr": "(pfIsolationVariables().sumChargedHadronPt + pfIsolationVariables().sumNeutralHadronEt + pfIsolationVariables().sumPhotonEt)/pt()",
           "type": "float",
           "doc": "Uncorrected PF relative isolation",
-          "precision": 10
+          "precision": -1
         },
         "cutBased": {
           "expr": "electronID('cutBasedElectronID-RunIIIWinter22-V1-veto')+electronID('cutBasedElectronID-RunIIIWinter22-V1-loose')+electronID('cutBasedElectronID-RunIIIWinter22-V1-medium')+electronID('cutBasedElectronID-RunIIIWinter22-V1-tight')",
@@ -222,6 +252,24 @@
           "expr": "electronID('mvaEleID-RunIIIWinter22-iso-V1-wp80')",
           "type": "bool",
           "doc": "MVA iso Winter22-V1 wp80"
+        },
+        "vx": {
+          "expr": "gsfTrack().vx()",
+          "type": "float",
+          "precision": -1,
+          "doc": "Track reference point x [cm]"
+        },
+        "vy": {
+          "expr": "gsfTrack().vy()",
+          "type": "float",
+          "precision": -1,
+          "doc": "Track reference point y [cm]"
+        },
+        "vz": {
+          "expr": "gsfTrack().vz()",
+          "type": "float",
+          "precision": -1,
+          "doc": "Track reference point z [cm]"
         }
       }
     }

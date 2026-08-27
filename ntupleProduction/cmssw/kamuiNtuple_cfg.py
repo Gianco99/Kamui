@@ -81,7 +81,13 @@ if opts.globalTag:
 modules, order = buildTables(content)
 for name, mod in modules.items():
     setattr(process, name, mod)
-process.kamuiTables = cms.Task(*[getattr(process, n) for n in order])
+## The generator-weight producer accumulates the run-level sums that normalization divides by,
+## so it has to see every event. Keeping it behind the skim would make the denominator count
+## only the events that survived, which silently inflates every yield from a skimmed sample.
+normNames = [n for n in order if "genweight" in n.lower()]
+tableNames = [n for n in order if n not in normNames]
+process.kamuiTables = cms.Task(*[getattr(process, n) for n in tableNames])
+
 
 # ---- optional HLT skim ----------------------------------------------------------
 skimFilter, skimName = buildSkim(content.get("skim", {}))
@@ -93,6 +99,14 @@ else:
     process.dvPath = cms.Path(process.kamuiTables)
     selectEvents = cms.untracked.PSet()   # keep every event
 
+## Unfiltered and scheduled, not in a Task: a Task runs its modules only when something
+## consumes their products, which would again mean only the events that survived the skim.
+if normNames:
+    normSeq = getattr(process, normNames[0])
+    for n in normNames[1:]:
+        normSeq = normSeq + getattr(process, n)
+    process.normPath = cms.Path(normSeq)
+
 # ---- output ---------------------------------------------------------------------
 trig = content.get("triggerBits", {})
 outputCommands = [
@@ -102,8 +116,12 @@ outputCommands = [
     "keep nanoaodUniqueString_nanoMetadata_*_*",
 ]
 if trig.get("keepAll", True):
-    # The output module turns edm::TriggerResults into one bool branch per HLT path.
-    outputCommands.append("keep edmTriggerResults_*_*_%s" % trig.get("process", "HLT"))
+    # The output module turns edm::TriggerResults into one bool branch per path.
+    # Several processes are kept because the HLT decisions and the MET filter decisions
+    # live in different ones, and a process absent from a given file simply matches nothing.
+    processes = trig.get("processes") or [trig.get("process", "HLT")]
+    for proc in processes:
+        outputCommands.append("keep edmTriggerResults_*_*_%s" % proc)
 
 miniaodCfg = content.get("miniaod", {})
 # Default is the flat tree only. A content preset may DEFINE a miniaod keep list

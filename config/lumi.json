@@ -1,0 +1,48 @@
+{
+  "_doc": "Integrated luminosity per era, in inverse picobarns. Some triggers were not live for the whole run, so a channel can have less luminosity than its era.",
+  "_units": "pb^-1",
+  "eras": {
+    "2016APV": {
+      "lumi": 19502.0,
+      "source": "JMTucker MFVNeutralino/interface/AnalysisConstants.h, int_lumi_20161"
+    },
+    "2016": {
+      "lumi": 16812.0,
+      "source": "JMTucker MFVNeutralino/interface/AnalysisConstants.h, int_lumi_20162"
+    },
+    "2017": {
+      "lumi": 42068.0,
+      "source": "JMTucker MFVNeutralino/interface/AnalysisConstants.h, int_lumi_2017"
+    },
+    "2018": {
+      "lumi": 59561.0,
+      "source": "JMTucker MFVNeutralino/interface/AnalysisConstants.h, int_lumi_2018"
+    },
+    "Summer22": {
+      "lumi": null,
+      "source": "TODO: certified luminosity for this era"
+    },
+    "Summer23": {
+      "lumi": null,
+      "source": "TODO: certified luminosity for this era"
+    },
+    "Summer24": {
+      "lumi": null,
+      "source": "TODO: certified luminosity for this era"
+    }
+  },
+  "_channelNote": "The b-jet triggers were not live for the whole of 2017 and 2018, so the displacement-triggered channel integrates less luminosity than the era total. Use the channel value when normalising that channel.",
+  "channels": {
+    "displaced": {
+      "2017": {
+        "lumi": 37187.0,
+        "source": "JMTucker AnalysisConstants.h, int_lumi_bjet_trig_2017"
+      },
+      "2018": {
+        "lumi": 54286.0,
+        "source": "JMTucker AnalysisConstants.h, int_lumi_bjet_trig_2018"
+      }
+    }
+  },
+  "_run3Note": "Run 3 luminosities are not filled in yet. Take the certified (golden) values from the CMS public luminosity page or from brilcalc over the golden JSON for the era, and record which one you used in 'source'."
+}

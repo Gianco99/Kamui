@@ -1,0 +1,439 @@
+{
+  "_doc": "Generator event counts and weight sums for the full dataset, used as the normalization denominator.",
+  "samples": {
+    "ZHToSSTo4d_mS55_ctau1mm_2018": {
+      "nEvents": 2652,
+      "sumGenWeight": 206.483305,
+      "sumGenWeight2": 18.83697827677692,
+      "source": "production task 'normRun2Lep'",
+      "dasEvents": 49999,
+      "complete": false
+    },
+    "ggH-2S-4D_mS15_ctau0p1mm_2024": {
+      "dasEvents": 5958672
+    },
+    "ggH-2S-4D_mS15_ctau1mm_2024": {
+      "dasEvents": 5969256
+    },
+    "ggH-2S-4D_mS15_ctau10mm_2024": {
+      "dasEvents": 5780076
+    },
+    "ggH-2S-4D_mS40_ctau0p1mm_2024": {
+      "dasEvents": 5868636
+    },
+    "ggH-2S-4D_mS40_ctau1mm_2024": {
+      "dasEvents": 5963600
+    },
+    "ggH-2S-4D_mS40_ctau10mm_2024": {
+      "dasEvents": 5945700
+    },
+    "ggH-2S-4D_mS55_ctau0p1mm_2024": {
+      "dasEvents": 5893280
+    },
+    "ggH-2S-4D_mS55_ctau1mm_2024": {
+      "dasEvents": 5946646
+    },
+    "ggH-2S-4D_mS55_ctau10mm_2024": {
+      "dasEvents": 5981575
+    },
+    "VBFH-2S-4D_mS15_ctau0p1mm_2024": {
+      "dasEvents": 449000
+    },
+    "VBFH-2S-4D_mS15_ctau1mm_2024": {
+      "dasEvents": 450000
+    },
+    "VBFH-2S-4D_mS15_ctau10mm_2024": {
+      "dasEvents": 450000
+    },
+    "VBFH-2S-4D_mS40_ctau0p1mm_2024": {
+      "dasEvents": 450000
+    },
+    "VBFH-2S-4D_mS40_ctau1mm_2024": {
+      "dasEvents": 450000
+    },
+    "VBFH-2S-4D_mS40_ctau10mm_2024": {
+      "dasEvents": 450000
+    },
+    "VBFH-2S-4D_mS55_ctau0p1mm_2024": {
+      "dasEvents": 448000
+    },
+    "VBFH-2S-4D_mS55_ctau1mm_2024": {
+      "dasEvents": 450000
+    },
+    "VBFH-2S-4D_mS55_ctau10mm_2024": {
+      "dasEvents": 449000
+    },
+    "WplusH-2S-4D_mS15_ctau0p1mm_2024": {
+      "dasEvents": 129360
+    },
+    "WplusH-2S-4D_mS15_ctau1mm_2024": {
+      "dasEvents": 129999
+    },
+    "WplusH-2S-4D_mS15_ctau10mm_2024": {
+      "dasEvents": 130000
+    },
+    "WplusH-2S-4D_mS40_ctau0p1mm_2024": {
+      "dasEvents": 129513
+    },
+    "WplusH-2S-4D_mS40_ctau1mm_2024": {
+      "dasEvents": 129864
+    },
+    "WplusH-2S-4D_mS40_ctau10mm_2024": {
+      "dasEvents": 129958
+    },
+    "WplusH-2S-4D_mS55_ctau0p1mm_2024": {
+      "dasEvents": 129981
+    },
+    "WplusH-2S-4D_mS55_ctau1mm_2024": {
+      "dasEvents": 129876
+    },
+    "WplusH-2S-4D_mS55_ctau10mm_2024": {
+      "dasEvents": 129961
+    },
+    "WminusH-2S-4D_mS15_ctau0p1mm_2024": {
+      "dasEvents": 69993
+    },
+    "WminusH-2S-4D_mS15_ctau1mm_2024": {
+      "dasEvents": 69926
+    },
+    "WminusH-2S-4D_mS15_ctau10mm_2024": {
+      "dasEvents": 69968
+    },
+    "WminusH-2S-4D_mS40_ctau0p1mm_2024": {
+      "dasEvents": 69912
+    },
+    "WminusH-2S-4D_mS40_ctau1mm_2024": {
+      "dasEvents": 69970
+    },
+    "WminusH-2S-4D_mS40_ctau10mm_2024": {
+      "dasEvents": 69963
+    },
+    "WminusH-2S-4D_mS55_ctau0p1mm_2024": {
+      "dasEvents": 69994
+    },
+    "WminusH-2S-4D_mS55_ctau1mm_2024": {
+      "dasEvents": 69991
+    },
+    "WminusH-2S-4D_mS55_ctau10mm_2024": {
+      "dasEvents": 69995
+    },
+    "ZH-2S-4D_mS15_ctau0p1mm_2024": {
+      "dasEvents": 129963
+    },
+    "ZH-2S-4D_mS15_ctau1mm_2024": {
+      "dasEvents": 129968
+    },
+    "ZH-2S-4D_mS15_ctau10mm_2024": {
+      "dasEvents": 129636
+    },
+    "ZH-2S-4D_mS40_ctau0p1mm_2024": {
+      "dasEvents": 129996
+    },
+    "ZH-2S-4D_mS40_ctau1mm_2024": {
+      "dasEvents": 129972
+    },
+    "ZH-2S-4D_mS40_ctau10mm_2024": {
+      "dasEvents": 129707
+    },
+    "ZH-2S-4D_mS55_ctau0p1mm_2024": {
+      "dasEvents": 129951
+    },
+    "ZH-2S-4D_mS55_ctau1mm_2024": {
+      "dasEvents": 129966
+    },
+    "ZH-2S-4D_mS55_ctau10mm_2024": {
+      "dasEvents": 129679
+    },
+    "ttH-2S-4D_mS15_ctau0p1mm_2024": {
+      "dasEvents": 70000
+    },
+    "ttH-2S-4D_mS15_ctau1mm_2024": {
+      "dasEvents": 70000
+    },
+    "ttH-2S-4D_mS15_ctau10mm_2024": {
+      "dasEvents": 69286
+    },
+    "ttH-2S-4D_mS40_ctau0p1mm_2024": {
+      "dasEvents": 70000
+    },
+    "ttH-2S-4D_mS40_ctau1mm_2024": {
+      "dasEvents": 70000
+    },
+    "ttH-2S-4D_mS40_ctau10mm_2024": {
+      "dasEvents": 70000
+    },
+    "ttH-2S-4D_mS55_ctau0p1mm_2024": {
+      "dasEvents": 70000
+    },
+    "ttH-2S-4D_mS55_ctau1mm_2024": {
+      "dasEvents": 70000
+    },
+    "ttH-2S-4D_mS55_ctau10mm_2024": {
+      "dasEvents": 70000
+    },
+    "StopStopbar-2Dbar2D_M400_ctau10mm_2024": {
+      "dasEvents": 100000
+    },
+    "rpvStopDD_M400_ctau1mm_2016APV": {
+      "dasEvents": 25000
+    },
+    "rpvStopDD_M400_ctau1mm_2016": {
+      "dasEvents": 25000
+    },
+    "rpvStopDD_M400_ctau1mm_2017": {
+      "dasEvents": 50000
+    },
+    "rpvStopDD_M400_ctau1mm_2018": {
+      "dasEvents": 50000
+    },
+    "rpvStopDD_M600_ctau1mm_2016APV": {
+      "dasEvents": 18000
+    },
+    "rpvStopDD_M600_ctau1mm_2016": {
+      "dasEvents": 18000
+    },
+    "rpvStopDD_M600_ctau1mm_2017": {
+      "dasEvents": 36000
+    },
+    "rpvStopDD_M600_ctau1mm_2018": {
+      "dasEvents": 36000
+    },
+    "ggHToSSTo4d_mS55_ctau1mm_2016APV": {
+      "dasEvents": 256935
+    },
+    "ggHToSSTo4d_mS55_ctau1mm_2016": {
+      "dasEvents": 271240
+    },
+    "ggHToSSTo4d_mS55_ctau1mm_2017": {
+      "dasEvents": 525699
+    },
+    "ggHToSSTo4d_mS55_ctau1mm_2018": {
+      "dasEvents": 546940
+    },
+    "ZHToSSTo4d_mS55_ctau1mm_2016APV": {
+      "dasEvents": 49990
+    },
+    "ZHToSSTo4d_mS55_ctau1mm_2016": {
+      "dasEvents": 49998
+    },
+    "ZHToSSTo4d_mS55_ctau1mm_2017": {
+      "dasEvents": 49997
+    },
+    "WplusHToSSTo4d_mS55_ctau1mm_2016APV": {
+      "dasEvents": 24999
+    },
+    "WplusHToSSTo4d_mS55_ctau1mm_2016": {
+      "dasEvents": 24998
+    },
+    "WplusHToSSTo4d_mS55_ctau1mm_2017": {
+      "dasEvents": 49991
+    },
+    "WplusHToSSTo4d_mS55_ctau1mm_2018": {
+      "dasEvents": 49994
+    },
+    "WminusHToSSTo4d_mS55_ctau1mm_2016APV": {
+      "dasEvents": 24995
+    },
+    "WminusHToSSTo4d_mS55_ctau1mm_2016": {
+      "dasEvents": 24998
+    },
+    "WminusHToSSTo4d_mS55_ctau1mm_2017": {
+      "dasEvents": 49995
+    },
+    "WminusHToSSTo4d_mS55_ctau1mm_2018": {
+      "dasEvents": 49995
+    },
+    "StealthSHH_mStop300_mSo100_ctau0p1mm_2024": {
+      "dasEvents": 107540
+    },
+    "StealthSHH_mStop300_mSo100_ctau1mm_2024": {
+      "dasEvents": 116450
+    },
+    "StealthSHH_mStop300_mSo100_ctau3mm_2024": {
+      "dasEvents": 107739
+    },
+    "StealthSHH_mStop300_mSo100_ctau10mm_2024": {
+      "dasEvents": 112788
+    },
+    "StealthSHH_mStop325_mSo100_ctau0p1mm_2024": {
+      "dasEvents": 111274
+    },
+    "StealthSHH_mStop325_mSo100_ctau1mm_2024": {
+      "dasEvents": 112756
+    },
+    "StealthSHH_mStop325_mSo100_ctau3mm_2024": {
+      "dasEvents": 100286
+    },
+    "StealthSHH_mStop325_mSo100_ctau10mm_2024": {
+      "dasEvents": 108213
+    },
+    "StealthSHH_mStop500_mSo100_ctau0p1mm_2024": {
+      "dasEvents": 94446
+    },
+    "StealthSHH_mStop500_mSo100_ctau1mm_2024": {
+      "dasEvents": 88939
+    },
+    "StealthSHH_mStop500_mSo100_ctau3mm_2024": {
+      "dasEvents": 90236
+    },
+    "StealthSHH_mStop500_mSo100_ctau10mm_2024": {
+      "dasEvents": 92895
+    },
+    "StealthSHH_mStop500_mSo275_ctau0p1mm_2024": {
+      "dasEvents": 95106
+    },
+    "StealthSHH_mStop500_mSo275_ctau1mm_2024": {
+      "dasEvents": 93533
+    },
+    "StealthSHH_mStop500_mSo275_ctau3mm_2024": {
+      "dasEvents": 91982
+    },
+    "StealthSHH_mStop500_mSo275_ctau10mm_2024": {
+      "dasEvents": 96308
+    },
+    "StealthSHH_mStop700_mSo100_ctau0p1mm_2024": {
+      "dasEvents": 85849
+    },
+    "StealthSHH_mStop700_mSo100_ctau1mm_2024": {
+      "dasEvents": 85932
+    },
+    "StealthSHH_mStop700_mSo100_ctau3mm_2024": {
+      "dasEvents": 83996
+    },
+    "StealthSHH_mStop700_mSo100_ctau10mm_2024": {
+      "dasEvents": 83170
+    },
+    "StealthSHH_mStop700_mSo475_ctau0p1mm_2024": {
+      "dasEvents": 86221
+    },
+    "StealthSHH_mStop700_mSo475_ctau1mm_2024": {
+      "dasEvents": 87244
+    },
+    "StealthSHH_mStop700_mSo475_ctau3mm_2024": {
+      "dasEvents": 82189
+    },
+    "StealthSHH_mStop700_mSo475_ctau10mm_2024": {
+      "dasEvents": 86490
+    },
+    "StealthSHH_mStop900_mSo100_ctau0p1mm_2024": {
+      "dasEvents": 80188
+    },
+    "StealthSHH_mStop900_mSo100_ctau1mm_2024": {
+      "dasEvents": 76667
+    },
+    "StealthSHH_mStop900_mSo100_ctau3mm_2024": {
+      "dasEvents": 79509
+    },
+    "StealthSHH_mStop900_mSo100_ctau10mm_2024": {
+      "dasEvents": 72304
+    },
+    "StealthSHH_mStop900_mSo675_ctau0p1mm_2024": {
+      "dasEvents": 79509
+    },
+    "StealthSHH_mStop900_mSo675_ctau1mm_2024": {
+      "dasEvents": 80733
+    },
+    "StealthSHH_mStop900_mSo675_ctau3mm_2024": {
+      "dasEvents": 83483
+    },
+    "StealthSHH_mStop900_mSo675_ctau10mm_2024": {
+      "dasEvents": 77303
+    },
+    "StealthSYY_mStop300_mSo100_ctau0p1mm_2024": {
+      "dasEvents": 109818
+    },
+    "StealthSYY_mStop300_mSo100_ctau1mm_2024": {
+      "dasEvents": 117890
+    },
+    "StealthSYY_mStop300_mSo100_ctau3mm_2024": {
+      "dasEvents": 114617
+    },
+    "StealthSYY_mStop300_mSo100_ctau10mm_2024": {
+      "dasEvents": 116439
+    },
+    "StealthSYY_mStop325_mSo100_ctau0p1mm_2024": {
+      "dasEvents": 111326
+    },
+    "StealthSYY_mStop325_mSo100_ctau1mm_2024": {
+      "dasEvents": 113632
+    },
+    "StealthSYY_mStop325_mSo100_ctau3mm_2024": {
+      "dasEvents": 109795
+    },
+    "StealthSYY_mStop325_mSo100_ctau10mm_2024": {
+      "dasEvents": 104873
+    },
+    "StealthSYY_mStop500_mSo100_ctau0p1mm_2024": {
+      "dasEvents": 93244
+    },
+    "StealthSYY_mStop500_mSo100_ctau1mm_2024": {
+      "dasEvents": 90278
+    },
+    "StealthSYY_mStop500_mSo100_ctau3mm_2024": {
+      "dasEvents": 92820
+    },
+    "StealthSYY_mStop500_mSo100_ctau10mm_2024": {
+      "dasEvents": 90999
+    },
+    "StealthSYY_mStop500_mSo275_ctau0p1mm_2024": {
+      "dasEvents": 95032
+    },
+    "StealthSYY_mStop500_mSo275_ctau1mm_2024": {
+      "dasEvents": 96122
+    },
+    "StealthSYY_mStop500_mSo275_ctau3mm_2024": {
+      "dasEvents": 92603
+    },
+    "StealthSYY_mStop500_mSo275_ctau10mm_2024": {
+      "dasEvents": 96750
+    },
+    "StealthSYY_mStop700_mSo100_ctau0p1mm_2024": {
+      "dasEvents": 84575
+    },
+    "StealthSYY_mStop700_mSo100_ctau1mm_2024": {
+      "dasEvents": 88860
+    },
+    "StealthSYY_mStop700_mSo100_ctau3mm_2024": {
+      "dasEvents": 90316
+    },
+    "StealthSYY_mStop700_mSo100_ctau10mm_2024": {
+      "dasEvents": 84209
+    },
+    "StealthSYY_mStop700_mSo475_ctau0p1mm_2024": {
+      "dasEvents": 87039
+    },
+    "StealthSYY_mStop700_mSo475_ctau1mm_2024": {
+      "dasEvents": 78446
+    },
+    "StealthSYY_mStop700_mSo475_ctau3mm_2024": {
+      "dasEvents": 90553
+    },
+    "StealthSYY_mStop700_mSo475_ctau10mm_2024": {
+      "dasEvents": 84012
+    },
+    "StealthSYY_mStop900_mSo100_ctau0p1mm_2024": {
+      "dasEvents": 84567
+    },
+    "StealthSYY_mStop900_mSo100_ctau1mm_2024": {
+      "dasEvents": 82085
+    },
+    "StealthSYY_mStop900_mSo100_ctau3mm_2024": {
+      "dasEvents": 79635
+    },
+    "StealthSYY_mStop900_mSo100_ctau10mm_2024": {
+      "dasEvents": 76113
+    },
+    "StealthSYY_mStop900_mSo675_ctau0p1mm_2024": {
+      "dasEvents": 78458
+    },
+    "StealthSYY_mStop900_mSo675_ctau1mm_2024": {
+      "dasEvents": 82799
+    },
+    "StealthSYY_mStop900_mSo675_ctau3mm_2024": {
+      "dasEvents": 79866
+    },
+    "StealthSYY_mStop900_mSo675_ctau10mm_2024": {
+      "dasEvents": 82218
+    }
+  }
+}

@@ -1,0 +1,277 @@
+{
+  "_doc": "Leptons for Run 2. Electron IDs are the Fall17 working points, the only ones present in Run 2 MiniAOD.",
+  "collections": {
+    "Muon": {
+      "type": "patMuon",
+      "src": "slimmedMuons",
+      "cut": "pt > 5",
+      "maxLen": 20,
+      "doc": "slimmedMuons, pT > 5 GeV",
+      "variables": {
+        "pt": {
+          "expr": "pt()",
+          "type": "float",
+          "doc": "pT [GeV]",
+          "precision": -1
+        },
+        "eta": {
+          "expr": "eta()",
+          "type": "float",
+          "doc": "Pseudorapidity",
+          "precision": -1
+        },
+        "phi": {
+          "expr": "phi()",
+          "type": "float",
+          "doc": "Azimuthal angle",
+          "precision": -1
+        },
+        "charge": {
+          "expr": "charge()",
+          "type": "int16",
+          "doc": "Electric charge"
+        },
+        "dxy": {
+          "expr": "dB('PV2D')",
+          "type": "float",
+          "doc": "Signed dxy wrt first PV [cm]",
+          "precision": -1
+        },
+        "dxyErr": {
+          "expr": "edB('PV2D')",
+          "type": "float",
+          "doc": "dxy uncertainty [cm]",
+          "precision": 8
+        },
+        "dxyBS": {
+          "expr": "dB('BS2D')",
+          "type": "float",
+          "doc": "Signed dxy wrt beamspot [cm]",
+          "precision": -1
+        },
+        "dz": {
+          "expr": "dB('PVDZ')",
+          "type": "float",
+          "doc": "Signed dz wrt first PV [cm]",
+          "precision": -1
+        },
+        "dzErr": {
+          "expr": "abs(edB('PVDZ'))",
+          "type": "float",
+          "doc": "dz uncertainty [cm]",
+          "precision": 8
+        },
+        "sip3d": {
+          "expr": "abs(dB('PV3D')/edB('PV3D'))",
+          "type": "float",
+          "doc": "3D IP significance wrt first PV",
+          "precision": -1
+        },
+        "isGlobal": {
+          "expr": "isGlobalMuon()",
+          "type": "bool",
+          "doc": "Global muon"
+        },
+        "isTracker": {
+          "expr": "isTrackerMuon()",
+          "type": "bool",
+          "doc": "Tracker muon"
+        },
+        "isPFcand": {
+          "expr": "isPFMuon()",
+          "type": "bool",
+          "doc": "PF muon"
+        },
+        "looseId": {
+          "expr": "passed('CutBasedIdLoose')",
+          "type": "bool",
+          "doc": "Cut-based loose ID"
+        },
+        "mediumId": {
+          "expr": "passed('CutBasedIdMedium')",
+          "type": "bool",
+          "doc": "Cut-based medium ID"
+        },
+        "tightId": {
+          "expr": "passed('CutBasedIdTight')",
+          "type": "bool",
+          "doc": "Cut-based tight ID"
+        },
+        "pfIsoId": {
+          "expr": "passed('PFIsoLoose')+passed('PFIsoMedium')+passed('PFIsoTight')",
+          "type": "uint8",
+          "doc": "PF isolation WP count passed (0-3)"
+        },
+        "nTrackerLayers": {
+          "expr": "?track.isNonnull?innerTrack().hitPattern().trackerLayersWithMeasurement():0",
+          "type": "uint8",
+          "doc": "Tracker layers with a measurement"
+        },
+        "nStations": {
+          "expr": "numberOfMatchedStations()",
+          "type": "uint8",
+          "doc": "Matched muon stations"
+        },
+        "pfRelIso04": {
+          "expr": "(pfIsolationR04().sumChargedHadronPt + max(0., pfIsolationR04().sumNeutralHadronEt + pfIsolationR04().sumPhotonEt - 0.5*pfIsolationR04().sumPUPt))/pt",
+          "type": "float",
+          "precision": -1,
+          "doc": "PF relative isolation, dR 0.4, delta-beta corrected"
+        },
+        "vx": {
+          "expr": "bestTrack().vx()",
+          "type": "float",
+          "precision": -1,
+          "doc": "Track reference point x [cm]"
+        },
+        "vy": {
+          "expr": "bestTrack().vy()",
+          "type": "float",
+          "precision": -1,
+          "doc": "Track reference point y [cm]"
+        },
+        "vz": {
+          "expr": "bestTrack().vz()",
+          "type": "float",
+          "precision": -1,
+          "doc": "Track reference point z [cm]"
+        }
+      }
+    },
+    "Electron": {
+      "type": "patElectron",
+      "src": "slimmedElectrons",
+      "cut": "pt > 5",
+      "maxLen": 20,
+      "doc": "slimmedElectrons, pT > 5 GeV",
+      "variables": {
+        "pt": {
+          "expr": "pt()",
+          "type": "float",
+          "doc": "pT [GeV]",
+          "precision": -1
+        },
+        "eta": {
+          "expr": "eta()",
+          "type": "float",
+          "doc": "Pseudorapidity",
+          "precision": -1
+        },
+        "phi": {
+          "expr": "phi()",
+          "type": "float",
+          "doc": "Azimuthal angle",
+          "precision": -1
+        },
+        "charge": {
+          "expr": "charge()",
+          "type": "int16",
+          "doc": "Electric charge"
+        },
+        "scEta": {
+          "expr": "superCluster().eta()",
+          "type": "float",
+          "doc": "Supercluster eta",
+          "precision": -1
+        },
+        "dxy": {
+          "expr": "dB('PV2D')",
+          "type": "float",
+          "doc": "Signed dxy wrt first PV [cm]",
+          "precision": -1
+        },
+        "dxyBS": {
+          "expr": "dB('BS2D')",
+          "type": "float",
+          "precision": 12,
+          "doc": "Signed dxy wrt the beamspot [cm]"
+        },
+        "dxyErr": {
+          "expr": "edB('PV2D')",
+          "type": "float",
+          "doc": "dxy uncertainty [cm]",
+          "precision": 8
+        },
+        "dz": {
+          "expr": "dB('PVDZ')",
+          "type": "float",
+          "doc": "Signed dz wrt first PV [cm]",
+          "precision": -1
+        },
+        "dzErr": {
+          "expr": "edB('PVDZ')",
+          "type": "float",
+          "doc": "dz uncertainty [cm]",
+          "precision": 8
+        },
+        "sip3d": {
+          "expr": "abs(dB('PV3D')/edB('PV3D'))",
+          "type": "float",
+          "doc": "3D IP significance wrt first PV",
+          "precision": -1
+        },
+        "convVeto": {
+          "expr": "passConversionVeto()",
+          "type": "bool",
+          "doc": "Passes photon-conversion veto"
+        },
+        "lostHits": {
+          "expr": "gsfTrack().hitPattern().numberOfLostHits('MISSING_INNER_HITS')",
+          "type": "uint8",
+          "doc": "Missing inner hits"
+        },
+        "sieie": {
+          "expr": "full5x5_sigmaIetaIeta()",
+          "type": "float",
+          "doc": "Full 5x5 sigma_ietaieta",
+          "precision": 10
+        },
+        "hoe": {
+          "expr": "hadronicOverEm()",
+          "type": "float",
+          "doc": "H/E",
+          "precision": 8
+        },
+        "relIso": {
+          "expr": "(pfIsolationVariables().sumChargedHadronPt + pfIsolationVariables().sumNeutralHadronEt + pfIsolationVariables().sumPhotonEt)/pt()",
+          "type": "float",
+          "doc": "Uncorrected PF relative isolation",
+          "precision": -1
+        },
+        "cutBased": {
+          "expr": "electronID('cutBasedElectronID-Fall17-94X-V2-veto')+electronID('cutBasedElectronID-Fall17-94X-V2-loose')+electronID('cutBasedElectronID-Fall17-94X-V2-medium')+electronID('cutBasedElectronID-Fall17-94X-V2-tight')",
+          "type": "uint8",
+          "doc": "cut-based Fall17-94X-V2 ID: 0 fail, 1 veto, 2 loose, 3 medium, 4 tight"
+        },
+        "mvaIsoWP90": {
+          "expr": "electronID('mvaEleID-Fall17-iso-V2-wp90')",
+          "type": "bool",
+          "doc": "MVA iso Fall17-V2 wp90"
+        },
+        "mvaIsoWP80": {
+          "expr": "electronID('mvaEleID-Fall17-iso-V2-wp80')",
+          "type": "bool",
+          "doc": "MVA iso Fall17-V2 wp80"
+        },
+        "vx": {
+          "expr": "gsfTrack().vx()",
+          "type": "float",
+          "precision": -1,
+          "doc": "Track reference point x [cm]"
+        },
+        "vy": {
+          "expr": "gsfTrack().vy()",
+          "type": "float",
+          "precision": -1,
+          "doc": "Track reference point y [cm]"
+        },
+        "vz": {
+          "expr": "gsfTrack().vz()",
+          "type": "float",
+          "precision": -1,
+          "doc": "Track reference point z [cm]"
+        }
+      }
+    }
+  }
+}

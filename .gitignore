@@ -2,10 +2,31 @@
 docs/SampleProdPlan.txt
 
 # Saved edmDumpEventContent output - reference only, regenerable
-production/branchDumps/*.txt
+ntupleProduction/branchDumps/*.txt
 
 # Generated job areas, DAS cache, python bytecode
-production/jobs/
-production/.dasCache/
+ntupleProduction/jobs/
+ntupleProduction/.dasCache/
+ntupleSelection/jobs/
+ntupleSelection/out/
 __pycache__/
 *.pyc
+*.pyo
+
+# Batch-system leavings. crab writes crab.log into whatever directory it is run from,
+# and condor writes .out/.err per job, so these appear at the repo root by accident.
+*.log
+*.out
+*.err
+logs/
+crab_*/
+
+# Data. Nothing in this repo is an ntuple; anything with these extensions got here by mistake.
+*.root
+*.tmp
+
+# Editor and shell leavings
+typescript
+.ipynb_checkpoints/
+*.swp
+.DS_Store

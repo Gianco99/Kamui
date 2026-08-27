@@ -78,9 +78,9 @@ def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, o
     effective = {s["name"]: int(unitsPerJob or s.get("unitsPerJob") or DEFAULT_FILES_PER_JOB) for s in samples}
     written = []
     for s in samples:
-        key = (s["content"], bool(s["isMC"]))
+        key = (s["content"], bool(s["isMC"]), s["era"])
         if key not in contentCache:
-            contentCache[key] = writeResolvedContent(d, s["content"], bool(s["isMC"]))
+            contentCache[key] = writeResolvedContent(d, s["content"], bool(s["isMC"]), s["era"])
         contentJson = contentCache[key]
 
         inputDBS = "phys03" if "phys03" in s["dasInstance"] else "global"
@@ -121,6 +121,20 @@ def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, o
     return written, taskName, base
 
 
+# The crab wrapper on cvmfs exits zero when the CMSSW environment is missing, so its
+# return code alone does not say whether anything was submitted. The project directory does.
+def _projectDir(configPath):
+    """Where `crab submit` puts its work area for a config, from the config itself."""
+    values = {}
+    for line in open(configPath):
+        for key in ("requestName", "workArea"):
+            if f"General.{key}" in line and "=" in line:
+                values[key] = line.split("=", 1)[1].strip().strip("'\"")
+    if len(values) != 2:
+        return ""
+    return os.path.join(values["workArea"], "crab_" + values["requestName"])
+
+
 def submit(configPaths, dryRun=False, sites=None, taskName=None, base=None):
     """Run `crab submit` for each generated config."""
     ok, bad = [], []
@@ -130,8 +144,10 @@ def submit(configPaths, dryRun=False, sites=None, taskName=None, base=None):
             ok.append(p)
             continue
         r = subprocess.run(["crab", "submit", "-c", p], capture_output=True, text=True)
-        if r.returncode != 0:
-            print(f"  FAILED {os.path.basename(p)}: {r.stderr.strip().splitlines()[-1:] or r.stdout[-400:]}")
+        project = _projectDir(p)
+        if r.returncode != 0 or not os.path.isdir(project):
+            reason = r.stderr.strip().splitlines()[-1:] or r.stdout.strip().splitlines()[-3:]
+            print(f"  FAILED {os.path.basename(p)}: {reason}")
             bad.append(p)
         else:
             print(f"  submitted {os.path.basename(p)}")
@@ -139,6 +155,28 @@ def submit(configPaths, dryRun=False, sites=None, taskName=None, base=None):
     if ok and not dryRun and taskName:
         publishRecord(taskDir(taskName, create=False), sites or loadSites(), taskName, base)
     return ok, bad
+
+
+# CRAB tracks its own failed jobs and writes retried output to the same place, so a retry needs
+# no new job list or destination here. The one thing it does not do is keep the earlier attempt
+# separate, which is why the condor backend has more machinery than this.
+def resubmit(taskName, dryRun=False):
+    """`crab resubmit` over every crab project in a task directory. Returns the number of projects acted on."""
+    workArea = os.path.join(taskDir(taskName, create=False), "crab")
+    if not os.path.isdir(workArea):
+        raise FileNotFoundError(f"no crab work area at {workArea}")
+    n = 0
+    for proj in sorted(os.listdir(workArea)):
+        full = os.path.join(workArea, proj)
+        if not os.path.isdir(full):
+            continue
+        n += 1
+        if dryRun:
+            print(f"  [dry-run] crab resubmit -d {full}")
+            continue
+        print(f"\n=== {proj}")
+        subprocess.run(["crab", "resubmit", "-d", full])
+    return n
 
 
 def status(taskName):

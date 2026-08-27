@@ -1,4 +1,4 @@
-# production
+# ntupleProduction
 
 Sample processing: turning a DAS dataset into flat ntuples on EOS. Human-facing docs are ../README.txt and the planning documents in ../docs/.
 

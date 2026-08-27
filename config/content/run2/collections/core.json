@@ -10,19 +10,19 @@
           "expr": "position().x()",
           "type": "float",
           "doc": "PV x [cm]",
-          "precision": 12
+          "precision": -1
         },
         "y": {
           "expr": "position().y()",
           "type": "float",
           "doc": "PV y [cm]",
-          "precision": 12
+          "precision": -1
         },
         "z": {
           "expr": "position().z()",
           "type": "float",
           "doc": "PV z [cm]",
-          "precision": 14
+          "precision": -1
         },
         "xErr": {
           "expr": "xError()",
@@ -46,13 +46,13 @@
           "expr": "ndof()",
           "type": "float",
           "doc": "Number of degrees of freedom",
-          "precision": 8
+          "precision": -1
         },
         "chi2": {
           "expr": "normalizedChi2()",
           "type": "float",
           "doc": "chi2/ndof",
-          "precision": 8
+          "precision": -1
         },
         "nTracks": {
           "expr": "tracksSize()",
@@ -80,19 +80,19 @@
           "expr": "x0()",
           "type": "float",
           "doc": "Beamspot x at z=0 [cm]",
-          "precision": 14
+          "precision": -1
         },
         "y": {
           "expr": "y0()",
           "type": "float",
           "doc": "Beamspot y at z=0 [cm]",
-          "precision": 14
+          "precision": -1
         },
         "z": {
           "expr": "z0()",
           "type": "float",
           "doc": "Beamspot z [cm]",
-          "precision": 14
+          "precision": -1
         },
         "sigmaZ": {
           "expr": "sigmaZ()",
@@ -116,13 +116,13 @@
           "expr": "dxdz()",
           "type": "float",
           "doc": "Beam tilt dx/dz",
-          "precision": 10
+          "precision": -1
         },
         "dydz": {
           "expr": "dydz()",
           "type": "float",
           "doc": "Beam tilt dy/dz",
-          "precision": 10
+          "precision": -1
         }
       }
     },
@@ -208,7 +208,12 @@
     }
   },
   "triggerBits": {
-    "process": "HLT",
-    "keepAll": true
+    "processes": [
+      "HLT",
+      "PAT",
+      "RECO"
+    ],
+    "keepAll": true,
+    "_doc": "HLT decisions come from the HLT process; the MET filter decisions are recomputed in PAT for MC and RECO for data. A process that is absent from a file matches nothing."
   }
 }

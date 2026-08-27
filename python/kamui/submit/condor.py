@@ -5,10 +5,12 @@ Local HTCondor backend for LPC.
 # Import Block
 
 ## Standard Python imports
+import datetime
 import json
 import os
 import re
 import stat
+import subprocess
 
 ## Kamui modules
 from ..configReaders.sites import loadSites
@@ -61,21 +63,22 @@ arguments               = $(sample) $(index)
 transfer_input_files    = {inputFiles}
 should_transfer_files   = YES
 when_to_transfer_output = ON_EXIT
-output                  = logs/$(sample)_$(index).out
-error                   = logs/$(sample)_$(index).err
-log                     = logs/condor.log
+output                  = {logDir}/$(sample)_$(index).out
+error                   = {logDir}/$(sample)_$(index).err
+log                     = {logDir}/condor.log
 request_memory          = {memoryMB}
 request_disk            = {diskMB}
 # LPC worker OS selection. If jobs sit idle forever, try +REQUIRED_OS = "rhel9" instead.
 +DesiredOS              = "EL9"
 x509userproxy           = $ENV(X509_USER_PROXY)
 
-queue sample,index,script from jobList.txt
+queue sample,index,script from {jobListName}
 '''
 
 
-def _scriptName(presetName, isMC):
-    return f"runJob_{contentStem(presetName)}_{'mc' if isMC else 'data'}.sh"
+def _scriptName(presetName, isMC, era):
+    """One run script per content preset, data/MC flavour and era, since each combination gets its own resolved content."""
+    return f"runJob_{contentStem(presetName)}_{'mc' if isMC else 'data'}_{era}.sh"
 
 
 # fileLists maps a sample name to the list of LFNs it should run over, resolved by the caller from DAS or EOS.
@@ -101,9 +104,9 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
         if not lfns:
             dropped.append(s["name"])
             continue
-        key = (s["content"], bool(s["isMC"]))
+        key = (s["content"], bool(s["isMC"]), s["era"])
         if key not in contentCache:
-            contentCache[key] = writeResolvedContent(d, s["content"], bool(s["isMC"]))
+            contentCache[key] = writeResolvedContent(d, s["content"], bool(s["isMC"]), s["era"])
         perJob = int(filesPerJob or s.get("unitsPerJob") or DEFAULT_FILES_PER_JOB)
         effective[s["name"]] = perJob
         groups = chunk(lfns, perJob)
@@ -120,7 +123,7 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
         f.write("\n".join(jobRows) + "\n")
 
     # A task may mix content presets and MC with data, so each combination gets its own run script and the job rows name the one they need.
-    for (preset, isMC), contentJson in contentCache.items():
+    for (preset, isMC, era), contentJson in contentCache.items():
         script = RUN_SCRIPT.format(
             scramArch=scramArch,
             cmsswVersion=cmsswVersion,
@@ -131,7 +134,7 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
             eosRedirector=sites["eosRedirector"].rstrip("/"),
             outDir="/".join([base, "ntuples", taskName, "$SAMPLE"]),
         )
-        p = os.path.join(d, _scriptName(preset, isMC))
+        p = os.path.join(d, _scriptName(preset, isMC, era))
         with open(p, "w") as f:
             f.write(script)
         os.chmod(p, os.stat(p).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
@@ -141,7 +144,8 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
     jdlName = "submit.jdl"
     with open(os.path.join(d, jdlName), "w") as f:
         f.write(JDL.format(jdlName=jdlName, inputFiles=",".join(inputFiles),
-                           memoryMB=memoryMB, diskMB=diskMB))
+                           memoryMB=memoryMB, diskMB=diskMB,
+                           logDir="logs", jobListName="jobList.txt"))
 
     submitted = [s for s in samples if s["name"] in chunked]
     writeTaskRecord(d, {
@@ -165,15 +169,149 @@ def submit(taskName, dryRun=False, base=None):
     print(r.stdout.strip() or r.stderr.strip())
     if r.returncode == 0:
         # condor_submit reports "N job(s) submitted to cluster 12345." - keep the id so status can ask about this task alone.
-        m = re.search(r"submitted to cluster (\d+)", r.stdout)
-        if m:
+        cluster = re.search(r"submitted to cluster (\d+)", r.stdout)
+        # LPC spreads a submission over several schedds, and condor_q asks the default one unless told otherwise.
+        schedd = re.search(r"submit jobs to (\S+)", r.stdout)
+        if cluster or schedd:
             recordPath = os.path.join(d, "task.json")
             with open(recordPath) as f:
                 rec = json.load(f)
-            rec["condorCluster"] = int(m.group(1))
+            if cluster:
+                rec["condorCluster"] = int(cluster.group(1))
+            if schedd:
+                rec["schedd"] = schedd.group(1)
             tmp = recordPath + ".tmp"           # Same temp-and-rename as writeTaskRecord, so a failure here cannot destroy the record.
             with open(tmp, "w") as f:
                 json.dump(rec, f, indent=2)
             os.replace(tmp, recordPath)
         publishRecord(d, loadSites(), taskName, base)
     return r.returncode
+
+
+# What a finished job leaves on EOS. The run script names outputs <sample>_<tag>_<index>.root, so a job
+# that died anywhere before the copy leaves nothing, and a job that ran twice leaves the same name twice.
+def _expectedOutputs(sampleName, index, output):
+    tags = ["ntuple", "miniaod"] if output == "both" else [output]
+    return [f"{sampleName}_{tag}_{index}.root" for tag in tags]
+
+
+def _eosListing(redirector, directory):
+    """Basenames present in an EOS directory, empty if it does not exist yet."""
+    try:
+        r = subprocess.run(["xrdfs", redirector, "ls", directory], capture_output=True, text=True, timeout=300)
+    except (OSError, subprocess.SubprocessError) as e:
+        raise RuntimeError(f"could not list {directory}: {e}")
+    if r.returncode != 0:
+        return set()
+    return {os.path.basename(line) for line in r.stdout.split() if line.strip()}
+
+
+def missingJobs(taskName, sites=None):
+    """Job rows from the task whose outputs are not on EOS. Returns (rows, presentCount, expectedCount)."""
+    sites = sites or loadSites()
+    d = taskDir(taskName, create=False)
+    with open(os.path.join(d, "task.json")) as f:
+        info = json.load(f)
+    if info.get("backend") != "condor":
+        raise ValueError(f"task '{taskName}' ran on {info.get('backend')}, not condor")
+    outDirBase = info.get("outDirBase")
+    if not outDirBase:
+        raise ValueError(f"task '{taskName}' has no outDirBase recorded, so its outputs cannot be located")
+    output = info.get("output", "ntuple")
+    redirector = sites["eosRedirector"].rstrip("/")
+
+    rows = [line.strip() for line in open(os.path.join(d, "jobList.txt")) if line.strip()]
+    listings, missing, nPresent, nExpected = {}, [], 0, 0
+    for row in rows:
+        sampleName, index = row.split(",")[0], row.split(",")[1]
+        if sampleName not in listings:
+            listings[sampleName] = _eosListing(redirector, f"{outDirBase}/{sampleName}")
+        wanted = _expectedOutputs(sampleName, index, output)
+        nExpected += len(wanted)
+        here = [w for w in wanted if w in listings[sampleName]]
+        nPresent += len(here)
+        if len(here) != len(wanted):
+            missing.append(row)
+    return missing, nPresent, nExpected
+
+
+def _nextRetry(d):
+    """The first retry number not already used, so an earlier attempt's logs are never overwritten."""
+    n = 1
+    while os.path.exists(os.path.join(d, "logs", f"retry{n}")) or os.path.exists(os.path.join(d, f"jobList.retry{n}.txt")):
+        n += 1
+    return n
+
+
+# Resubmission reuses the task area untouched: the same run scripts, the same resolved content and the same
+# EOS destination, so retried outputs land beside the ones that already succeeded. Only the job list and the
+# log directory are new.
+def resubmit(taskName, dryRun=False, sites=None, rows=None):
+    """Submit only the jobs of a task whose outputs are missing. Returns (retryNumber, nJobs, returncode)."""
+    sites = sites or loadSites()
+    d = taskDir(taskName, create=False)
+    if rows is None:
+        rows = missingJobs(taskName, sites)[0]
+    if not rows:
+        return None, 0, 0
+
+    n = _nextRetry(d)
+    logDir = os.path.join("logs", f"retry{n}")
+    jobListName = f"jobList.retry{n}.txt"
+    if dryRun:
+        # Writing nothing here keeps the retry number free, so a dry run does not push the real attempt to retry2.
+        print(f"  [dry-run] condor_submit submit.retry{n}.jdl   ({len(rows)} job(s), logs would go to {logDir})")
+        return n, len(rows), 0
+
+    os.makedirs(os.path.join(d, logDir), exist_ok=True)
+    with open(os.path.join(d, jobListName), "w") as f:
+        f.write("\n".join(rows) + "\n")
+
+    with open(os.path.join(d, "submit.jdl")) as f:
+        original = f.read()
+    jdlName = f"submit.retry{n}.jdl"
+    jdl = original.replace("queue sample,index,script from jobList.txt",
+                           f"queue sample,index,script from {jobListName}")
+    jdl = jdl.replace("output                  = logs/$(sample)_$(index).out",
+                      f"output                  = {logDir}/$(sample)_$(index).out")
+    jdl = jdl.replace("error                   = logs/$(sample)_$(index).err",
+                      f"error                   = {logDir}/$(sample)_$(index).err")
+    jdl = jdl.replace("log                     = logs/condor.log",
+                      f"log                     = {logDir}/condor.log")
+    jdl = jdl.replace("# Generated by kamui - resubmit with: condor_submit submit.jdl",
+                      f"# Generated by kamui - retry {n} of task {taskName}. Resubmit with: condor_submit {jdlName}")
+    if f"from {jobListName}" not in jdl or logDir not in jdl:
+        raise ValueError(f"could not build a retry JDL from {os.path.join(d, 'submit.jdl')}; its format has changed")
+    with open(os.path.join(d, jdlName), "w") as f:
+        f.write(jdl)
+
+    r = runTool(["condor_submit", jdlName], cwd=d, capture_output=True, text=True)
+    print(r.stdout.strip() or r.stderr.strip())
+    if r.returncode == 0:
+        _recordRetry(d, n, len(rows), logDir, jdlName, r.stdout)
+    return n, len(rows), r.returncode
+
+
+def _recordRetry(d, n, nJobs, logDir, jdlName, stdout):
+    """Append the retry to task.json without disturbing the original submission's record."""
+    recordPath = os.path.join(d, "task.json")
+    with open(recordPath) as f:
+        rec = json.load(f)
+    entry = {
+        "retry": n,
+        "nJobs": nJobs,
+        "logDir": logDir,
+        "jdl": jdlName,
+        "submittedAt": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+    }
+    m = re.search(r"submitted to cluster (\d+)", stdout or "")
+    if m:
+        entry["condorCluster"] = int(m.group(1))
+    m = re.search(r"submit jobs to (\S+)", stdout or "")
+    if m:
+        entry["schedd"] = m.group(1)
+    rec.setdefault("retries", []).append(entry)
+    tmp = recordPath + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(rec, f, indent=2)
+    os.replace(tmp, recordPath)

@@ -10,6 +10,7 @@ See python/kamui/README.txt for what each command does and the flags they take.
 import argparse
 import json
 import os
+import subprocess
 import sys
 
 ## Kamui modules
@@ -17,8 +18,11 @@ from .grid import das, fetch
 from .foundations import paths
 from .helpers.banner import printBanner
 from .configReaders.catalog import loadCatalog, select
-from .configReaders.content import listPresets, resolveContent, summarize, validateTriggers
+from .configReaders.content import eraGroup, listPresets, resolveContent, summarize, validateEraCopies, validateTriggers
 from .submit import condor as condorBackend, crab as crabBackend
+from .select import batch as selectBatch, io as selectBackend, normalization
+from .select.engine import applySelection
+from .configReaders.selections import resolveSelection
 from .configReaders.sites import loadSites
 from .submit.common import runTool, taskDir
 
@@ -76,7 +80,7 @@ def _cmdContent(args):
         for group, names in listPresets().items():
             print(f"{group or 'content'}: " + ", ".join(names))
         return
-    resolved = resolveContent(args.preset, isMC=not args.data)
+    resolved = resolveContent(args.preset, isMC=not args.data, era=args.era or "Summer24")
     print(f"{args.preset}  (isMC={not args.data})")
     print(summarize(resolved))
     nvar = sum(len(c.get("variables", c.get("extVariables", {}))) for c in resolved["collections"].values())
@@ -142,7 +146,7 @@ def _cmdSubmit(args):
     print(f"task '{args.task}' : {len(sel)} sample(s), backend={args.backend}")
 
     if args.output != "ntuple":
-        missing = [s["name"] for s in sel if not resolveContent(s["content"], isMC=bool(s["isMC"])).get("miniaod")]
+        missing = [s["name"] for s in sel if not resolveContent(s["content"], isMC=bool(s["isMC"]), era=s["era"]).get("miniaod")]
         if missing:
             sys.exit(f"error: output={args.output} but these samples' content presets define no " f"miniaod block: {missing[:5]}")
         if args.backend == "crab" and args.output == "both":
@@ -165,6 +169,83 @@ def _cmdSubmit(args):
         print(f"  wrote {nJobs} job(s) under {d}")
         print(f"  output goes to {base}/ntuples/{task}")
         condorBackend.submit(task, dryRun=args.dryRun, base=base)
+
+
+def _cmdSelect(args):
+    """Apply an event-level selection to ntuples and write ntuples with the same branches."""
+    sel = _pick(args)
+    outBase = args.outputBase or loadSites()["stageoutBase"].rstrip("/")
+    print(f"task '{args.task}' : {len(sel)} sample(s), selection={args.selection}")
+
+    fileLists = {}
+    for s in sel:
+        inputs = selectBackend.findInputs(args.inputTask, s["name"], args.inputBase)
+        if not inputs:
+            print(f"  {s['name']:<44} no input ntuples found, skipping")
+            continue
+        fileLists[s["name"]] = inputs
+    if not fileLists:
+        sys.exit("no input ntuples found for any selected sample")
+
+    ## One resolved selection per era, since thresholds differ by era
+    eras = sorted({s["era"] for s in sel if s["name"] in fileLists})
+    resolvedSelections = {e: resolveSelection(args.selection, era=e) for e in eras}
+
+    if args.backend == "local":
+        flows = {}
+        for s in sel:
+            if s["name"] not in fileLists:
+                continue
+            outDir = os.path.join(paths.SELECTION_DIR, "out", args.task, s["name"])
+            flow = applySelection(fileLists[s["name"]], resolvedSelections[s["era"]],
+                                  os.path.join(outDir, f"{s['name']}_selected.root"), writeSteps=args.cutflow)
+            flows[s["name"]] = flow
+            print(f"  {s['name']:<44} {flow[0]['kept']:>8,} -> {flow[-1]['kept']:>8,}  ({100 * flow[-1]['cumulative']:.1f}%)")
+        selectBackend.writeCutflow(paths.SELECTION_DIR, args.task, args.selection, flows)
+        print(f"  cutflow written under {os.path.join(paths.SELECTION_DIR, 'out', args.task)}")
+        return
+
+    samples = [s for s in sel if s["name"] in fileLists]
+    d, nJobs = selectBatch.prepare(samples, args.task, fileLists, resolvedSelections,
+                                   filesPerJob=args.filesPerJob, base=args.outputBase)
+    print(f"  wrote {nJobs} job(s) under {d}")
+    print(f"  output goes to {(args.outputBase or loadSites()['stageoutBase']).rstrip('/')}/selected/{args.task}")
+    selectBatch.submit(args.task, dryRun=args.dryRun)
+
+
+def _cmdNorm(args):
+    """Measure a sample's generator sums over a complete production and store them for normalization."""
+    sel = _pick(args)
+    for s in sel:
+        dasEvents = None
+        if not args.noDas:
+            try:
+                dasEvents = das.datasetSummary(s["dataset"], s["dasInstance"])["nevents"]
+            except das.DasError as e:
+                print(f"  warning: could not ask DAS for {s['name']}: {e}")
+
+        ## Without a production to measure, the DAS count alone is still worth recording
+        measured = None
+        if args.inputTask:
+            inputs = selectBackend.findInputs(args.inputTask, s["name"], args.inputBase)
+            if inputs:
+                measured = normalization.measure(inputs)
+            else:
+                print(f"  {s['name']:<44} no ntuples found in task '{args.inputTask}'")
+
+        entry = normalization.record(s["name"], measured, dasEvents,
+                                     source=f"production task '{args.inputTask}'" if args.inputTask else "DAS")
+        das_ = f"{entry.get('dasEvents', 0):>10,} in DAS" if entry.get("dasEvents") else "  DAS unknown"
+        if "sumGenWeight" in entry:
+            flag = "" if entry.get("complete") is not False else "   INCOMPLETE, do not normalize with this"
+            print(f"  {s['name']:<44} {das_}   measured {entry['nEvents']:,}   sumw {entry['sumGenWeight']:.6g}{flag}")
+        else:
+            print(f"  {s['name']:<44} {das_}   sumw not measured yet")
+
+
+def _cmdCutflow(args):
+    """Print the cutflow table recorded by a select task."""
+    selectBackend.printCutflow(paths.SELECTION_DIR, args.task)
 
 
 def _cmdStatus(args):
@@ -192,13 +273,76 @@ def _cmdStatus(args):
         crabBackend.status(args.task)
     else:
         cluster = info.get("condorCluster")
-        cmd = ["condor_q", "-nobatch"] + ([str(cluster)] if cluster else [])
+        schedd = info.get("schedd")
+        cmd = ["condor_q", "-nobatch"] + (["-name", schedd] if schedd else []) + ([str(cluster)] if cluster else [])
         if not cluster:
             print("\n(no cluster id recorded; showing every job you have queued)")
+        for retry in info.get("retries", []):
+            print(f"retry {retry['retry']}: {retry['nJobs']} job(s) at {retry.get('submittedAt')}, logs in {retry['logDir']}")
         try:
             runTool(cmd)
         except OSError as e:
             print(f"\ncould not run condor_q: {e}")
+
+
+def _cmdResubmit(args):
+    """Resubmit only the jobs of a task whose outputs never reached EOS."""
+    d = taskDir(args.task, create=False)
+    rec = os.path.join(d, "task.json")
+    if not os.path.exists(rec):
+        sys.exit(f"no task '{args.task}' under {paths.JOBS_DIR}")
+    with open(rec) as f:
+        info = json.load(f)
+
+    print(f"task     {info.get('task')}  ({info.get('backend')}, output={info.get('output')})")
+    print(f"output   {info.get('outLFNDirBase') or info.get('outDirBase')}")
+
+    if info.get("backend") == "crab":
+        # CRAB knows which of its own jobs failed, and writes their output to the same place.
+        n = crabBackend.resubmit(args.task, dryRun=args.dryRun)
+        print(f"  asked crab to resubmit failed jobs in {n} project(s)")
+        return
+
+    missing, nPresent, nExpected = condorBackend.missingJobs(args.task)
+    print(f"outputs  {nPresent}/{nExpected} present on EOS")
+    if not missing:
+        print("  nothing to resubmit")
+        return
+    print(f"missing  {len(missing)} job(s):")
+    for row in missing[:20]:
+        sampleName, index = row.split(",")[0], row.split(",")[1]
+        print(f"           {sampleName}  job {index}")
+    if len(missing) > 20:
+        print(f"           ... and {len(missing) - 20} more")
+
+    # A job still on the queue has not failed, and running it again would write the same output twice.
+    queued = _queuedJobs(info)
+    if queued:
+        print(f"  {queued} job(s) from this task are still queued or running.")
+        if not args.yes:
+            sys.exit("  refusing to resubmit while they run. Wait, or pass --yes to submit anyway.")
+
+    n, nJobs, code = condorBackend.resubmit(args.task, dryRun=args.dryRun)
+    if code == 0 and not args.dryRun:
+        print(f"  retry {n} submitted: {nJobs} job(s), logs in logs/retry{n}, output to the same directory")
+    elif code != 0:
+        sys.exit(f"  condor_submit failed with code {code}")
+
+
+def _queuedJobs(info):
+    """How many of this task's jobs are still on the queue, or 0 if that cannot be determined."""
+    cluster = info.get("condorCluster")
+    if not cluster:
+        return 0
+    cmd = ["condor_q"] + (["-name", info["schedd"]] if info.get("schedd") else []) + [str(cluster), "-af", "ClusterId"]
+    for retry in info.get("retries", []):
+        if retry.get("condorCluster"):
+            cmd.insert(-2, str(retry["condorCluster"]))
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    except (OSError, subprocess.SubprocessError):
+        return 0
+    return len([line for line in r.stdout.split() if line.strip()]) if r.returncode == 0 else 0
 
 
 def _cmdCheck(args):
@@ -207,19 +351,31 @@ def _cmdCheck(args):
     cat = loadCatalog()
     print(f"catalog : {len(cat)} samples in " f"{len({s.get('family') for s in cat})} families")
 
-    presets = [n for names in listPresets().values() for n in names]
-    resolved = {}
-    for p in presets:
-        try:
-            resolved[p] = resolveContent(p, isMC=True)
-            resolveContent(p, isMC=False)
-        except Exception as e:                                        # noqa: BLE001
-            problems.append(f"content preset '{p}': {e}")
-    print(f"content presets: {len(resolved)}/{len(presets)} resolve for both MC and data")
+    ## Every preset resolves within its own era set, for MC and for data
+    groups = listPresets()
+    nOk = nTried = 0
+    byEra = {}
+    for group, names in groups.items():
+        if group not in ("run2", "run3"):
+            continue
+        era = "2018" if group == "run2" else "Summer24"
+        byEra[group] = set(names)
+        for p in names:
+            nTried += 1
+            try:
+                resolveContent(p, isMC=True, era=era)
+                resolveContent(p, isMC=False, era=era)
+                nOk += 1
+            except Exception as e:                                    # noqa: BLE001
+                problems.append(f"content preset '{group}/{p}': {e}")
+    print(f"content presets: {nOk}/{nTried} resolve for both MC and data")
+
+    problems += validateEraCopies()
 
     for s in cat:
-        if s["content"] not in presets:
-            problems.append(f"sample '{s['name']}' wants unknown content preset '{s['content']}'")
+        group = eraGroup(s["era"])
+        if s["content"] not in byEra.get(group, set()):
+            problems.append(f"sample '{s['name']}' is {s['era']} ({group}) but wants content preset '{s['content']}', which that era does not define")
         if not s["dataset"].startswith("/") or s["dataset"].count("/") != 3:
             problems.append(f"sample '{s['name']}' has a malformed dataset path")
     dupes = len(cat) - len({s["name"] for s in cat})
@@ -244,6 +400,13 @@ def _cmdCheck(args):
             for line in open(os.path.join(root, f)):
                 if any("paths." + d in line for d in ("CONFIG_DIR", "SAMPLES_DIR", "CONTENT_DIR", "TRIGGERS_DIR", "SITES_FILE")):
                     problems.append(f"{os.path.relpath(os.path.join(root, f), pkgDir)} reads a config directory directly; that belongs in configReaders/")
+
+    ## A sample cannot be normalized without its full-dataset generator count, so record it when the sample is added
+    noDas, noSumw = normalization.missingSums([s["name"] for s in cat])
+    if noDas:
+        problems.append(f"{len(noDas)} sample(s) have no DAS event count recorded; run 'kamui norm' for them. First few: {noDas[:3]}")
+    if noSumw:
+        print(f"generator sums: {len(cat) - len(noSumw)}/{len(cat)} samples have a weight sum measured")
 
     sites = loadSites()
     for k in ("eosRedirector", "sourceRedirector", "stageoutBase", "crabStageoutBase", "crabStorageSite"):
@@ -292,6 +455,7 @@ def main(argv=None):
     q = sub.add_parser("content", help="Show or export a content preset", description=_cmdContent.__doc__)
     q.add_argument("preset", nargs="?", help="Preset name; omit to list them")
     q.add_argument("--data", action="store_true", help="Resolve as data (drops mcOnly collections)")
+    q.add_argument("--era", help="Era whose content set to resolve against (default: Summer24)")
     q.add_argument("--write", help="Write the resolved JSON here")
     q.set_defaults(func=_cmdContent)
 
@@ -316,7 +480,7 @@ def main(argv=None):
     q = sub.add_parser("submit", help="Produce ntuples", description=_cmdSubmit.__doc__)
     _addSelection(q)
     q.add_argument("--task", required=True, help="Task name; also the EOS output subdirectory")
-    q.add_argument("--backend", choices=["crab", "condor"], default="crab", help="Where the jobs run (default: crab)")
+    q.add_argument("--backend", choices=["condor", "crab"], default="condor", help="Where the jobs run (default: condor; crab for large productions)")
     q.add_argument("--content", help="Override the per-sample content preset")
     q.add_argument("--output", choices=["ntuple", "miniaod", "both"], default="ntuple", help="What each job writes (default: ntuple)")
     q.add_argument("--filesPerJob", type=int, help="Input files per job, overriding any per-sample unitsPerJob (default: 5)")
@@ -328,9 +492,39 @@ def main(argv=None):
     q.add_argument("--outputBase", help="Write output under this EOS path instead of the site default")
     q.set_defaults(func=_cmdSubmit)
 
+    q = sub.add_parser("select", help="Apply an event selection to ntuples", description=_cmdSelect.__doc__)
+    _addSelection(q)
+    q.add_argument("--selection", required=True, help="Selection config name, e.g. run2Lepton")
+    q.add_argument("--task", required=True, help="Name for this selection pass")
+    q.add_argument("--inputTask", required=True, help="The ntuple production task to read from")
+    q.add_argument("--inputBase", help="EOS base holding the input ntuples (default: the site stageout base)")
+    q.add_argument("--outputBase", help="Where to write the selected ntuples")
+    q.add_argument("--cutflow", action="store_true", help="Also write one ntuple per cut, for inspection (local only)")
+    q.add_argument("--backend", choices=["local", "condor"], default="local", help="Where the selection runs (default: local, which is seconds for a small pass)")
+    q.add_argument("--filesPerJob", type=int, help="Input files per job on condor (default: 5)")
+    q.add_argument("--dry-run", dest="dryRun", action="store_true", help="Write the job area, submit nothing")
+    q.set_defaults(func=_cmdSelect)
+
+    q = sub.add_parser("norm", help="Measure and store generator sums for normalization", description=_cmdNorm.__doc__)
+    _addSelection(q)
+    q.add_argument("--inputTask", help="A complete production task to measure the weight sum over; omit to record the DAS count alone")
+    q.add_argument("--inputBase", help="EOS base holding the ntuples (default: the site stageout base)")
+    q.add_argument("--noDas", action="store_true", help="Skip the DAS cross-check of the event count")
+    q.set_defaults(func=_cmdNorm)
+
+    q = sub.add_parser("cutflow", help="Print the cutflow from a select task", description=_cmdCutflow.__doc__)
+    q.add_argument("--task", required=True, help="Select task name")
+    q.set_defaults(func=_cmdCutflow)
+
     q = sub.add_parser("status", help="Status of a submitted task", description=_cmdStatus.__doc__)
-    q.add_argument("--task", required=True, help="Task name under production/jobs/")
+    q.add_argument("--task", required=True, help="Task name under ntupleProduction/jobs/")
     q.set_defaults(func=_cmdStatus)
+
+    q = sub.add_parser("resubmit", help="Resubmit only a task's failed jobs", description=_cmdResubmit.__doc__)
+    q.add_argument("--task", required=True, help="The task to retry")
+    q.add_argument("--dry-run", dest="dryRun", action="store_true", help="Report what would be resubmitted, submit nothing")
+    q.add_argument("--yes", action="store_true", help="Resubmit even while jobs from this task are still queued")
+    q.set_defaults(func=_cmdResubmit)
 
     q = sub.add_parser("check", help="Validate every config offline", description=_cmdCheck.__doc__)
     q.set_defaults(func=_cmdCheck)

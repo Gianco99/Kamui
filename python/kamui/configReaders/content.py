@@ -45,16 +45,24 @@ VALID_TYPES = {"float", "double", "int", "uint", "int16", "uint16", "uint8", "bo
 
 
 def listPresets(contentDir=None):
-    """Every content config, grouped by the subdirectory it lives in. Returns {group: [names]}."""
+    """Presets an era defines, as {era: [names]}. Only presets/, since collections are building blocks rather than things a sample names."""
     contentDir = contentDir or paths.CONTENT_DIR
     out = {}
-    for d in sorted(os.listdir(contentDir)):
-        full = os.path.join(contentDir, d)
-        if os.path.isdir(full):
-            out[d] = sorted(f[:-5] for f in os.listdir(full) if f.endswith(".json"))
-    loose = sorted(f[:-5] for f in os.listdir(contentDir) if f.endswith(".json"))
-    if loose:
-        out[""] = loose
+    for era in sorted(os.listdir(contentDir)):
+        d = os.path.join(contentDir, era, "presets")
+        if os.path.isdir(d):
+            out[era] = sorted(f[:-5] for f in os.listdir(d) if f.endswith(".json"))
+    return out
+
+
+def listCollections(contentDir=None):
+    """Collections an era defines, as {era: [names]}."""
+    contentDir = contentDir or paths.CONTENT_DIR
+    out = {}
+    for era in sorted(os.listdir(contentDir)):
+        d = os.path.join(contentDir, era, "collections")
+        if os.path.isdir(d):
+            out[era] = sorted(f[:-5] for f in os.listdir(d) if f.endswith(".json"))
     return out
 
 
@@ -62,10 +70,24 @@ def listPresets(contentDir=None):
 CONTENT_FIELDS = {"collections", "triggerBits", "skim", "miniaod"}
 
 
-def resolveContent(name, contentDir=None, isMC=True):
-    """Flatten a preset's include chain and translate it into what a job receives: name, isMC, collections, triggerBits, skim, miniaod."""
+## Which content set an era draws from
+RUN2_ERAS = {"2016", "2016APV", "2017", "2018"}
+
+
+def eraGroup(era):
+    """run2 or run3, the content set an era's samples must use."""
+    return "run2" if era in RUN2_ERAS else "run3"
+
+
+def contentDirs(era, contentDir=None):
+    """Search path for a content config: only that era's own set, so a Run 3 config can never reach a Run 2 sample."""
     contentDir = contentDir or paths.CONTENT_DIR
-    cfg = loadWithIncludes(name, contentDir)
+    return [os.path.join(contentDir, eraGroup(era))]
+
+
+def resolveContent(name, contentDir=None, isMC=True, era="Summer24"):
+    """Flatten a preset's include chain and translate it into what a job receives: name, isMC, collections, triggerBits, skim, miniaod."""
+    cfg = loadWithIncludes(name, contentDirs(era, contentDir))
 
     unknown = sorted(set(cfg) - CONTENT_FIELDS)
     if unknown:
@@ -118,6 +140,20 @@ def _resolveMiniaod(cfg, isMC):
 
 ## Every key a skim block may carry
 SKIM_FIELDS = {"triggers", "mode", "process"}
+
+
+def loadTriggerPaths(name):
+    """The HLT path patterns a trigger config defines."""
+    trig = loadWithIncludes(name, paths.TRIGGERS_DIR)
+    if "paths" not in trig:
+        raise ValueError(f"trigger config '{name}' defines no 'paths'")
+    return list(trig["paths"])
+
+
+def loadTriggerVetoes(name):
+    """The veto blocks a trigger config defines, each pairing a path list with an offline description."""
+    trig = loadWithIncludes(name, paths.TRIGGERS_DIR)
+    return list(trig.get("vetoes", []))
 
 
 def _resolveSkim(skim):
@@ -283,4 +319,29 @@ def validateTriggers():
             continue
         if not trig.get("paths"):
             problems.append(f"trigger config '{f}' declares no paths")
+    return problems
+
+
+## Collections that are meant to differ between the two era sets
+ERA_SPECIFIC_COLLECTIONS = {"leptons"}
+
+
+def validateEraCopies(contentDir=None):
+    """Each era carries its own copy of every collection. Report copies that drifted, or era-specific ones that did not."""
+    contentDir = contentDir or paths.CONTENT_DIR
+    problems = []
+    colls = listCollections(contentDir)
+    if set(colls) != {"run2", "run3"}:
+        return [f"expected content sets run2 and run3, found {sorted(colls)}"]
+    for name in sorted(set(colls["run2"]) | set(colls["run3"])):
+        a = os.path.join(contentDir, "run2", "collections", name + ".json")
+        b = os.path.join(contentDir, "run3", "collections", name + ".json")
+        if not (os.path.exists(a) and os.path.exists(b)):
+            problems.append(f"collection '{name}' exists in only one era set")
+            continue
+        same = open(a).read() == open(b).read()
+        if name in ERA_SPECIFIC_COLLECTIONS and same:
+            problems.append(f"collection '{name}' is meant to differ by era but both copies are identical")
+        if name not in ERA_SPECIFIC_COLLECTIONS and not same:
+            problems.append(f"collection '{name}' differs between run2 and run3; add it to ERA_SPECIFIC_COLLECTIONS if deliberate, otherwise the copies have drifted")
     return problems

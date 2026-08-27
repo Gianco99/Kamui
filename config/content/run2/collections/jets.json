@@ -12,19 +12,19 @@
           "expr": "pt()",
           "type": "float",
           "doc": "Corrected pT [GeV]",
-          "precision": 10
+          "precision": -1
         },
         "eta": {
           "expr": "eta()",
           "type": "float",
           "doc": "Pseudorapidity",
-          "precision": 12
+          "precision": -1
         },
         "phi": {
           "expr": "phi()",
           "type": "float",
           "doc": "Azimuthal angle",
-          "precision": 12
+          "precision": -1
         },
         "mass": {
           "expr": "mass()",
@@ -48,31 +48,31 @@
           "expr": "chargedHadronEnergyFraction()",
           "type": "float",
           "doc": "Charged hadron energy fraction",
-          "precision": 8
+          "precision": -1
         },
         "neHEF": {
           "expr": "neutralHadronEnergyFraction()",
           "type": "float",
           "doc": "Neutral hadron energy fraction",
-          "precision": 8
+          "precision": -1
         },
         "chEmEF": {
           "expr": "chargedEmEnergyFraction()",
           "type": "float",
           "doc": "Charged EM energy fraction",
-          "precision": 8
+          "precision": -1
         },
         "neEmEF": {
           "expr": "neutralEmEnergyFraction()",
           "type": "float",
           "doc": "Neutral EM energy fraction",
-          "precision": 8
+          "precision": -1
         },
         "muEF": {
           "expr": "muonEnergyFraction()",
           "type": "float",
           "doc": "Muon energy fraction",
-          "precision": 8
+          "precision": -1
         },
         "nConstituents": {
           "expr": "numberOfDaughters()",
@@ -93,7 +93,7 @@
           "expr": "bDiscriminator('pfDeepFlavourJetTags:probb')+bDiscriminator('pfDeepFlavourJetTags:probbb')+bDiscriminator('pfDeepFlavourJetTags:problepb')",
           "type": "float",
           "doc": "DeepJet b+bb+lepb",
-          "precision": 10
+          "precision": -1
         },
         "btagUParTAK4B": {
           "expr": "bDiscriminator('pfUnifiedParticleTransformerAK4DiscriminatorsJetTags:BvsAll')",
@@ -115,6 +115,39 @@
           "expr": "?hasOverlaps('electrons')?overlaps('electrons').size():0",
           "type": "uint8",
           "doc": "Number of electrons overlapping the jet"
+        }
+      }
+    },
+    "CaloJet": {
+      "type": "candidate",
+      "src": "slimmedCaloJets",
+      "cut": "",
+      "maxLen": 40,
+      "doc": "Uncorrected AK4 calo jets, the full collection. The displaced-dijet triggers are emulated offline from these, and JMTucker uses their raw pT, so no correction is applied here either",
+      "variables": {
+        "pt": {
+          "expr": "pt()",
+          "type": "float",
+          "doc": "Uncorrected pT [GeV]",
+          "precision": -1
+        },
+        "eta": {
+          "expr": "eta()",
+          "type": "float",
+          "doc": "Pseudorapidity",
+          "precision": -1
+        },
+        "phi": {
+          "expr": "phi()",
+          "type": "float",
+          "doc": "Azimuth [rad]",
+          "precision": -1
+        },
+        "energy": {
+          "expr": "energy()",
+          "type": "float",
+          "doc": "Uncorrected energy [GeV]",
+          "precision": -1
         }
       }
     }

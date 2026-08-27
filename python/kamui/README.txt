@@ -63,7 +63,7 @@ stage
 
 submit
   - Produces the ntuples. It takes the samples you selected, works out what each job should write, builds a job area on disk, and sends it to CRAB or to condor.
-  - --task names the production. It becomes the directory under production/jobs/ and the output subdirectory on EOS.
+  - --task names the production. It becomes the directory under ntupleProduction/jobs/ and the output subdirectory on EOS.
   - Always look at a --dry-run first. It writes the whole job area and submits nothing, so you can read the config files that would actually be used.
   - Task names are letters, digits, dot, dash and underscore, at most 96 characters, since the name becomes a directory, an EOS path and a shell word. Re-using one asks before it overwrites; overwriting deletes the old area, so the record of what was submitted is gone. Answer no and it writes to <task>_2 instead. --yes overwrites without asking, and with nothing attached to answer it always takes the safe branch. A task with a CRAB work area is never overwritten, since its jobs may still be running.
   - --filesPerJob wins when you pass it. Otherwise a sample's own unitsPerJob applies, and failing that, five. --maxFiles caps how many input files a sample uses at all.
@@ -139,7 +139,7 @@ Submitting Jobs - submit/
 -------------------------
 Everything that turns a set of samples into running jobs. Each backend first writes a job area to disk and only then submits, so a --dry-run leaves you the exact files that would have been used.
 
-A job area is one directory per task, under production/jobs/<task>/, holding everything a job needs.
+A job area is one directory per task, under ntupleProduction/jobs/<task>/, holding everything a job needs.
 
 common.py - The parts both backends share: making the task directory, flattening the content preset into it, splitting a file list into per-job groups, and writing task.json.
 
