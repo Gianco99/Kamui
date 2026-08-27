@@ -13,13 +13,21 @@ import subprocess
 from ..configReaders.sites import loadSites
 
 
+# Both layouts give the sample its own directory, so the sample name is a whole path component.
+# Testing for it as a substring instead would make one sample claim another's files whenever one
+# name is a prefix of the other, which is exactly the case for '..._2016' and '..._2016APV'.
+def _namesSample(path, sampleName):
+    """Whether a path has the sample as one of its directory components."""
+    return sampleName in path.replace(os.sep, "/").split("/")
+
+
 def findInputs(inputTask, sampleName, inputBase=None):
     """Every ntuple a production task wrote for one sample. Reads EOS over xrootd, or a local directory."""
     sites = loadSites()
     base = (inputBase or sites["stageoutBase"]).rstrip("/")
 
     ## Condor writes <task>/<sample>/*.root while CRAB nests under <task>/<primaryDataset>/<sample>/<timestamp>/0000/.
-    ## Searching the whole task and keeping paths that name the sample handles both.
+    ## Searching the whole task and keeping paths whose directories name the sample handles both.
     if os.path.isdir(base):
         root = os.path.join(base, "ntuples", inputTask)
         if not os.path.isdir(root):
@@ -27,7 +35,7 @@ def findInputs(inputTask, sampleName, inputBase=None):
         return sorted(os.path.join(dirpath, f)
                       for dirpath, _, files in os.walk(root)
                       for f in files
-                      if f.endswith(".root") and sampleName in os.path.join(dirpath, f))
+                      if f.endswith(".root") and _namesSample(dirpath, sampleName))
 
     redirector = sites["eosRedirector"].rstrip("/")
     remote = "/".join([base, "ntuples", inputTask])
@@ -38,7 +46,7 @@ def findInputs(inputTask, sampleName, inputBase=None):
     if r.returncode != 0:
         return []
     return sorted(f"{redirector}/{line.strip()}" for line in r.stdout.splitlines()
-                  if line.strip().endswith(".root") and sampleName in line)
+                  if line.strip().endswith(".root") and _namesSample(os.path.dirname(line.strip()), sampleName))
 
 
 def writeCutflow(selectionDir, task, selectionName, flows):

@@ -19,16 +19,24 @@
       "source": "JMTucker MFVNeutralino/interface/AnalysisConstants.h, int_lumi_2018"
     },
     "Summer22": {
-      "lumi": null,
-      "source": "TODO: certified luminosity for this era"
+      "lumi": 8086.0,
+      "source": "brilcalc totrecorded, -b 'STABLE BEAMS', --normtag normtag_PHYSICS.json, over Cert_Collisions2022_355100_362760_Golden.json (post-TrkML2026 review) restricted to runs <= 357900, i.e. 2022 pre-EE, eras B/C/D; 8086.07 pb^-1; brilws 3.9.4, run 2026-08-27"
+    },
+    "Summer22EE": {
+      "lumi": 26675.0,
+      "source": "brilcalc totrecorded, -b 'STABLE BEAMS', --normtag normtag_PHYSICS.json, over Cert_Collisions2022_355100_362760_Golden.json (post-TrkML2026 review) restricted to runs >= 359022, i.e. 2022 post-EE, eras E/F/G; 26674.92 pb^-1; brilws 3.9.4, run 2026-08-27"
     },
     "Summer23": {
-      "lumi": null,
-      "source": "TODO: certified luminosity for this era"
+      "lumi": 18605.0,
+      "source": "brilcalc totrecorded, -b 'STABLE BEAMS', --normtag normtag_PHYSICS.json, over Cert_Collisions2023_366442_370790_Golden.json (post-TrkML2026 review) restricted to runs <= 369802, i.e. 2023 pre-BPix, eras B/C; 18604.64 pb^-1; brilws 3.9.4, run 2026-08-27"
+    },
+    "Summer23BPix": {
+      "lumi": 9677.0,
+      "source": "brilcalc totrecorded, -b 'STABLE BEAMS', --normtag normtag_PHYSICS.json, over Cert_Collisions2023_366442_370790_Golden.json (post-TrkML2026 review) restricted to runs >= 369803, i.e. 2023 BPix, era D; 9676.74 pb^-1; brilws 3.9.4, run 2026-08-27"
     },
     "Summer24": {
-      "lumi": null,
-      "source": "TODO: certified luminosity for this era"
+      "lumi": 109947.0,
+      "source": "brilcalc totrecorded, -b 'STABLE BEAMS', --normtag normtag_PHYSICS.json, over Cert_Collisions2024_378981_386951_Golden.json (post-TrkML2026 review), whole year, eras B-I, no intra-year split; 109947.27 pb^-1; brilws 3.9.4, run 2026-08-27"
     }
   },
   "_channelNote": "The b-jet triggers were not live for the whole of 2017 and 2018, so the displacement-triggered channel integrates less luminosity than the era total. Use the channel value when normalising that channel.",
@@ -44,5 +52,5 @@
       }
     }
   },
-  "_run3Note": "Run 3 luminosities are not filled in yet. Take the certified (golden) values from the CMS public luminosity page or from brilcalc over the golden JSON for the era, and record which one you used in 'source'."
+  "_run3Note": "Run 3 luminosities filled 2026-08-27. Basis is the certified (golden) luminosity: brilcalc totrecorded with -b 'STABLE BEAMS' and --normtag normtag_PHYSICS.json, integrated over the official golden JSON for the era, converted to pb^-1. Same recipe as the Run 2 entries (JMTucker MFVNeutralino/test/jsons/README), so every era is on one basis. The era keys are CMS MC campaign names, so Summer22 is 2022 pre-EE only and Summer23 is 2023 pre-BPix only; the post-EE and BPix data live under Summer22EE and Summer23BPix. Sub-era values come from splitting the full-year golden JSON at run 357900/359022 (2022) and 369802/369803 (2023); both cuts fall inside certified gaps, and the two halves reconstruct the full year lumi-section for lumi-section. Each source names the golden JSON used, because the value moves with the golden and normtag vintage: re-run against whatever golden JSON the ntuples were actually filtered with. There is no 2025 entry, and channels.displaced has no Run 3 entry because config/triggers/ has no Run 3 trigger list yet."
 }

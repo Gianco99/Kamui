@@ -19,15 +19,21 @@ ERAS_2016 = {"2016", "2016APV"}
 
 def tightLepVeto2017p8(events):
     """
-    TightLepVeto PF jet ID for 2017 and 2018.
+    TightLepVeto PF jet ID for 2017 and 2018, as the Run 2 analysis defines it.
 
     The ntuples deliberately keep raw fractions rather than a precomputed flag, so the
     working point lives here.
+
+    The charged requirements apply at every eta, with no barrel/endcap split. The published
+    TightLepVeto working point drops them beyond |eta| = 2.4, where the tracker ends, but
+    JMTucker's jet_cuts_2017p8 is a flat conjunction (Tools/python/PATTupleSelection_cfi.py),
+    so a jet between 2.4 and 2.5 has no tracks, fails chHEF > 0, and never enters the
+    selection. Reinstating the split admits those jets and moves HT and the jet ladders.
+    The 2016 cut in the same file does carry the split, which is why tightLepVeto2016 keeps it.
     """
-    ok = (events["Jet_neHEF"] < 0.90) & (events["Jet_neEmEF"] < 0.90) \
-        & (events["Jet_nConstituents"] > 1) & (events["Jet_muEF"] < 0.80)
-    central = (events["Jet_chHEF"] > 0) & (events["Jet_chMultiplicity"] > 0) & (events["Jet_chEmEF"] < 0.80)
-    return ok & ak.where(abs(events["Jet_eta"]) <= 2.4, central, True)
+    return (events["Jet_neHEF"] < 0.90) & (events["Jet_neEmEF"] < 0.90) \
+        & (events["Jet_nConstituents"] > 1) & (events["Jet_muEF"] < 0.80) \
+        & (events["Jet_chHEF"] > 0) & (events["Jet_chMultiplicity"] > 0) & (events["Jet_chEmEF"] < 0.80)
 
 
 def tightLepVeto2016(events):
