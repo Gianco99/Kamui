@@ -2,8 +2,7 @@
 """
 Count how many events pass a channel's trigger OR, per sample, per path.
 
-This is the number we compare against DVCode. See VALIDATION.txt for what the
-comparison proves and what is deliberately not reproduced.
+This is the number we compare against JMTucker.
 
 Needs cmsenv (uses ROOT). No grid proxy needed for files already on our EOS.
 
@@ -14,11 +13,12 @@ Needs cmsenv (uses ROOT). No grid proxy needed for files already on our EOS.
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 
 sys.path.insert(0, os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "python"))
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "python"))
 from kamui.foundations import paths                                        # noqa: E402
 from kamui.configReaders.catalog import loadCatalog, select                  # noqa: E402
 from kamui.foundations.config import loadWithIncludes                      # noqa: E402
@@ -108,6 +108,8 @@ def main():
     else:
         if not args.task:
             sys.exit("give --task or --files")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,95}", args.task):
+            sys.exit(f"bad task name {args.task!r}")
         rec = os.path.join(paths.JOBS_DIR, args.task, "task.json")
         if not os.path.exists(rec):
             sys.exit(f"no task '{args.task}' under {paths.JOBS_DIR}")
@@ -125,7 +127,7 @@ def main():
             if not skim.get("hltPaths"):
                 print(f"  {name}: content preset '{s['content']}' declares no trigger skim, skipping")
                 continue
-            files = listEos(sites, f"{info['outLFNDirBase']}/{name}")
+            files = listEos(sites, f"{info.get('outLFNDirBase') or info['outDirBase']}/{name}")
             jobs.append((name, skim.get("triggers", "?"), skim["hltPaths"],
                          files, s.get("notes", "")))
 
@@ -142,7 +144,7 @@ def main():
         line = f"{name:<42} {chan:<16} {len(files):>5} {total:>9,} {nPass:>9,} {eff:>7.3f}%"
         print(line)
         if notes:
-            print(f"{'':<42} DVCode reference: {notes}")
+            print(f"{'':<42} JMTucker reference: {notes}")
         if args.perPath:
             for b, n in sorted(perPath.items()):
                 mark = "not in menu" if n is None else f"{n:,}"

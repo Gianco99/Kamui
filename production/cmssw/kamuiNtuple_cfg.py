@@ -122,6 +122,10 @@ if mode in ("ntuple", "both"):
         outputCommands=cms.untracked.vstring(*outputCommands),
         compressionLevel=cms.untracked.int32(9),
         compressionAlgorithm=cms.untracked.string("LZMA"),
+        dataset=cms.untracked.PSet(
+            filterName=cms.untracked.string(""),
+            dataTier=cms.untracked.string("NANOAODSIM" if opts.isMC else "NANOAOD"),
+        ),
         SelectEvents=selectEvents,
     )
     process.endNtuple = cms.EndPath(process.out)

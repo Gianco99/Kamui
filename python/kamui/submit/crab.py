@@ -10,7 +10,7 @@ import subprocess
 
 ## Kamui modules
 from ..configReaders.sites import loadSites
-from .common import publishRecord, resolveTaskDir, taskDir, writeResolvedContent, writeTaskRecord
+from .common import checkTaskName, outputBase, publishRecord, resolveTaskDir, taskDir, writeResolvedContent, writeTaskRecord
 from ..foundations import paths
 
 ## Input files per job when neither the flag nor the sample says otherwise
@@ -52,13 +52,30 @@ def _requestName(taskName, sampleName):
     return name[:100]
 
 
-def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, output="ntuple", assumeYes=False):
+def _checkRequestNames(taskName, samples):
+    seen = {}
+    for s in samples:
+        r = _requestName(taskName, s["name"])
+        if r in seen:
+            raise ValueError(
+                f"task name '{taskName}' is too long: samples '{seen[r]}' and '{s['name']}' "
+                f"both truncate to the same CRAB requestName. Use a shorter --task."
+            )
+        seen[r] = s["name"]
+
+
+def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, output="ntuple", assumeYes=False, base=None):
     """Write one crabConfig per sample into the task directory. Returns their paths and the task name used."""
     sites = sites or loadSites()
+    checkTaskName(taskName)
+    _checkRequestNames(taskName, samples)
+    base = outputBase(sites, "crab", base)
     d, taskName = resolveTaskDir(taskName, assumeYes)
+    _checkRequestNames(taskName, samples)
     pset = os.path.join(paths.CMSSW_DIR, "kamuiNtuple_cfg.py")
 
     contentCache = {}
+    effective = {s["name"]: int(unitsPerJob or s.get("unitsPerJob") or DEFAULT_FILES_PER_JOB) for s in samples}
     written = []
     for s in samples:
         key = (s["content"], bool(s["isMC"]))
@@ -76,15 +93,15 @@ def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, o
             workArea=os.path.join(d, "crab"),
             psetName=pset,
             pyCfgParams=[
-                f"content={os.path.basename(contentJson)}",
+                f"content={contentJson}",
                 f"isMC={'True' if s['isMC'] else 'False'}",
                 f"output={output}",
             ],
             inputFiles=[contentJson, os.path.join(paths.CMSSW_DIR, "kamuiTables.py")],
             maxMemoryMB=maxMemoryMB,
             inputDBS=inputDBS,
-            unitsPerJob=int(unitsPerJob or s.get("unitsPerJob") or DEFAULT_FILES_PER_JOB),
-            outLFNDirBase="/".join([sites["stageoutBase"].rstrip("/"), "ntuples", taskName]),
+            unitsPerJob=effective[s["name"]],
+            outLFNDirBase="/".join([base, "ntuples", taskName]),
             outputDatasetTag=s["name"][:99],
             lumiMaskLine=lumiMaskLine,
             storageSite=sites["crabStorageSite"],
@@ -98,13 +115,13 @@ def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, o
         "task": taskName, "backend": "crab", "output": output, "nSamples": len(samples),
         "samples": [s["name"] for s in samples],
         "content": sorted({s["content"] for s in samples}),
-        "unitsPerJob": unitsPerJob, "maxMemoryMB": maxMemoryMB,
-        "outLFNDirBase": "/".join([sites["stageoutBase"].rstrip("/"), "ntuples", taskName]),
+        "unitsPerJob": effective, "maxMemoryMB": maxMemoryMB,
+        "outLFNDirBase": "/".join([base, "ntuples", taskName]),
     }, samples=samples, sites=sites, resolvedContent=contentCache.values())
-    return written, taskName
+    return written, taskName, base
 
 
-def submit(configPaths, dryRun=False, sites=None, taskName=None):
+def submit(configPaths, dryRun=False, sites=None, taskName=None, base=None):
     """Run `crab submit` for each generated config."""
     ok, bad = [], []
     for p in configPaths:
@@ -120,7 +137,7 @@ def submit(configPaths, dryRun=False, sites=None, taskName=None):
             print(f"  submitted {os.path.basename(p)}")
             ok.append(p)
     if ok and not dryRun and taskName:
-        publishRecord(taskDir(taskName, create=False), sites or loadSites(), taskName)
+        publishRecord(taskDir(taskName, create=False), sites or loadSites(), taskName, base)
     return ok, bad
 
 

@@ -1,0 +1,69 @@
+DEBUG 2026-08-27 04:58:49.114 UTC: 	 CRAB Client version: v3.260630
+DEBUG 2026-08-27 04:58:49.114 UTC: 	 Running on: Linux cmslpc348.fnal.gov 5.14.0-687.31.1.el9_8.x86_64 #1 SMP PREEMPT_DYNAMIC Sat Aug 1 05:38:01 EDT 2026 x86_64 x86_64 x86_64 GNU/Linux
+DEBUG 2026-08-27 04:58:49.114 UTC: 	 Not using Singularity
+DEBUG 2026-08-27 04:58:49.114 UTC: 	 Operating System: AlmaLinux 9.8 (Olive Jaguar)
+DEBUG 2026-08-27 04:58:49.114 UTC: 	 Executing command: 'checkwrite'
+DEBUG 2026-08-27 04:58:49.115 UTC: 	 Found CRAB cache file /uscms/home/gdecastr/.crab3
+DEBUG 2026-08-27 04:58:49.119 UTC: 	 Checking credentials
+DEBUG 2026-08-27 04:58:49.119 UTC: 	 Found proxy file /uscms/home/gdecastr/x509up_u59769
+DEBUG 2026-08-27 04:58:49.119 UTC: 	 Making sure it has proper VOMS extension
+DEBUG 2026-08-27 04:58:49.119 UTC: 	 Executing command :
+ voms-proxy-info --vo --file /uscms/home/gdecastr/x509up_u59769
+DEBUG 2026-08-27 04:58:49.138 UTC: 	 output : cms
+
+ error: 
+ retcode : 0
+DEBUG 2026-08-27 04:58:49.138 UTC: 	 Getting proxy life time left
+DEBUG 2026-08-27 04:58:49.139 UTC: 	 Executing command :
+ voms-proxy-info --actimeleft --timeleft --file /uscms/home/gdecastr/x509up_u59769
+DEBUG 2026-08-27 04:58:49.157 UTC: 	 output : 563615
+563615
+
+ error: 
+ retcode : 0
+DEBUG 2026-08-27 04:58:49.157 UTC: 	 Proxy valid for 156:33:35 hours
+DEBUG 2026-08-27 04:58:49.157 UTC: 	 Retrieving username ...
+DEBUG 2026-08-27 04:58:49.157 UTC: 	 Retrieving username from CRIC...
+DEBUG 2026-08-27 04:58:50.338 UTC: 	 username is gdecastr
+INFO 2026-08-27 04:58:50.975 UTC: 	 Rucio client intialized for account gdecastr
+DEBUG 2026-08-27 04:58:50.975 UTC: 	 Command use: checkwrite
+DEBUG 2026-08-27 04:58:50.975 UTC: 	 Options use: ['--site=T3_US_FNALLPC', '--lfn=/store/user/gdecastr/Kamui']
+DEBUG 2026-08-27 04:58:50.975 UTC: 	 Instance is None
+DEBUG 2026-08-27 04:58:50.975 UTC: 	 Server base url is None
+DEBUG 2026-08-27 04:58:50.975 UTC: 	 Retrieving username ...
+DEBUG 2026-08-27 04:58:50.975 UTC: 	 Retrieving username from CRIC...
+DEBUG 2026-08-27 04:58:52.195 UTC: 	 username is gdecastr
+INFO 2026-08-27 04:58:52.195 UTC: 	 Validating LFN /store/user/gdecastr/Kamui...
+INFO 2026-08-27 04:58:52.195 UTC: 	 LFN /store/user/gdecastr/Kamui is valid.
+INFO 2026-08-27 04:58:52.208 UTC: 	 Will use `gfal-copy`, `gfal-rm` commands for checking write permissions
+INFO 2026-08-27 04:58:52.208 UTC: 	 Will check write permission in /store/user/gdecastr/Kamui on site T3_US_FNALLPC
+INFO 2026-08-27 04:58:52.356 UTC: 	 Will use PFN: davs://cmseos.fnal.gov:9000/eos/uscms/store/user/gdecastr/Kamui/crab3checkwrite_20260826_235852_6a4e8340-995e-4665-a26f-49b35af58bab/6a4e8340-995e-4665-a26f-49b35af58bab.tmp
+INFO 2026-08-27 04:58:52.356 UTC: 	 
+Attempting to create (dummy) directory crab3checkwrite_20260826_235852_6a4e8340-995e-4665-a26f-49b35af58bab and copy (dummy) file 6a4e8340-995e-4665-a26f-49b35af58bab.tmp to /store/user/gdecastr/Kamui
+
+INFO 2026-08-27 04:58:52.361 UTC: 	 Executing command: which scram >/dev/null 2>&1 && eval `scram unsetenv -sh`; gfal-copy -p -v -t 180 file:///uscms_data/d3/gdecastr/work/Kamui/6a4e8340-995e-4665-a26f-49b35af58bab.tmp 'davs://cmseos.fnal.gov:9000/eos/uscms/store/user/gdecastr/Kamui/crab3checkwrite_20260826_235852_6a4e8340-995e-4665-a26f-49b35af58bab/6a4e8340-995e-4665-a26f-49b35af58bab.tmp'
+INFO 2026-08-27 04:58:52.361 UTC: 	 Please wait...
+INFO 2026-08-27 04:58:53.353 UTC: 	 Failed running copy command
+INFO 2026-08-27 04:58:53.353 UTC: 	   Stdout:
+    Copying 85 bytes file:///uscms_data/d3/gdecastr/work/Kamui/6a4e8340-995e-4665-a26f-49b35af58bab.tmp => davs://cmseos.fnal.gov:9000/eos/uscms/store/user/gdecastr/Kamui/crab3checkwrite_20260826_235852_6a4e8340-995e-4665-a26f-49b35af58bab/6a4e8340-995e-4665-a26f-49b35af58bab.tmp
+    event: [1787806733193] BOTH   GFAL2:CORE:COPY	LIST:ENTER	
+    event: [1787806733193] BOTH   GFAL2:CORE:COPY	LIST:ITEM	file:///uscms_data/d3/gdecastr/work/Kamui/6a4e8340-995e-4665-a26f-49b35af58bab.tmp => davs://cmseos.fnal.gov:9000/eos/uscms/store/user/gdecastr/Kamui/crab3checkwrite_20260826_235852_6a4e8340-995e-4665-a26f-49b35af58bab/6a4e8340-995e-4665-a26f-49b35af58bab.tmp
+    event: [1787806733193] BOTH   GFAL2:CORE:COPY	LIST:EXIT	
+    event: [1787806733193] BOTH   http_plugin	PREPARE:ENTER	file:///uscms_data/d3/gdecastr/work/Kamui/6a4e8340-995e-4665-a26f-49b35af58bab.tmp => davs://cmseos.fnal.gov:9000/eos/uscms/store/user/gdecastr/Kamui/crab3checkwrite_20260826_235852_6a4e8340-995e-4665-a26f-49b35af58bab/6a4e8340-995e-4665-a26f-49b35af58bab.tmp
+    
+INFO 2026-08-27 04:58:53.353 UTC: 	   Stderr:
+    gfal-copy error: 113 (No route to host) - DESTINATION MAKE_PARENT Domain name resolution failed
+    
+INFO 2026-08-27 04:58:53.354 UTC: 	 
+Checkwrite Result:
+INFO 2026-08-27 04:58:53.355 UTC: 	 Unable to check write permission in /store/user/gdecastr/Kamui on site T3_US_FNALLPC
+Please try again later or contact the site administrators sending them the 'crab checkwrite' output as printed above.
+INFO 2026-08-27 04:58:53.355 UTC: 	 Note: You cannot write to a site if you did not ask permission.
+WARNING 2026-08-27 04:58:53.355 UTC: 	 Command checkwrite failed
+ERROR 2026-08-27 04:58:53.355 UTC: 	 Caught CommandFailedException exception
+Traceback (most recent call last):
+  File "/cvmfs/cms.cern.ch/share/cms/crab-prod/v3.260630.00/bin/crab.py", line 157, in <module>
+    client()
+  File "/cvmfs/cms.cern.ch/share/cms/crab-prod/v3.260630.00/bin/crab.py", line 144, in __call__
+    raise CommandFailedException("Command %s failed" % str(args[0]))
+CRABClient.ClientExceptions.CommandFailedException: Command checkwrite failed

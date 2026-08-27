@@ -7,7 +7,7 @@ Sample processing: turning a DAS dataset into flat ntuples on EOS. Human-facing 
 - This directory holds what is specific to this stage.
 - `config/` has `samples/`, `content/`, `triggers/` and `sites.json`, each with its own README and CLAUDE.md.
 - `cmssw/` holds the three things that run inside CMSSW: `kamuiNtuple_cfg.py`, wiring only with no content decisions; `kamuiTables.py`, which turns resolved JSON into table producers; and `inspectMiniAOD.py`.
-- `tools/triggerYields.py` computes the DVCode comparison numbers.
+- `tools/triggerYields.py` computes the JMTucker comparison numbers.
 - `jobs/` and `branchDumps/` are gitignored. The latter holds saved `edmDumpEventContent` output, kept as a reference for what a MiniAOD file contains.
 
 ## Things That Will Bite

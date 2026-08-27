@@ -14,7 +14,7 @@ A collection names one thing in MiniAOD and lists the variables to keep from it.
   type       What kind of object it is: patJet, patMuon, vertex, genParticle, etc..
   src        The MiniAOD collection it reads
   cut        Optional. Only objects passing this are kept
-  maxLen     Optional. Keep at most this many, highest pT first
+  maxLen     Optional. Keep at most this many, in the order the source collection gives them
   mcOnly     Optional. The collection disappears when the preset is resolved for data
   variables  The branches to write
 

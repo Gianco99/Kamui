@@ -13,3 +13,6 @@ String values pass through environment-variable expansion when loaded, which is 
 
 ## The Release Version
 `cmssw.version` and `cmssw.scramArch` are read by the condor backend and written into every generated job script. Changing them changes what runs on the grid.
+
+## The Two Stageout Bases
+CRAB refuses an `outLFNDirBase` under another user's `/store/user` area, so it cannot write to the shared `lpcdisplacedvertices` directory and gets its own `crabStageoutBase`. Condor stages out with `xrdcp` and has no such restriction, so it keeps the group area. `--outputBase` overrides either.

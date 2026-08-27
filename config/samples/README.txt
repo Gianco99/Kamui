@@ -14,7 +14,6 @@ Every sample ends up with these, while anything else is rejected on load.
   family         The JSON file this sample came from. Filled in automatically.
   content        Which content preset defines the branches to write, e.g. dvSignal
   tags           Free-form labels, used for selection.
-  nFilesFor10k   Files needed for roughly 10k events. Used only by stage and by submit --backend condor --quick; production submissions ignore it.
   unitsPerJob    Overrides the job splitting for this sample
   lumiMask       Data only.
   notes          Anything a reader would want to know
@@ -39,7 +38,7 @@ A grid is a name template, a dataset template, and a list of axes. Every combina
 Notice the two axes are written differently. Write an axis as a plain list when each value fills in one placeholder of the same name, as mass does. Write it as a list of blocks when picking one value has to fill in several placeholders at once, as era does.
 
 "defaults" applies to every sample in the file.
-"overrides" applies last, keyed by the final sample name, and is where per-point exceptions go such as a measured nFilesFor10k.
+"overrides" applies last, keyed by the final sample name, and is where per-point exceptions go such as a different unitsPerJob.
 Keys beginning with an underscore are comments and are stripped on load, so you can annotate them freely.
 
 Run ./kamui check after editing anything here. It validates every file to make sure it follows the appropriate convention.

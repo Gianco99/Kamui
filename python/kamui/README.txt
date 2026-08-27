@@ -54,27 +54,29 @@ find
 
 stage
   - Copies raw MiniAOD from the grid to our EOS area.
-  - By default it copies only enough files for roughly 10k events, using each sample's nFilesFor10k. Add --full for the whole dataset, or --maxFiles N for a hard cap.
+  - It copies the whole dataset unless you pass --maxFiles N.
   - Files already on EOS are skipped.
   - Example commands:
-      ./kamui stage --name ggH-2S-4D_mS55_ctau10mm_2024        Roughly 10k events of one sample
+      ./kamui stage --name ggH-2S-4D_mS55_ctau10mm_2024        One whole sample
       ./kamui stage --name ggH-2S-4D_mS55_ctau10mm_2024 --dry-run   Print what would be copied
       ./kamui stage --tag rpv --maxFiles 1                     One file each
-      ./kamui stage --name ZHToSSTo4d_mS55_ctau1mm_2018 --full    The entire dataset
 
 submit
   - Produces the ntuples. It takes the samples you selected, works out what each job should write, builds a job area on disk, and sends it to CRAB or to condor.
   - --task names the production. It becomes the directory under production/jobs/ and the output subdirectory on EOS.
   - Always look at a --dry-run first. It writes the whole job area and submits nothing, so you can read the config files that would actually be used.
-  - Re-using a task name asks before it overwrites, since the old area holds the record of what was submitted. Answer no and it writes to <task>_2 instead. --yes overwrites without asking, and with nothing attached to answer it always takes the safe branch.
-  - --filesPerJob wins when you pass it. Otherwise a sample's own unitsPerJob applies, and failing that, five.
+  - Task names are letters, digits, dot, dash and underscore, at most 96 characters, since the name becomes a directory, an EOS path and a shell word. Re-using one asks before it overwrites; overwriting deletes the old area, so the record of what was submitted is gone. Answer no and it writes to <task>_2 instead. --yes overwrites without asking, and with nothing attached to answer it always takes the safe branch. A task with a CRAB work area is never overwritten, since its jobs may still be running.
+  - --filesPerJob wins when you pass it. Otherwise a sample's own unitsPerJob applies, and failing that, five. --maxFiles caps how many input files a sample uses at all.
+  - Condor output goes to the shared lpcdisplacedvertices area and CRAB output to your own /store/user/<you>/Kamui, because CRAB will not write into another user's area. --outputBase sends either one somewhere else.
   - Example commands:
       ./kamui submit --tag validation --task run2Val --dry-run     Build the job area, submit nothing
       ./kamui submit --tag validation --task run2Val               The 24 Run 2 samples through CRAB
-      ./kamui submit --name rpvStopDD_M400_ctau1mm_2018 --task test --backend condor --quick    One sample, roughly 10k events, run at LPC
+      ./kamui submit --name ggH-2S-4D_mS15_ctau1mm_2024 --task test --backend condor    One sample, run at LPC
       ./kamui submit --tag rpv --task rpvNtuples --content dvFull  Override the preset every sample uses
       ./kamui submit --tag signal --task withMini --output both    Write the slimmed MiniAOD alongside the ntuple
       ./kamui submit --tag rpv --task big --filesPerJob 10 --memoryMB 4000    Fewer, larger, hungrier jobs
+      ./kamui submit --name ggH-2S-4D_mS15_ctau1mm_2024 --task quick --maxFiles 2    Two files only, for a fast test
+      ./kamui submit --tag rpv --task elsewhere --outputBase /store/user/gdecastr/Scratch    Somewhere other than the default
       ./kamui submit --tag rpv --task big --yes                    Overwrite an existing job area without being asked
 
 cache

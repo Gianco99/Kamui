@@ -8,6 +8,7 @@ The file format is documented in config/samples/README.txt and the CLAUDE.md bes
 ## Standard Python imports
 import itertools
 import os
+import re
 
 ## Kamui modules
 from ..foundations import paths
@@ -15,8 +16,11 @@ from ..foundations.config import deepMerge, loadJson
 
 # Classes and Functions
 
+## Characters a sample name may use
+NAME_OK = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
 ## Every field a sample may carry. Documented in config/samples/README.txt
-SAMPLE_FIELDS = {"name", "dataset", "dasInstance", "isMC", "era", "family", "content", "tags", "nFilesFor10k", "unitsPerJob", "lumiMask", "notes"}
+SAMPLE_FIELDS = {"name", "dataset", "dasInstance", "isMC", "era", "family", "content", "tags", "unitsPerJob", "lumiMask", "notes"}
 
 class Sample(dict):
     """A dictionary with attribute access, just so sample.name reads better in f-strings."""
@@ -48,12 +52,14 @@ def _expandGrid(grid, defaults):
     points = [_axisPoints(a, grid["axes"][a]) for a in axisNames]
     skip = set(grid.get("skip", []))
 
+    generated = set()
     samples = []
     for combo in itertools.product(*points) if points else [()]:
         subs = {}
         for part in combo:
             subs.update(part)
         name = grid["name"].format(**subs)
+        generated.add(name)
         if name in skip:
             continue
         s = dict(defaults)
@@ -66,7 +72,11 @@ def _expandGrid(grid, defaults):
         s.setdefault("notes", "")
         s["_axes"] = subs
         samples.append(s)
-    return samples
+
+    stale = sorted(skip - generated)
+    if stale:
+        raise ValueError(f"grid '{grid.get('name')}' skips sample(s) it never generates: {stale}")
+    return samples, generated
 
 
 def _loadFamily(path):
@@ -76,18 +86,24 @@ def _loadFamily(path):
     defaults.setdefault("family", cfg.get("family", os.path.basename(path)[:-5]))
 
     out = []
+    generated = set()
     for grid in cfg.get("grids", []):
-        out.extend(_expandGrid(grid, defaults))
+        expanded, names = _expandGrid(grid, defaults)
+        generated |= names
+        out.extend(expanded)
     for s in cfg.get("samples", []):
         merged = deepMerge(defaults, s)
         out.append(merged)
 
     overrides = cfg.get("overrides", {})
+    preOverrideNames = {x["name"] for x in out if "name" in x}
     seen = set()
     final = []
     for s in out:
         if s["name"] in overrides:
             s = deepMerge(s, overrides[s["name"]])
+        if not NAME_OK.fullmatch(s["name"]):
+            raise ValueError(f"{path}: sample name {s['name']!r} has characters that break job lists, shell scripts and EOS paths; use letters, digits, dot, dash, underscore")
         if s["name"] in seen:
             raise ValueError(f"{path}: duplicate sample name '{s['name']}'")
         seen.add(s["name"])
@@ -96,11 +112,18 @@ def _loadFamily(path):
             raise ValueError(f"{path}: sample '{s['name']}' has unknown field(s): {sorted(bad)}")
         if "dataset" not in s:
             raise ValueError(f"{path}: sample '{s['name']}' has no dataset")
+        u = s.get("unitsPerJob")
+        if u is not None and (isinstance(u, bool) or not isinstance(u, int) or u < 1):
+            raise ValueError(f"{path}: sample '{s['name']}' has unitsPerJob {u!r}; it must be a positive integer")
         s.setdefault("dasInstance", "prod/global")
         s.setdefault("isMC", True)
         s.setdefault("content", "dvBase")
         s.setdefault("tags", [])
         final.append(Sample(s))
+
+    stale = sorted(set(overrides) - seen - preOverrideNames)
+    if stale:
+        raise ValueError(f"{path}: overrides name sample(s) that do not exist: {stale}")
     return final
 
 
@@ -122,7 +145,11 @@ def loadCatalog(samplesDir=None):
 def _resolve(value, allowed, what):
     """Return the catalog's own spelling of a family, era or tag, matched case-insensitively, and raise if it exists nowhere."""
     allowed = {a for a in allowed if a}
-    hit = [a for a in allowed if a.lower() == value.lower()]
+    if value in allowed:
+        return value
+    hit = sorted(a for a in allowed if a.lower() == value.lower())
+    if len(hit) > 1:
+        raise KeyError(f"{what} '{value}' is ambiguous; the catalog spells it {hit}. Use the exact spelling.")
     if hit:
         return hit[0]
     plural = "families" if what == "family" else what + "s"

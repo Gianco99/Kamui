@@ -52,8 +52,8 @@ def _requireProxy(minSeconds=3600):
 CACHE_MAX_AGE_DAYS = 30
 
 
-def _cachePath(query, instance):
-    key = hashlib.sha1(f"{instance}|{query}".encode()).hexdigest()[:16]
+def _cachePath(query, instance, jsonOut=False):
+    key = hashlib.sha1(json.dumps([instance, query, bool(jsonOut)]).encode()).hexdigest()[:16]
     return os.path.join(paths.CACHE_DIR, key + ".json")
 
 
@@ -62,12 +62,17 @@ def query(q, instance="prod/global", refresh=False, maxAgeDays=CACHE_MAX_AGE_DAY
     Run one dasgoclient query and return its lines (or parsed JSON if jsonOut).
     Results are cached; `maxAgeDays` bounds how stale a cache entry may be.
     """
-    cp = _cachePath(q + ("|json" if jsonOut else ""), instance)
+    cp = _cachePath(q, instance, jsonOut)
     if not refresh and os.path.exists(cp):
         age = (time.time() - os.path.getmtime(cp)) / 86400.0
-        if age < maxAgeDays:
-            with open(cp) as f:
-                return json.load(f)["result"]
+        if 0 <= age < maxAgeDays:
+            try:
+                with open(cp) as f:
+                    rec = json.load(f)
+                if isinstance(rec, dict) and "result" in rec and rec["result"] is not None:
+                    return rec["result"]
+            except (OSError, ValueError):
+                pass                            # Unreadable entry, so treat it as a miss and ask DAS again.
 
     if not _haveDasgoclient():
         raise DasError("dasgoclient not on PATH - source cmsset_default.sh and cmsenv first")
@@ -80,28 +85,49 @@ def query(q, instance="prod/global", refresh=False, maxAgeDays=CACHE_MAX_AGE_DAY
     if r.returncode != 0:
         raise DasError(f"dasgoclient failed for '{q}':\n{r.stderr.strip()}")
 
-    result = json.loads(r.stdout) if jsonOut else [l.strip() for l in r.stdout.splitlines() if l.strip()]
+    try:
+        result = json.loads(r.stdout) if jsonOut else [l.strip() for l in r.stdout.splitlines() if l.strip()]
+    except ValueError as e:
+        raise DasError(f"dasgoclient returned unparseable JSON for '{q}':\n{e}")
+
+    if not result and r.stderr.strip():
+        print(f"  warning: dasgoclient returned nothing for '{q}' and said: {r.stderr.strip().splitlines()[-1]}")
+        return result
 
     os.makedirs(paths.CACHE_DIR, exist_ok=True)
-    with open(cp, "w") as f:
-        json.dump({"query": q, "instance": instance, "when": time.time(), "result": result}, f)
+    tmp = cp + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            json.dump({"query": q, "instance": instance, "jsonOut": bool(jsonOut), "when": time.time(), "result": result}, f)
+        os.replace(tmp, cp)                     # Atomic, so an interrupted query cannot leave a broken entry.
+    except OSError:
+        pass                                    # A cache that cannot be written is a cache miss next time, never a failure now.
     return result
 
 
 def listFiles(dataset, instance="prod/global", refresh=False):
-    """LFNs of a dataset, sorted for reproducible job splitting."""
-    return sorted(query(f"file dataset={dataset}", instance, refresh))
+    """LFNs of a dataset, deduplicated and sorted for reproducible job splitting."""
+    return sorted(set(query(f"file dataset={dataset}", instance, refresh)))
 
 
 def datasetSummary(dataset, instance="prod/global", refresh=False):
     """{'nfiles','nevents','sizeGB'} for a dataset, or zeros if DAS has nothing."""
     rows = query(f"summary dataset={dataset}", instance, refresh, jsonOut=True)
-    for row in rows:
-        for s in row.get("summary", []):
+    def num(v, cast):
+        try:
+            return cast(v)
+        except (TypeError, ValueError):
+            return cast(0)
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        for s in row.get("summary") or []:
+            if not isinstance(s, dict):
+                continue
             return {
-                "nfiles":  int(s.get("nfiles", 0)),
-                "nevents": int(s.get("nevents", 0)),
-                "sizeGB":  float(s.get("file_size", 0)) / 1e9,
+                "nfiles":  num(s.get("nfiles", 0), int),
+                "nevents": num(s.get("nevents", 0), int),
+                "sizeGB":  num(s.get("file_size", 0), float) / 1e9,
             }
     return {"nfiles": 0, "nevents": 0, "sizeGB": 0.0}
 
@@ -122,22 +148,30 @@ def _cacheEntries():
         return []
     out = []
     for name in sorted(os.listdir(paths.CACHE_DIR)):
-        if not name.endswith(".json"):
+        if not (name.endswith(".json") or name.endswith(".json.tmp")):
             continue
         path = os.path.join(paths.CACHE_DIR, name)
+        try:
+            size = os.path.getsize(path)
+        except OSError:
+            continue                            # Vanished under us, so there is nothing to report or prune.
+        broken = {"path": path, "query": None, "instance": None, "ageDays": None, "bytes": size}
         try:
             with open(path) as f:
                 rec = json.load(f)
         except (OSError, ValueError):
-            # A truncated entry is unreadable to us and to query(), so treat it as prunable rather than crashing the report.
-            out.append({"path": path, "query": None, "instance": None, "ageDays": None, "bytes": os.path.getsize(path)})
+            out.append(broken)
             continue
+        if not isinstance(rec, dict) or rec.get("result") is None:
+            out.append(broken)
+            continue
+        age = (time.time() - os.path.getmtime(path)) / 86400.0
         out.append({
             "path": path,
             "query": rec.get("query"),
             "instance": rec.get("instance"),
-            "ageDays": (time.time() - rec.get("when", 0)) / 86400.0,
-            "bytes": os.path.getsize(path),
+            "ageDays": age if age >= 0 else float("inf"),
+            "bytes": size,
         })
     return out
 
@@ -164,6 +198,8 @@ def pruneCache(maxAgeDays=CACHE_MAX_AGE_DAYS):
             try:
                 os.remove(e["path"])
                 gone += 1
+            except IsADirectoryError:
+                print(f"  warning: {e['path']} is a directory, not a cache entry; remove it by hand")
             except OSError:
                 pass
     return gone

@@ -16,8 +16,7 @@
   "samples": [
     {
       "name": "StopStopbar-2Dbar2D_M400_ctau10mm_2024",
-      "dataset": "/StopStopbarTo2Dbar2D_M-400_CTau-10mm_Summer24_100k_v2/brlopesd-StopStopbarTo2Dbar2D_M-400_CTau-10mm_Summer24_100k_miniAOD_v2-df1e99b50d14b85be33e7e4ab518ee3a/USER",
-      "nFilesFor10k": 1
+      "dataset": "/StopStopbarTo2Dbar2D_M-400_CTau-10mm_Summer24_100k_v2/brlopesd-StopStopbarTo2Dbar2D_M-400_CTau-10mm_Summer24_100k_miniAOD_v2-df1e99b50d14b85be33e7e4ab518ee3a/USER"
     }
   ]
 }

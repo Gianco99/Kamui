@@ -19,8 +19,7 @@ Physics caveats per family are kept here so the configs stay readable.
 - Exclusive per (mStop, mSo, ctau).
 
 **Run 2 validation (run2Validation).**
-- Dataset paths and event counts copied from DVCode's `JMTucker/Tools/python/Samples.py` on 2026-08-25.
-- Procedure is in `docs/VALIDATION.txt`.
+- Dataset paths and event counts copied from JMTucker's `Tools/python/Samples.py` on 2026-08-25.
 
 ## Selection Values Are Checked and Matched
 `--family`, `--era` and `--tag` are resolved case-insensitively against what exists in the catalog. A value matching nothing raises, naming every value that does exist.

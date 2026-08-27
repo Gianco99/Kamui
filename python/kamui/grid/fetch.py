@@ -18,14 +18,18 @@ def _eosDir(sites, sampleName):
 
 
 def _listStaged(sites, sampleName):
-    r = subprocess.run(["xrdfs", sites["eosRedirector"].rstrip("/"), "ls", _eosDir(sites, sampleName)], capture_output=True, text=True)
+    try:
+        r = subprocess.run(["xrdfs", sites["eosRedirector"].rstrip("/"), "ls", _eosDir(sites, sampleName)], capture_output=True, text=True, timeout=120)
+    except (OSError, subprocess.SubprocessError) as e:
+        print(f"  warning: could not list EOS ({e}); assuming nothing is staged")
+        return []
     if r.returncode != 0:
         return []
     return [l.strip() for l in r.stdout.splitlines() if l.strip()]
 
 
-def stage(sample, sites=None, quick=True, maxFiles=None, dryRun=False, refresh=False):
-    """Copy files for one sample, capped at nFilesFor10k unless quick is False. Returns (nCopied, nFailed)."""
+def stage(sample, sites=None, maxFiles=None, dryRun=False, refresh=False):
+    """Copy files for one sample, capped at maxFiles when given. Returns (nCopied, nFailed)."""
     sites = sites or loadSites()
     dest = _eosDir(sites, sample["name"])
     eosRed = sites["eosRedirector"].rstrip("/")
@@ -36,7 +40,9 @@ def stage(sample, sites=None, quick=True, maxFiles=None, dryRun=False, refresh=F
         print("  no files found in DAS")
         return 0, 0
 
-    cap = maxFiles if maxFiles is not None else (sample.get("nFilesFor10k") if quick else None)
+    if maxFiles is not None and maxFiles < 1:
+        raise ValueError(f"--maxFiles must be at least 1, got {maxFiles}")
+    cap = maxFiles
     total = len(lfns)
     if cap is not None and total > cap:
         lfns = lfns[:cap]

@@ -11,6 +11,7 @@ needs the kamui package (which matters on a worker node).
 """
 
 import json
+import os
 
 import FWCore.ParameterSet.Config as cms
 
@@ -122,5 +123,9 @@ def buildSkim(skim):
 
 
 def loadContent(path):
-    with open(path) as f:
-        return json.load(f)
+    candidates = [path, os.path.basename(path)]
+    for c in candidates:
+        if os.path.isfile(c):
+            with open(c) as f:
+                return json.load(f)
+    raise RuntimeError("content JSON not found; looked for %s" % " and ".join(candidates))

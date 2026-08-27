@@ -1,5 +1,5 @@
 {
-  "_doc": "Run 2 UL points for validating this framework against JMTucker. Caveats in CLAUDE.md, procedure in docs/VALIDATION.txt.",
+  "_doc": "Run 2 UL points for validating this framework against JMTucker. Caveats in CLAUDE.md.",
   "family": "run2Validation",
   "defaults": {
     "isMC": true,

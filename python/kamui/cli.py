@@ -10,7 +10,6 @@ See python/kamui/README.txt for what each command does and the flags they take.
 import argparse
 import json
 import os
-import subprocess
 import sys
 
 ## Kamui modules
@@ -21,7 +20,7 @@ from .configReaders.catalog import loadCatalog, select
 from .configReaders.content import listPresets, resolveContent, summarize, validateTriggers
 from .submit import condor as condorBackend, crab as crabBackend
 from .configReaders.sites import loadSites
-from .submit.common import taskDir
+from .submit.common import runTool, taskDir
 
 # Sample Selection Helper Functions
 ## These come first because other functions later on depend on them to work.
@@ -114,15 +113,29 @@ def _cmdFind(args):
 def _cmdStage(args):
     """Copy raw MiniAOD files to our EOS area. For inspecting files and prototyping content presets."""
     sites = loadSites()
+    if args.maxFiles is not None and args.maxFiles < 1:
+        sys.exit(f"--maxFiles must be at least 1, got {args.maxFiles}")
     sel = _pick(args)
+    problems = []
     for s in sel:
         print(f"\n=== {s['name']}\n  {s['dataset']}")
-        fetch.stage(s, sites, quick=not args.full, maxFiles=args.maxFiles, dryRun=args.dryRun, refresh=args.refresh)
+        try:
+            fetch.stage(s, sites, maxFiles=args.maxFiles, dryRun=args.dryRun, refresh=args.refresh)
+        except ValueError as e:
+            print(f"  skipped: {e}")
+            problems.append(s["name"])
+    if problems:
+        print(f"\n{len(problems)} sample(s) skipped: {', '.join(problems)}")
+        return 1 if len(problems) == len(sel) else 0
 
 
 def _cmdSubmit(args):
     """Build a job area for the selected samples and submit it. Use --dry-run first for testing."""
     sel = _pick(args)
+    if args.filesPerJob is not None and args.filesPerJob < 1:
+        sys.exit(f"--filesPerJob must be at least 1, got {args.filesPerJob}")
+    if args.maxFiles is not None and args.maxFiles < 1:
+        sys.exit(f"--maxFiles must be at least 1, got {args.maxFiles}")
     if args.content:                       # override the per-sample preset
         for s in sel:
             s["content"] = args.content
@@ -136,20 +149,22 @@ def _cmdSubmit(args):
             print(" NOTE: two EDM output modules in one CRAB task is not yet verified here. " "If CRAB refuses it, run two tasks with --output ntuple and --output miniaod.")
 
     if args.backend == "crab":
-        cfgs, task = crabBackend.prepare(sel, args.task, unitsPerJob=args.filesPerJob, maxMemoryMB=args.memoryMB, output=args.output, assumeYes=args.yes)
+        cfgs, task, base = crabBackend.prepare(sel, args.task, unitsPerJob=args.filesPerJob, maxMemoryMB=args.memoryMB, output=args.output, assumeYes=args.yes, base=args.outputBase)
         print(f"  wrote {len(cfgs)} crab config(s) under {taskDir(task, create=False)}")
-        crabBackend.submit(cfgs, dryRun=args.dryRun, taskName=task)
+        print(f"  output goes to {base}/ntuples/{task}")
+        crabBackend.submit(cfgs, dryRun=args.dryRun, taskName=task, base=base)
     else:
         fileLists = {}
         for s in sel:
             lfns = das.listFiles(s["dataset"], s["dasInstance"], refresh=args.refresh)
-            if args.quick and s.get("nFilesFor10k"):
-                lfns = lfns[: s["nFilesFor10k"]]
+            if args.maxFiles:
+                lfns = lfns[: args.maxFiles]
             fileLists[s["name"]] = lfns
             print(f"  {s['name']:<48} {len(lfns):>5} file(s)")
-        d, nJobs, task = condorBackend.prepare(sel, args.task, fileLists, filesPerJob=args.filesPerJob, memoryMB=args.memoryMB, output=args.output, assumeYes=args.yes)
+        d, nJobs, task, base = condorBackend.prepare(sel, args.task, fileLists, filesPerJob=args.filesPerJob, memoryMB=args.memoryMB, output=args.output, assumeYes=args.yes, base=args.outputBase)
         print(f"  wrote {nJobs} job(s) under {d}")
-        condorBackend.submit(task, dryRun=args.dryRun)
+        print(f"  output goes to {base}/ntuples/{task}")
+        condorBackend.submit(task, dryRun=args.dryRun, base=base)
 
 
 def _cmdStatus(args):
@@ -180,7 +195,10 @@ def _cmdStatus(args):
         cmd = ["condor_q", "-nobatch"] + ([str(cluster)] if cluster else [])
         if not cluster:
             print("\n(no cluster id recorded; showing every job you have queued)")
-        subprocess.run(cmd)
+        try:
+            runTool(cmd)
+        except OSError as e:
+            print(f"\ncould not run condor_q: {e}")
 
 
 def _cmdCheck(args):
@@ -228,7 +246,7 @@ def _cmdCheck(args):
                     problems.append(f"{os.path.relpath(os.path.join(root, f), pkgDir)} reads a config directory directly; that belongs in configReaders/")
 
     sites = loadSites()
-    for k in ("eosRedirector", "sourceRedirector", "stageoutBase", "crabStorageSite"):
+    for k in ("eosRedirector", "sourceRedirector", "stageoutBase", "crabStageoutBase", "crabStorageSite"):
         if k not in sites:
             problems.append(f"sites.json is missing '{k}'")
 
@@ -255,7 +273,7 @@ def _cmdCache(args):
         print(f"pruned {das.pruneCache()} expired entry(s)")
     st = das.cacheStats()
     print(f"{st['n']} cached DAS response(s), {st['bytes'] / 1e6:.1f} MB in {st['dir']}")
-    if st["n"]:
+    if st["n"] and st["newestDays"] is not None:
         print(f"  age      {st['newestDays']:.1f} to {st['oldestDays']:.1f} days")
         print(f"  expired  {st['nStale']} (older than {das.CACHE_MAX_AGE_DAYS} days, ignored on read)")
 
@@ -290,7 +308,6 @@ def main(argv=None):
 
     q = sub.add_parser("stage", help="Copy raw MiniAOD to EOS (small test samples)", description=_cmdStage.__doc__)
     _addSelection(q)
-    q.add_argument("--full", action="store_true", help="Copy the whole dataset, not just nFilesFor10k")
     q.add_argument("--maxFiles", type=int, help="Hard cap on files copied")
     q.add_argument("--dry-run", dest="dryRun", action="store_true", help="Print what would be copied, copy nothing")
     q.add_argument("--refresh", action="store_true", help="Bypass the DAS cache")
@@ -303,11 +320,12 @@ def main(argv=None):
     q.add_argument("--content", help="Override the per-sample content preset")
     q.add_argument("--output", choices=["ntuple", "miniaod", "both"], default="ntuple", help="What each job writes (default: ntuple)")
     q.add_argument("--filesPerJob", type=int, help="Input files per job, overriding any per-sample unitsPerJob (default: 5)")
+    q.add_argument("--maxFiles", type=int, help="Use at most this many input files per sample")
     q.add_argument("--memoryMB", type=int, default=2500, help="Memory request per job in MB (default: 2500)")
-    q.add_argument("--quick", action="store_true", help="Condor only: cap at nFilesFor10k")
     q.add_argument("--dry-run", dest="dryRun", action="store_true", help="Write the job area, submit nothing")
     q.add_argument("--refresh", action="store_true", help="Bypass the DAS cache")
     q.add_argument("--yes", action="store_true", help="Overwrite an existing job area without asking")
+    q.add_argument("--outputBase", help="Write output under this EOS path instead of the site default")
     q.set_defaults(func=_cmdSubmit)
 
     q = sub.add_parser("status", help="Status of a submitted task", description=_cmdStatus.__doc__)
@@ -326,7 +344,7 @@ def main(argv=None):
     args = p.parse_args(argv)
     try:
         return args.func(args)
-    except (KeyError, FileNotFoundError, ValueError, das.DasError) as e:
+    except (KeyError, FileNotFoundError, PermissionError, ValueError, das.DasError) as e:
         # Config and DAS problems are user errors - say what is wrong and stop.
         # Anything else still raises.
         sys.exit(f"error: {e}")

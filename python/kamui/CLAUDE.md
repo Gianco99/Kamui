@@ -20,12 +20,11 @@ The design principle the whole package serves is that the physics lives in confi
     - The one command that ignores the catalog entirely. Everything else answers questions about samples we already wrote down; this asks DAS what exists. Private datasets need `--instance prod/phys03`, and forgetting that returns nothing.
 - `stage`
     - Copies whole MiniAOD files to EOS, which is expensive and rarely what you want. It exists for inspecting a file and for prototyping a content preset against something local. Production goes through `submit`, which streams from the grid and never copies the input.
-    - Defaults to `quick`, capping the copy at the sample's `nFilesFor10k`. A `--full` on a large dataset copies hundreds of GB.
+    - Copies the whole dataset unless `--maxFiles` caps it, which on a large dataset is hundreds of GB.
 - `query`
     - The only command that can tell you a dataset is real.
 - `submit`
     - CRAB takes the dataset name and splits it itself; condor needs a resolved file list, so only the condor path queries DAS.
-    - `--quick` applies to condor only. CRAB never materializes a file list, so there is nothing to cap.
 - `status`
     - Summarizes `task.json`. The record runs to tens of kB, so printing it whole buries the few lines anyone wants.
     - Reads the backend out of the record, so a task is always queried the way it was submitted.
@@ -66,10 +65,10 @@ The design principle the whole package serves is that the physics lives in confi
 
 
 ## Talking to the Grid - grid/
-- `das.py` caches every answer on disk under `.dasCache/`, keyed by the query. DAS is slow and its answers rarely change. `--refresh` bypasses it.
+- `das.py` caches every answer on disk under `.dasCache/`, keyed by (instance, query, jsonOut). DAS is slow and its answers rarely change. `--refresh` bypasses it.
     - `CACHE_MAX_AGE_DAYS` is the single definition of stale, shared by `query`, `cacheStats` and `pruneCache`. Reading and pruning have to agree on it or prune deletes entries still in use.
     - An entry past the limit is skipped on read but never removed, so the cache grows until something prunes it.
-    - `pruneCache` removes exactly what `query` would refuse, including unparseable entries.
+    - `pruneCache` removes what `query` refuses: expired, unparseable, or result-less entries, aged by file mtime, the same clock `query` reads.
     - Cache layout is known only to `das.py`; anything counting or measuring entries calls `cacheStats`.
 - It refuses to run without a valid proxy.
 - `fetch.py` copies whole files and skips anything already on EOS. Nothing in the production path uses it: `submit` streams from the grid instead.
@@ -86,7 +85,7 @@ The design principle the whole package serves is that the physics lives in confi
     - Anything added to a submission path that changes what a job does belongs in it.
 - The content preset is flattened into the job area and shipped with the job.
 - `crab.py`
-    - `requestName` is capped at 100 characters by CRAB, so `_requestName` truncates. Long task and sample names can therefore collide, and CRAB rejects a duplicate.
+    - `requestName` is capped at 100 characters by CRAB, so `_requestName` truncates. `_checkRequestNames` rejects a submission whose samples would collide after truncation, before the job area is touched.
     - `submit` returns `(ok, bad)` and keeps going, so one bad sample cannot strand the rest of a production.
     - Whether CRAB accepts two EDM output modules at once, which is what `--output both` asks for, is unverified.
 - `condor.py`

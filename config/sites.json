@@ -6,8 +6,9 @@
   "_sourceAlt": "root://cmsxrootd.fnal.gov/ is faster for datasets already cached at FNAL",
 
   "stageoutBase": "/store/user/lpcdisplacedvertices/$USER",
+  "crabStageoutBase": "/store/user/$USER/Kamui",
   "miniaodDir": "miniaod",
-  "_layout": "Raw MiniAOD copies go to <stageoutBase>/<miniaodDir>/<sample>/ ; job output to <stageoutBase>/ntuples/<task>/<sample>/",
+  "_layout": "MiniAOD copies to <stageoutBase>/<miniaodDir>/<sample>/ ; condor output to <stageoutBase>/ntuples/<task>/<sample>/ ; CRAB output to <crabStageoutBase>/ntuples/<task>/<sample>/",
 
   "crabStorageSite": "T3_US_FNALLPC",
 

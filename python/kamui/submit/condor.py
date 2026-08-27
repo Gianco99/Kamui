@@ -9,11 +9,10 @@ import json
 import os
 import re
 import stat
-import subprocess
 
 ## Kamui modules
 from ..configReaders.sites import loadSites
-from .common import chunk, publishRecord, resolveTaskDir, taskDir, writeResolvedContent, writeTaskRecord
+from .common import chunk, contentStem, outputBase, publishRecord, resolveTaskDir, runTool, taskDir, writeResolvedContent, writeTaskRecord
 from ..foundations import paths
 
 ## Input files per job when neither the flag nor the sample says otherwise
@@ -76,14 +75,14 @@ queue sample,index,script from jobList.txt
 
 
 def _scriptName(presetName, isMC):
-    # One run script per content preset and data/MC flavour, since the two differ in what cmsRun is told.
-    return f"runJob_{presetName}_{'mc' if isMC else 'data'}.sh"
+    return f"runJob_{contentStem(presetName)}_{'mc' if isMC else 'data'}.sh"
 
 
 # fileLists maps a sample name to the list of LFNs it should run over, resolved by the caller from DAS or EOS.
-def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvents=-1, memoryMB=2500, diskMB=4000000, output="ntuple", cmsswVersion=None, scramArch=None, assumeYes=False):
+def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvents=-1, memoryMB=2500, diskMB=4000000, output="ntuple", cmsswVersion=None, scramArch=None, assumeYes=False, base=None):
     """Write a complete condor submission area. Returns the directory, the job count and the task name used."""
     sites = sites or loadSites()
+    base = outputBase(sites, "condor", base)
     # The release lives in config/sites.json
     cmsswVersion = cmsswVersion or sites["cmssw"]["version"]
     scramArch = scramArch or sites["cmssw"]["scramArch"]
@@ -92,16 +91,22 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
 
     contentCache = {}
     chunked, jobRows = {}, []
+    effective = {}
     dropped = []
     for s in samples:
         lfns = fileLists.get(s["name"], [])
+        if len(set(lfns)) != len(lfns):
+            print(f"  warning: {s['name']} listed {len(lfns) - len(set(lfns))} duplicate file(s); keeping one copy of each")
+            lfns = sorted(set(lfns))
         if not lfns:
             dropped.append(s["name"])
             continue
         key = (s["content"], bool(s["isMC"]))
         if key not in contentCache:
             contentCache[key] = writeResolvedContent(d, s["content"], bool(s["isMC"]))
-        groups = chunk(lfns, int(filesPerJob or s.get("unitsPerJob") or DEFAULT_FILES_PER_JOB))
+        perJob = int(filesPerJob or s.get("unitsPerJob") or DEFAULT_FILES_PER_JOB)
+        effective[s["name"]] = perJob
+        groups = chunk(lfns, perJob)
         chunked[s["name"]] = [[sites["sourceRedirector"].rstrip("/") + "/" + f if not f.startswith("root:") else f
                                for f in g] for g in groups]
         jobRows += [f"{s['name']},{i},{_scriptName(*key)}" for i in range(len(groups))]
@@ -124,7 +129,7 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
             maxEvents=maxEvents,
             output=output,
             eosRedirector=sites["eosRedirector"].rstrip("/"),
-            outDir="/".join([sites["stageoutBase"].rstrip("/"), "ntuples", taskName, "$SAMPLE"]),
+            outDir="/".join([base, "ntuples", taskName, "$SAMPLE"]),
         )
         p = os.path.join(d, _scriptName(preset, isMC))
         with open(p, "w") as f:
@@ -141,22 +146,22 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
     submitted = [s for s in samples if s["name"] in chunked]
     writeTaskRecord(d, {
         "task": taskName, "backend": "condor", "output": output, "nJobs": len(jobRows),
-        "samples": sorted(chunked), "droppedSamples": sorted(dropped), "filesPerJob": filesPerJob or DEFAULT_FILES_PER_JOB,
+        "samples": sorted(chunked), "droppedSamples": sorted(dropped), "filesPerJob": effective,
         "maxEvents": maxEvents, "memoryMB": memoryMB,
         "nInputFiles": {k: sum(len(g) for g in v) for k, v in sorted(chunked.items())},
-        "outDirBase": "/".join([sites["stageoutBase"].rstrip("/"), "ntuples", taskName]),
+        "outDirBase": "/".join([base, "ntuples", taskName]),
     }, samples=submitted, sites=sites, resolvedContent=contentCache.values())
-    return d, len(jobRows), taskName
+    return d, len(jobRows), taskName, base
 
 
-def submit(taskName, dryRun=False):
+def submit(taskName, dryRun=False, base=None):
     """Run `condor_submit` on the task's JDL."""
     d = taskDir(taskName, create=False)
     jdl = os.path.join(d, "submit.jdl")
     if dryRun:
         print(f"  [dry-run] condor_submit {jdl}")
         return 0
-    r = subprocess.run(["condor_submit", "submit.jdl"], cwd=d, capture_output=True, text=True)
+    r = runTool(["condor_submit", "submit.jdl"], cwd=d, capture_output=True, text=True)
     print(r.stdout.strip() or r.stderr.strip())
     if r.returncode == 0:
         # condor_submit reports "N job(s) submitted to cluster 12345." - keep the id so status can ask about this task alone.
@@ -166,7 +171,9 @@ def submit(taskName, dryRun=False):
             with open(recordPath) as f:
                 rec = json.load(f)
             rec["condorCluster"] = int(m.group(1))
-            with open(recordPath, "w") as f:
+            tmp = recordPath + ".tmp"           # Same temp-and-rename as writeTaskRecord, so a failure here cannot destroy the record.
+            with open(tmp, "w") as f:
                 json.dump(rec, f, indent=2)
-        publishRecord(d, loadSites(), taskName)
+            os.replace(tmp, recordPath)
+        publishRecord(d, loadSites(), taskName, base)
     return r.returncode
