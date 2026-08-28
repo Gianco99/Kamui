@@ -1,0 +1,17 @@
+{
+  "_doc": "Sample for the tutorial!",
+  "family": "tutorial",
+  "defaults": {
+    "era": "2018",
+    "isMC": true,
+    "dasInstance": "prod/global",
+    "content": "dvLepton",
+    "tags": ["tutorial", "run2"]
+  },
+  "samples": [
+    {
+      "name": "tutorialZH2018",
+      "dataset": "/ZH_HToSSTodddd_ZToLL_MH-125_MS-55_ctauS-1_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL18MiniAODv2-106X_upgrade2018_realistic_v16_L1v1-v2/MINIAODSIM"
+    }
+  ]
+}

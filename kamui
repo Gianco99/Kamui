@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Kamui CLI entry point. See python/kamui/README.txt for details."""
+"""Kamui CLI entry point. See python/kamui/README.md for details."""
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "python")) # Puts python/ on the import path. Lets kamui work from anywhere.
 from kamui.cli import main # Imports the CLI.

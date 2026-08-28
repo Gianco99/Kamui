@@ -2,41 +2,19 @@
 
 ## Design Premise
 - Kamui is the CLI for the whole analysis framework.
-- Sample processing, turning CMS datasets to ntuples on EOS, is the only stage implemented so far.
+- Two stages exist: sample processing (`submit`, everything under `submit/`) and event selection (`select`, everything under `select/`).
 - When a new stage is added it belongs here as commands, not as a separate script alongside kamui.
 
 The design principle the whole package serves is that the physics lives in configuration files and this code only executes what they say. When reviewing or extending anything here, that is the constraint to protect.
 
 
 ## Main Driver - cli.py
-- Every command lives in this one file. Adding one is two edits here: a `cmdX` handler, and a `sub.add_parser` block that points at it.
+- Every command lives in this one file. Adding one is two edits here: a `_cmdX` handler, and an `_addCmd(sub, ...)` block that points at it. Registration order is the order `--help` lists them, and it follows the root README's command table.
 - Keep it thin. It parses, calls a module, and prints. The actual behavior belongs in the modules so they can be imported without the CLI.
-- `list`
-    - The only command that accepts an empty selection, via `_pick(args, required=False)`. Every other command exits when nothing matches: listing nothing is a valid answer.
-- `content`
-    - `--write` emits exactly the JSON a job is handed, and `submit` calls the same resolver.
-    - `--data` changes the answer, so a preset has to work both ways. `check` resolves every preset twice for that reason.
-- `find`
-    - The one command that ignores the catalog entirely. Everything else answers questions about samples we already wrote down; this asks DAS what exists. Private datasets need `--instance prod/phys03`, and forgetting that returns nothing.
-- `stage`
-    - Copies whole MiniAOD files to EOS, which is expensive and rarely what you want. It exists for inspecting a file and for prototyping a content preset against something local. Production goes through `submit`, which streams from the grid and never copies the input.
-    - Copies the whole dataset unless `--maxFiles` caps it, which on a large dataset is hundreds of GB.
-- `query`
-    - The only command that can tell you a dataset is real.
-- `submit`
-    - CRAB takes the dataset name and splits it itself; condor needs a resolved file list, so only the condor path queries DAS.
-- `status`
-    - Summarizes `task.json`. The record runs to tens of kB, so printing it whole buries the few lines anyone wants.
-    - Reads the backend out of the record, so a task is always queried the way it was submitted.
-    - Condor jobs are filtered by the cluster id recorded at submit time. Without one it lists the whole queue and says so, which otherwise reads as if it were this task.
-- `cache`
-    - `--prune` drops only expired entries, `--clear` drops everything. Clearing costs a full refetch from a slow service.
-- `check`
-    - Everything it does must work with no proxy.
-    - It enforces the two architectural boundaries by reading source: `foundations/` importing from above, and anything outside `configReaders/` touching a config path. Both are greppable, which is what makes them checkable.
-    - It resolves every preset for both MC and data, including unreferenced ones, which break just as loudly.
-    - Returns 1 on any problem so it can gate CI or a submission script.
-- `main()` passes the nine `cmdX` docstrings to argparse as `description=`, so they are the per-command `--help` text.
+- `check` on the sample catalog
+    - A newly added sample has no `dasEvents` recorded, which `check` treats as a problem rather than a warning, so it returns 1 until `./kamui norm --name <sample> --fromNano --write` clears it.
+    - It never asks whether a dataset exists or whether its path is spelled right. `./kamui query` does, and needs a proxy.
+- `main()` passes each `_cmdX` docstring to argparse as `description=`, so a command's docstring is its `--help` text. The root README's command table is the source of the one-line `help=` strings, and nothing enforces that the two agree.
 
 
 ## The Basics - foundations/
@@ -44,24 +22,31 @@ The design principle the whole package serves is that the physics lives in confi
 - `paths.py` is the only module allowed to know the repository layout. Anything else that hardcodes a directory name is a bug, and moving a directory should mean editing this file alone.
     - It derives the repository root from its own file location, which is why the package can be moved without configuration. That also means it breaks silently if the file is relocated without updating the `dirname` chain.
 - `config.py` merges layer by layer, and a list replaces the list below.
-    - For example: `dvRun2Lepton` is built on `dvRun2Displaced` and swaps its 11 displacement HLT paths for 8 lepton ones.
+    - For example: `dvLepton` is built on `dvDisplaced` and swaps its 11 displacement HLT paths for 8 lepton ones.
     - The cost falls on two keys where adding is the natural intent: `miniaod.keep`, restated in full by `dvBase`, `dvSignal` and `dvFull`, and `tags`, restated by all three grids in `run2Validation`. If that becomes annoying, add an opt-in append marker to `deepMerge`.
 
 
 ## Reading the Configs - configReaders/
 - Nothing outside this folder may open a config file.
     - `./kamui check` enforces it by scanning for `paths.*_DIR` and `paths.SITES_FILE` outside `configReaders/`.
-    - This is why `loadSites` lives here, and why `cmdCheck` calls `validateTriggers()` to reach the trigger directory.
+    - This is why `loadSites` lives here, and why `_cmdCheck` calls `validateTriggers()` to reach the trigger directory.
+    - `select/normalization.py` is the one place that writes a config file, `config/crossSections/generatorSums.json`. It is measured data rather than hand-written physics, which is why it does not go through a reader.
 - `catalog.py` reads the sample configs and answers which samples a command means.
     - The `Sample` class is a dict subclass giving attribute access, `sample.name`.
+    - `select` backs the five sample flags on every command that takes them, and they do not behave alike. `--family`, `--era` and `--tag` resolve case-insensitively against what exists and raise on a value matching nothing, naming every value that does exist; two spellings differing only in case are ambiguous and also raise. `--name` is exact and case-sensitive. `--match` is a plain glob with no check at all, so a pattern matching nothing leaves the selection empty and the command exits with "No samples matched the selection".
 - `content.py` resolves a content preset into what a job receives.
     - `KIND_TO_PLUGIN` is the point of the module: a physics-facing `type` maps onto the CMSSW plugin that builds that table, so nobody writing a config has to know a plugin name. A new kind of collection is an entry here, plus any of the sets below it whose behavior it shares.
+- `selections.py` resolves a selection config into something the engine can run without further lookups.
+    - It resolves for exactly one era. Thresholds, trigger lists and flag lists may each be written as a plain value or as an object keyed by era, and `_resolveThreshold` collapses them. Passing `era=None` is legal only for a config that uses none of that, and everything else raises rather than guessing a year.
+    - Trigger names are expanded into path lists here via `loadTriggerPaths`, so the resolved selection is self-contained and a worker never reads `config/triggers/`. That is what lets `batch.py` ship a single JSON to the grid.
+    - The `*_FIELDS` sets exist to reject a misspelled key. A typo in a cut would otherwise be silently ignored and the cut would quietly do less.
+    - `CUT_TYPES` and the engine's `_cutMask` must be kept in step; a type accepted here and unknown there fails only when the selection runs.
+    - It validates every `quantity` against `select.quantities.QUANTITIES`, which is why this module imports from `select/`. The direction is deliberate: the vocabulary belongs to the code that evaluates it, and `quantities.py` imports nothing from kamui, so there is no cycle.
+    - An `anyOf` alternative that does not apply to the era is dropped at resolve time. Leaving it in would have it fail later on trigger paths that never existed that year.
+    - `orderedMinPt` is checked to be descending, because it is matched against pT-sorted objects and an ascending ladder would pass everything.
 - `sites.py` reads `sites.json`, expanding environment variables as it goes.
     - Expansion happens at config-load time on the submitting machine, deliberately. On a worker node `$USER` is the batch account, and output would go somewhere wrong.
     - An unset variable raises, since a path with a literal dollar sign in it fails much later and less clearly.
-- `slimming.py` maps a preset's `miniaod` group names onto EDM outputCommands.
-    - Keeps are written label-first, because a class name spelled slightly wrong keeps nothing and reports nothing.
-    - A group naming a collection that does not exist in a given campaign is harmless: the keep matches nothing.
 
 
 ## Talking to the Grid - grid/
@@ -73,30 +58,67 @@ The design principle the whole package serves is that the physics lives in confi
 - It refuses to run without a valid proxy.
 - `fetch.py` copies whole files and skips anything already on EOS. Nothing in the production path uses it: `submit` streams from the grid instead.
 
+
 ## Submitting Jobs - submit/
-- `prepare` writes the job area, `submit` only shells out. `--dry-run` runs the first and skips the second, so the files it leaves are the ones a real submission would use.
+- `prepare` writes the job area, `submit` only shells out. `--dryRun` runs the first and skips the second, so the files it leaves are the ones a real submission would use.
 - Re-using a task name prompts before overwriting, because the old area is the only local record of a submission that may still be running. Declining writes to `<task>_n`, and `prepare` returns the name it actually used, so the caller and the EOS output directory follow it. A non-interactive run never overwrites.
 - `--filesPerJob` is `default=None` so an explicitly passed value can be told from an absent one, letting the flag beat a sample's `unitsPerJob` while the sample value still beats the built-in.
 - `task.json` is what makes a production reproducible.
     - It embeds the resolved content, so it stays readable when the preset changes.
     - A dirty tree means the commit alone does not describe the task, so check that flag first when ntuples disagree with expectations.
-    - `publishRecord` copies it to the EOS output directory on real submission, never on `--dry-run`. Job areas are gitignored scratch, so the EOS copy is the only one that lives as long as the ntuples.
+    - `publishRecord` copies it to the EOS output directory on real submission, never on `--dryRun`. Job areas are gitignored scratch, so the EOS copy is the only one that lives as long as the ntuples.
     - A failed publish warns and returns False.
     - Anything added to a submission path that changes what a job does belongs in it.
 - The content preset is flattened into the job area and shipped with the job.
 - `crab.py`
     - `requestName` is capped at 100 characters by CRAB, so `_requestName` truncates. `_checkRequestNames` rejects a submission whose samples would collide after truncation, before the job area is touched.
     - `submit` returns `(ok, bad)` and keeps going, so one bad sample cannot strand the rest of a production.
-    - Whether CRAB accepts two EDM output modules at once, which is what `--output both` asks for, is unverified.
 - `condor.py`
+    - `resubmit` decides what failed by looking at EOS, not at condor: a job whose output is present is done however it exited. It refuses while any of this task's jobs are still queued, since retrying a running job writes the same output twice.
     - A sample whose file list came back empty gets no jobs. It is named in a warning and recorded in `droppedSamples`, since a silently shorter production looks like a successful one.
     - Each job builds a CMSSW area with `scramv1 project` before running, so there is fixed startup cost per job. Jobs over very few files spend most of their wall time on it.
     - A task can mix content presets and data with MC, so a run script is written per `(preset, isMC)` combination and each row of `jobList.txt` names the script it needs. The JDL's executable is `$(script)`.
     - `+DesiredOS = "EL9"` is the LPC worker OS selector. If jobs sit idle indefinitely, `+REQUIRED_OS = "rhel9"` is the alternative.
     - Output is copied back with `xrdcp` from inside the job because EOS is not a condor-visible filesystem.
 
+
+## Selecting Events - select/
+- The stage is pure Python over the ntuples: uproot and awkward, no CMSSW. That is what makes the local backend viable and why a selection can be iterated on in seconds.
+- Nothing here reads a config directory. The selection arrives already resolved, from `configReaders/selections.py` on the submitting machine.
+- `engine.py`
+    - `applySelection` accumulates one boolean mask and never drops rows until the end, so every cut's efficiency is measured against the same array and the cutflow is exact.
+    - The output has the same branches as the input. This stage removes events, never objects: an `object` cut is an existence test over a collection, and the objects that failed it stay in the file.
+    - `_readAll` concatenates every input file into one in-memory array. That sets the real limit on `--filesPerJob`, and it is why a large pass has to go through condor rather than a bigger local run.
+    - `_localCopy` copies a `root://` path to scratch before opening it. uproot needs `fsspec-xrootd` to read xrootd directly and the CMSSW python stack does not ship it. `normalization.py` imports this function for the same reason.
+    - `_write` groups a collection's fields into one `ak.zip` record so uproot emits one counter per collection. Writing each jagged branch separately makes uproot invent `nElectron_pt`, `nElectron_eta` and so on, and the schema then drifts with every selection pass.
+    - `_primaryVertex` takes the first vertex passing `PV_isGood`, not index 0. The ntuples keep every reconstructed vertex and a low-ndof fit sits at index 0 often enough to move dz by a centimetre.
+    - `_trackIP` recomputes dz and dxy from the stored track reference point, including the beam tilt, because the ntuple stores the ingredients rather than a finished impact parameter.
+    - A trigger pattern matching no branch contributes nothing and is not an error. The note records how many of the requested paths were present, which is where a wrong era or a missing skim shows up.
+    - Cut kinds carrying `invert` are how an orthogonality veto is written: state the other channel's selection, then invert it, so the two channels cannot drift apart.
+- `quantities.py`
+    - `QUANTITIES` is the entire vocabulary a selection config may name. Adding a quantity is an entry here; nothing else changes.
+    - `tightLepVeto` demands an era and raises for anything outside Run 2. Guessing a working point would bias a whole year's yields silently, and the Run 3 table is not written down yet.
+    - The 2017/18 TightLepVeto is a flat conjunction with no barrel/endcap split, which is not the published working point. It matches JMTucker's `jet_cuts_2017p8`, and reinstating the split admits jets between |eta| 2.4 and 2.5 and moves HT and every jet ladder. The 2016 definition does carry the split, because JMTucker's does.
+    - `caloHT30` sums raw pT with no identification and no energy correction, since that is the quantity the displaced-dijet triggers actually cut on.
+- `io.py`
+    - `_namesSample` tests the sample name as a whole path component. A substring test would make `..._2016` claim `..._2016APV`'s files, which is a real pair in the catalog.
+    - `findInputs` walks the whole task directory and keeps what names the sample, so it handles both layouts: condor writes `<task>/<sample>/`, CRAB nests under `<task>/<primaryDataset>/<sample>/<timestamp>/0000/`.
+    - It returns an empty list on any xrdfs failure. A missing task and an unreachable EOS look the same to the caller.
+    - `writeCutflow` writes to a temporary file and renames, so an interrupted run leaves the previous cutflow intact.
+- `batch.py`
+    - Has its own `taskDir`, under `ntupleSelection/jobs/`, distinct from `submit/common.taskDir`. The two stages must not share a task namespace.
+    - `packageKamui` tars the package into the job area, so a worker imports kamui with no checkout and no CMSSW integration. `__pycache__` is filtered out, since a stale `.pyc` from a different Python would ship with it.
+    - One resolved selection JSON is written per era and named in `jobList.txt` through the run script, the same mechanism `submit/condor.py` uses for `(preset, isMC)`.
+    - The memory and disk requests are function arguments with no CLI flag. Add flags when a pass actually needs them.
+- `runOne.py` writes the cutflow next to the output as `<output>.cutflow.json`, and the run script copies both to EOS. Merging those per-job cutflows is not implemented, which is why `kamui cutflow` only works after a local pass.
+- `normalization.py`
+    - `complete` is set by comparing the measured event count against DAS, and `denominator` raises rather than returning a number when it is False. Anything normalizing must call `denominator`, not read `sumGenWeight` out of the file.
+    - `record` merges into the existing entry, so the DAS count recorded when a sample was added survives a later weight-sum measurement.
+    - Files missing a `Runs` tree are skipped rather than counted as zero.
+
+
 ## Extras - helpers/
 - `banner.py` writes to stderr, not stdout, so it can never contaminate piped output.
 - It draws only when stderr is a terminal, keeping scripts, cron and log files clean.
 - The braille art is wrapped in a `try` for `UnicodeEncodeError`, so a terminal that cannot encode it gets no banner. This matters on LPC, where non-UTF-8 environments turn up.
-- `--no-banner` is handled twice on purpose. `main()` scans raw `argv` before `parse_args`, because the banner has to print before argument parsing to appear on `--help` and on errors. The registered flag exists only so `--help` documents it, which is why `args.noBanner` is never read. It sits on the top-level parser, so it has to precede the command.
+- The banner is drawn only for help output: `main()` scans raw `argv` before `parse_args` and draws when the arguments are empty or carry `-h`/`--help`. Real work never prints it. `--noBanner` is registered so `--help` documents it and is read from raw argv, so `args.noBanner` is never used. It sits on the top-level parser and has to precede the command.

@@ -1,5 +1,5 @@
 {
-  "_doc": "Run 2 UL points for validating this framework against JMTucker. Caveats in CLAUDE.md.",
+  "_doc": "Run 2 UL points for validating this framework against JMTucker.",
   "family": "run2Validation",
   "defaults": {
     "isMC": true,
@@ -79,9 +79,9 @@
       }
     },
     {
-      "_doc": "VH -> SS -> 4d with leptonic V, lepton-triggered channel. 3 modes x 4 eras.",
+      "_doc": "VH -> SS -> 4d, lepton-triggered channel. 3 modes x 4 eras. NOTE exclusive, leptonically decaying V",
       "name": "{mode}ToSSTo4d_mS55_ctau1mm_{era}",
-      "dataset": "/{stem}_HToSSTodddd_{vDecay}_MH-125_MS-55_ctauS-1_TuneCP5_13TeV-powheg-pythia8/{campaign}/MINIAODSIM",
+      "dataset": "/{mode}_HToSSTodddd_{vDecay}_MH-125_MS-55_ctauS-1_TuneCP5_13TeV-powheg-pythia8/{campaign}/MINIAODSIM",
       "content": "dvLepton",
       "tags": [
         "run2",
@@ -93,17 +93,14 @@
         "mode": [
           {
             "mode": "ZH",
-            "stem": "ZH",
             "vDecay": "ZToLL"
           },
           {
             "mode": "WplusH",
-            "stem": "WplusH",
             "vDecay": "WToLNu"
           },
           {
             "mode": "WminusH",
-            "stem": "WminusH",
             "vDecay": "WToLNu"
           }
         ],

@@ -61,13 +61,69 @@ def measure(inputPaths):
     return {"nEvents": count, "sumGenWeight": sumw, "sumGenWeight2": sumw2}
 
 
-def record(sampleName, measured=None, dasEvents=None, source=""):
+# The Runs counters hold the generator totals for the whole production and do not shrink when a
+# selection runs, so summing the per-event weight in Events is the only way to learn what a
+# processed sample is worth. The two answers differ, and using the wrong one silently returns
+# the denominator instead of the processed sum.
+def measureProcessed(inputPaths):
+    """Sum the per-event generator weight actually present in a set of ntuples."""
+    count = 0
+    sumw = 0.0
+    scratch = os.path.join(tempfile.gettempdir(), "kamuiNormInputs")
+    for path in inputPaths:
+        local, isCopy = _localCopy(path, scratch)
+        with uproot.open(local) as f:
+            if "Events" not in [k.split(";")[0] for k in f.keys()]:
+                continue
+            events = f["Events"]
+            count += int(events.num_entries)
+            if "genWeight" in events.keys():
+                sumw += float(ak.sum(events["genWeight"].array()))
+        if isCopy:
+            os.remove(local)
+    return {"nEvents": count, "sumWeight": sumw}
+
+
+# ROOT reads xrootd natively, which uproot cannot do here, and the Runs tree is small enough
+# that opening a remote NanoAOD file to read it costs seconds rather than a download.
+def measureFromNano(fileNames, redirector="root://cms-xrd-global.cern.ch/"):
+    """Sum the generator counters in the Runs tree of a central NanoAOD dataset."""
+    try:
+        import ROOT
+    except ImportError:
+        raise RuntimeError("reading central NanoAOD needs ROOT, so run this from a cmsenv shell")
+    ROOT.gErrorIgnoreLevel = ROOT.kError
+
+    count = 0
+    sumw = 0.0
+    sumw2 = 0.0
+    unreadable = []
+    for name in fileNames:
+        handle = ROOT.TFile.Open(redirector + name)
+        if not handle or handle.IsZombie():
+            unreadable.append(name)
+            continue
+        runs = handle.Get("Runs")
+        for entry in runs:
+            count += int(entry.genEventCount)
+            sumw += float(entry.genEventSumw)
+            sumw2 += float(entry.genEventSumw2)
+        handle.Close()
+    ## A missing file makes the sum too small, and a denominator that is too small inflates
+    ## every yield, so an incomplete read is reported rather than returned as a number.
+    if unreadable:
+        raise RuntimeError(f"could not read {len(unreadable)} of {len(fileNames)} NanoAOD file(s); first: {unreadable[0]}")
+    return {"nEvents": count, "sumGenWeight": sumw, "sumGenWeight2": sumw2}
+
+
+def record(sampleName, measured=None, dasEvents=None, source="", write=True):
     """
-    Store what is known about a sample's normalization.
+    Assemble what is known about a sample's normalization, and store it when asked.
 
     DAS gives the generated event count as soon as a sample is added, so that much can be
     recorded immediately. The sum of generator weights needs the files themselves and is
-    filled in later, once a complete production exists.
+    filled in later, once a complete production exists. With write False the entry is
+    returned for display and the file on disk is left alone.
     """
     data = loadSums()
     entry = dict(data["samples"].get(sampleName, {}))
@@ -79,6 +135,8 @@ def record(sampleName, measured=None, dasEvents=None, source=""):
     if "nEvents" in entry and entry.get("dasEvents"):
         entry["complete"] = (entry["nEvents"] == entry["dasEvents"])
     data["samples"][sampleName] = entry
+    if not write:
+        return entry
 
     os.makedirs(paths.XSEC_DIR, exist_ok=True)
     tmp = sumsFile() + ".tmp"

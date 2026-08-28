@@ -3,18 +3,5 @@
   "include": [
     "dvSignal",
     "tracks"
-  ],
-  "miniaod": {
-    "keep": [
-      "jets",
-      "leptons",
-      "met",
-      "vertices",
-      "triggerObjects",
-      "gen",
-      "tracks",
-      "displacedTracks",
-      "displacedLeptons"
-    ]
-  }
+  ]
 }

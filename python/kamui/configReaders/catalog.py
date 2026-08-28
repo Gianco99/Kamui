@@ -1,6 +1,6 @@
 """
 Reads the sample config files and filters them.
-The file format is documented in config/samples/README.txt and the CLAUDE.md beside it.
+The file format is documented in config/samples/README.md and the CLAUDE.md beside it.
 """
 
 # Import Block
@@ -19,7 +19,7 @@ from ..foundations.config import deepMerge, loadJson
 ## Characters a sample name may use
 NAME_OK = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
-## Every field a sample may carry. Documented in config/samples/README.txt
+## Every field a sample may carry. Documented in config/samples/README.md
 SAMPLE_FIELDS = {"name", "dataset", "dasInstance", "isMC", "era", "family", "content", "tags", "unitsPerJob", "lumiMask", "notes"}
 
 class Sample(dict):
@@ -130,11 +130,15 @@ def _loadFamily(path):
 def loadCatalog(samplesDir=None):
     """Load every family file into one list of Sample."""
     samplesDir = samplesDir or paths.SAMPLES_DIR
-    files = sorted(f for f in os.listdir(samplesDir) if f.endswith(".json"))
+    ## Walked rather than listed, so families can be grouped into subdirectories as the
+    ## catalog grows. A sample means the same thing wherever its file sits.
+    files = sorted(os.path.join(root, f)
+                   for root, _, names in os.walk(samplesDir)
+                   for f in names if f.endswith(".json"))
     catalog = []
     names = set()
-    for f in files:
-        for s in _loadFamily(os.path.join(samplesDir, f)):
+    for path in files:
+        for s in _loadFamily(path):
             if s["name"] in names:
                 raise ValueError(f"duplicate sample name across families: '{s['name']}'")
             names.add(s["name"])

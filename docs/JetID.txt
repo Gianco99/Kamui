@@ -14,3 +14,15 @@ https://github.com/cms-sw/cmssw/blob/master/PhysicsTools/SelectorUtils/interface
 Changes from Run 2: NHF loosened from 0.9 to 0.99 in the barrel, and the CHF/CHM boundary moved from |eta| < 2.4 to < 2.6. The Run 2 presets use CHS slimmedJets and therefore the Run 2 working points, not this table.
 
 Two related gaps, both checked 2026-08. Scouting jets carry the energy-fraction variables on Run3ScoutingPFJet but no official JetID working point exists; the Run3PFScouting twiki lists no criteria. Calo jets have no official Run 3 ID either.
+
+Run 2 TightLepVeto as implemented, in python/kamui/select/quantities.py, recorded 2026-08-28. The selection picks the function by era, and an era with no entry raises.
+
+2016 and 2016APV, tightLepVeto2016:
+
+  NHF < 0.90 and NEF < 0.99 at every eta, and inside |eta| < 2.4 additionally NEF < 0.90, nConst > 1, MUF < 0.80, CHF > 0, CHM > 0, CEF < 0.80.
+
+2017 and 2018, tightLepVeto2017p8:
+
+  NHF < 0.90, NEF < 0.90, nConst > 1, MUF < 0.80, CHF > 0, CHM > 0, CEF < 0.80, applied at every eta the jet collection reaches, which is |eta| < 2.5.
+
+The 2017/18 row carries a deliberate deviation from the published working point, which drops the charged requirements beyond |eta| = 2.4 where the tracker ends. JMTucker's jet_cuts_2017p8 in Tools/python/PATTupleSelection_cfi.py is a flat conjunction with no eta split, so a jet between 2.4 and 2.5 has no tracks, fails CHF > 0, and never enters its selection. Applying the published split admits those jets, which moves HT and the jet pT ladders in the displacement-triggered channel. The Run 2 selections are validated against JMTucker event for event, so the flat form is what reproduces them. Their 2016 cut does carry the split, which is why the two eras differ here.

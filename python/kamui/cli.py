@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Kamui - the CLI for the analysis framework.
-See python/kamui/README.txt for what each command does and the flags they take.
+See python/kamui/README.md for what each command does and the flags they take.
 """
 
 # Import Block
@@ -18,11 +18,11 @@ from .grid import das, fetch
 from .foundations import paths
 from .helpers.banner import printBanner
 from .configReaders.catalog import loadCatalog, select
-from .configReaders.content import eraGroup, listPresets, resolveContent, summarize, validateEraCopies, validateTriggers
+from .configReaders.content import eraGroup, listPresets, listTriggerConfigs, resolveContent, summarize, validateEraCopies, validateTriggers
 from .submit import condor as condorBackend, crab as crabBackend
 from .select import batch as selectBatch, io as selectBackend, normalization
 from .select.engine import applySelection
-from .configReaders.selections import resolveSelection
+from .configReaders.selections import listSelections, resolveSelection, selectionEras
 from .configReaders.sites import loadSites
 from .submit.common import runTool, taskDir
 
@@ -32,7 +32,7 @@ from .submit.common import runTool, taskDir
 def _addSelection(p):
     """
     Gives a sample-related command defined in main() the five sample selection flags.
-    Sample convention documented in Kamui/config/samples/README.txt
+    Sample convention documented in Kamui/config/samples/README.md
     """
     p.add_argument("--name", action="append", help="Exact sample name")
     p.add_argument("--family", help="Family file name, e.g. exoticHiggs4d2024")
@@ -51,10 +51,14 @@ def _pick(args, required=True):
     return sel
 
 
+## Commands that act on samples, so running them bare has nothing to do.
+NEEDS_SELECTION = {"query", "stage", "submit", "select", "norm"}
+
+
 # Commands!
 
 def _cmdList(args):
-    """List catalog entries. With no selection flags, lists the whole catalog."""
+    """List available samples. If no selection flags are passed, list all registered samples."""
     sel = _pick(args, required=False)
     if args.datasets:
         for s in sel:
@@ -69,13 +73,14 @@ def _cmdList(args):
     wContent = max([len(s["content"]) for s in sel] + [7])
     for fam in sorted(fams):
         print(f"\n{fam}  ({len(fams[fam])} samples)")
+        print(f"  {'Sample':<{wName}}  {'Era':<{wEra}}  {'Content':<{wContent}}  Tags")
         for s in sorted(fams[fam], key=lambda x: x["name"]):
             print(f"  {s['name']:<{wName}}  {s.get('era','-'):<{wEra}}  {s['content']:<{wContent}}  {','.join(s['tags'])}")
     print(f"\n{len(sel)} sample(s) total")
 
 
 def _cmdContent(args):
-    """Show what a content preset writes out: collections, variables, skim and MiniAOD groups. With no preset name, lists the presets available."""
+    """Show what a content preset writes out. If no preset flags are passed, lists all the presets available."""
     if not args.preset:
         for group, names in listPresets().items():
             print(f"{group or 'content'}: " + ", ".join(names))
@@ -134,7 +139,7 @@ def _cmdStage(args):
 
 
 def _cmdSubmit(args):
-    """Build a job area for the selected samples and submit it. Use --dry-run first for testing."""
+    """Build a job area for the selected samples and submit them. Use --dryRun first for testing."""
     sel = _pick(args)
     if args.filesPerJob is not None and args.filesPerJob < 1:
         sys.exit(f"--filesPerJob must be at least 1, got {args.filesPerJob}")
@@ -143,17 +148,10 @@ def _cmdSubmit(args):
     if args.content:                       # override the per-sample preset
         for s in sel:
             s["content"] = args.content
-    print(f"task '{args.task}' : {len(sel)} sample(s), backend={args.backend}")
-
-    if args.output != "ntuple":
-        missing = [s["name"] for s in sel if not resolveContent(s["content"], isMC=bool(s["isMC"]), era=s["era"]).get("miniaod")]
-        if missing:
-            sys.exit(f"error: output={args.output} but these samples' content presets define no " f"miniaod block: {missing[:5]}")
-        if args.backend == "crab" and args.output == "both":
-            print(" NOTE: two EDM output modules in one CRAB task is not yet verified here. " "If CRAB refuses it, run two tasks with --output ntuple and --output miniaod.")
+    print(f"Task '{args.task}' : {len(sel)} sample(s), backend={args.backend}")
 
     if args.backend == "crab":
-        cfgs, task, base = crabBackend.prepare(sel, args.task, unitsPerJob=args.filesPerJob, maxMemoryMB=args.memoryMB, output=args.output, assumeYes=args.yes, base=args.outputBase)
+        cfgs, task, base = crabBackend.prepare(sel, args.task, unitsPerJob=args.filesPerJob, maxMemoryMB=args.memoryMB, assumeYes=args.overwrite, base=args.outputBase)
         print(f"  wrote {len(cfgs)} crab config(s) under {taskDir(task, create=False)}")
         print(f"  output goes to {base}/ntuples/{task}")
         crabBackend.submit(cfgs, dryRun=args.dryRun, taskName=task, base=base)
@@ -165,7 +163,7 @@ def _cmdSubmit(args):
                 lfns = lfns[: args.maxFiles]
             fileLists[s["name"]] = lfns
             print(f"  {s['name']:<48} {len(lfns):>5} file(s)")
-        d, nJobs, task, base = condorBackend.prepare(sel, args.task, fileLists, filesPerJob=args.filesPerJob, memoryMB=args.memoryMB, output=args.output, assumeYes=args.yes, base=args.outputBase)
+        d, nJobs, task, base = condorBackend.prepare(sel, args.task, fileLists, filesPerJob=args.filesPerJob, memoryMB=args.memoryMB, assumeYes=args.overwrite, base=args.outputBase)
         print(f"  wrote {nJobs} job(s) under {d}")
         print(f"  output goes to {base}/ntuples/{task}")
         condorBackend.submit(task, dryRun=args.dryRun, base=base)
@@ -175,7 +173,7 @@ def _cmdSelect(args):
     """Apply an event-level selection to ntuples and write ntuples with the same branches."""
     sel = _pick(args)
     outBase = args.outputBase or loadSites()["stageoutBase"].rstrip("/")
-    print(f"task '{args.task}' : {len(sel)} sample(s), selection={args.selection}")
+    print(f"Task '{args.task}' : {len(sel)} sample(s), selection={args.selection}")
 
     fileLists = {}
     for s in sel:
@@ -185,7 +183,7 @@ def _cmdSelect(args):
             continue
         fileLists[s["name"]] = inputs
     if not fileLists:
-        sys.exit("no input ntuples found for any selected sample")
+        sys.exit("No input ntuples found for any selected sample")
 
     ## One resolved selection per era, since thresholds differ by era
     eras = sorted({s["era"] for s in sel if s["name"] in fileLists})
@@ -198,7 +196,7 @@ def _cmdSelect(args):
                 continue
             outDir = os.path.join(paths.SELECTION_DIR, "out", args.task, s["name"])
             flow = applySelection(fileLists[s["name"]], resolvedSelections[s["era"]],
-                                  os.path.join(outDir, f"{s['name']}_selected.root"), writeSteps=args.cutflow)
+                                  os.path.join(outDir, f"{s['name']}_selected.root"))
             flows[s["name"]] = flow
             print(f"  {s['name']:<44} {flow[0]['kept']:>8,} -> {flow[-1]['kept']:>8,}  ({100 * flow[-1]['cumulative']:.1f}%)")
         selectBackend.writeCutflow(paths.SELECTION_DIR, args.task, args.selection, flows)
@@ -214,33 +212,78 @@ def _cmdSelect(args):
 
 
 def _cmdNorm(args):
-    """Measure a sample's generator sums over a complete production and store them for normalization."""
+    """Report a sample's generator weight sum. Only meaningful for MC, so data samples are skipped."""
     sel = _pick(args)
+    data = [s["name"] for s in sel if not s.get("isMC")]
+    sel = [s for s in sel if s.get("isMC")]
+    if data:
+        print(f"  Skipping {len(data)} data sample(s); a generator weight sum has no meaning there")
+    if not sel:
+        sys.exit("No MC samples matched the selection")
+
+    ## What a sample is worth after cuts, which is never the denominator and so is never stored.
+    if args.processed:
+        if not args.inputTask:
+            sys.exit("--processed needs --inputTask, naming the task whose output to sum")
+        for s in sel:
+            inputs = selectBackend.findInputs(args.inputTask, s["name"], args.inputBase)
+            if not inputs:
+                print(f"  {s['name']:<44} No ntuples found in task '{args.inputTask}'")
+                continue
+            got = normalization.measureProcessed(inputs)
+            stored = normalization.loadSums().get(s["name"], {}).get("sumGenWeight")
+            share = f"   {100 * got['sumWeight'] / stored:.2f}% of the generator sum" if stored else ""
+            print(f"  {s['name']:<44} {got['nEvents']:>10,} events   sumw {got['sumWeight']:.6g}{share}")
+        return 0
+
+    ## The denominator comes from central NanoAOD, which is unskimmed and independent of
+    ## anything we produced. DAS itself cannot serve it: the weight sum is a property of the
+    ## event payload, so it is recorded nowhere central except inside the files.
+    if args.fromNano:
+        for s in sel:
+            nano = das.nanoSibling(s["dataset"], s["dasInstance"], refresh=args.refresh)
+            if not nano:
+                print(f"  {s['name']:<44} No central NanoAOD sibling found")
+                continue
+            try:
+                measured = normalization.measureFromNano(das.listFiles(nano, s["dasInstance"], refresh=args.refresh))
+            except (RuntimeError, das.DasError) as e:
+                print(f"  {s['name']:<44} {e}")
+                continue
+            entry = normalization.record(s["name"], measured, measured["nEvents"], write=args.write,
+                                         source=f"central NanoAOD {nano}")
+            print(f"  {s['name']:<44} {entry['nEvents']:>10,} events   sumw {entry['sumGenWeight']:.6g}")
+        if not args.write:
+            print("  Nothing written. Pass --write to store these in config/crossSections/generatorSums.json")
+        return 0
+
     for s in sel:
         dasEvents = None
         if not args.noDas:
             try:
                 dasEvents = das.datasetSummary(s["dataset"], s["dasInstance"])["nevents"]
             except das.DasError as e:
-                print(f"  warning: could not ask DAS for {s['name']}: {e}")
+                print(f"  Warning: could not ask DAS for {s['name']}: {e}")
 
-        ## Without a production to measure, the DAS count alone is still worth recording
         measured = None
         if args.inputTask:
             inputs = selectBackend.findInputs(args.inputTask, s["name"], args.inputBase)
             if inputs:
                 measured = normalization.measure(inputs)
             else:
-                print(f"  {s['name']:<44} no ntuples found in task '{args.inputTask}'")
+                print(f"  {s['name']:<44} No ntuples found in task '{args.inputTask}'")
 
-        entry = normalization.record(s["name"], measured, dasEvents,
+        entry = normalization.record(s["name"], measured, dasEvents, write=args.write,
                                      source=f"production task '{args.inputTask}'" if args.inputTask else "DAS")
-        das_ = f"{entry.get('dasEvents', 0):>10,} in DAS" if entry.get("dasEvents") else "  DAS unknown"
+        shown = f"{entry.get('dasEvents', 0):>10,} in DAS" if entry.get("dasEvents") else "  DAS unknown"
         if "sumGenWeight" in entry:
             flag = "" if entry.get("complete") is not False else "   INCOMPLETE, do not normalize with this"
-            print(f"  {s['name']:<44} {das_}   measured {entry['nEvents']:,}   sumw {entry['sumGenWeight']:.6g}{flag}")
+            print(f"  {s['name']:<44} {shown}   Measured {entry['nEvents']:,}   sumw {entry['sumGenWeight']:.6g}{flag}")
         else:
-            print(f"  {s['name']:<44} {das_}   sumw not measured yet")
+            print(f"  {s['name']:<44} {shown}   Sum of generator weights not measured yet")
+    if not args.write:
+        print("  Nothing written. Pass --write to store these in config/crossSections/generatorSums.json")
+    return 0
 
 
 def _cmdCutflow(args):
@@ -249,25 +292,25 @@ def _cmdCutflow(args):
 
 
 def _cmdStatus(args):
-    """Show what a task submitted and its current batch status."""
+    """Show the current tasks status and configuration."""
     d = taskDir(args.task, create=False)
     rec = os.path.join(d, "task.json")
     if not os.path.exists(rec):
-        sys.exit(f"no task '{args.task}' under {paths.JOBS_DIR}")
+        sys.exit(f"No task '{args.task}' under {paths.JOBS_DIR}")
     with open(rec) as f:
         info = json.load(f)
 
     # Print the few lines that matter; the record embeds every resolved preset and runs to tens of kB.
     prov = info.get("provenance", {})
-    print(f"task     {info.get('task')}  ({info.get('backend')}, output={info.get('output')})")
-    print(f"samples  {len(info.get('samples', []))}, content {', '.join(info.get('content') or sorted({c for c in [d.get('content') for d in info.get('sampleDetails', [])] if c}))}")
+    print(f"Task     {info.get('task')}  ({info.get('backend')}, output={info.get('output')})")
+    print(f"Samples  {len(info.get('samples', []))}, content {', '.join(info.get('content') or sorted({c for c in [d.get('content') for d in info.get('sampleDetails', [])] if c}))}")
     if info.get("nJobs") is not None:
-        print(f"jobs     {info['nJobs']}")
+        print(f"Jobs     {info['nJobs']}")
     if prov:
         dirty = " (dirty tree)" if prov.get("dirty") else ""
-        print(f"from     {str(prov.get('commit'))[:8]} on {prov.get('branch')}{dirty}, by {prov.get('submittedBy')} at {prov.get('submittedAt')}")
-    print(f"output   {info.get('outLFNDirBase') or info.get('outDirBase')}")
-    print(f"record   {rec}")
+        print(f"From     {str(prov.get('commit'))[:8]} on {prov.get('branch')}{dirty}, by {prov.get('submittedBy')} at {prov.get('submittedAt')}")
+    print(f"Output   {info.get('outLFNDirBase') or info.get('outDirBase')}")
+    print(f"Record   {rec}")
 
     if info.get("backend") == "crab":
         crabBackend.status(args.task)
@@ -278,7 +321,7 @@ def _cmdStatus(args):
         if not cluster:
             print("\n(no cluster id recorded; showing every job you have queued)")
         for retry in info.get("retries", []):
-            print(f"retry {retry['retry']}: {retry['nJobs']} job(s) at {retry.get('submittedAt')}, logs in {retry['logDir']}")
+            print(f"Retry {retry['retry']}: {retry['nJobs']} job(s) at {retry.get('submittedAt')}, logs in {retry['logDir']}")
         try:
             runTool(cmd)
         except OSError as e:
@@ -286,16 +329,16 @@ def _cmdStatus(args):
 
 
 def _cmdResubmit(args):
-    """Resubmit only the jobs of a task whose outputs never reached EOS."""
+    """Resubmit jobs that did not write to output paths."""
     d = taskDir(args.task, create=False)
     rec = os.path.join(d, "task.json")
     if not os.path.exists(rec):
-        sys.exit(f"no task '{args.task}' under {paths.JOBS_DIR}")
+        sys.exit(f"No task '{args.task}' under {paths.JOBS_DIR}")
     with open(rec) as f:
         info = json.load(f)
 
-    print(f"task     {info.get('task')}  ({info.get('backend')}, output={info.get('output')})")
-    print(f"output   {info.get('outLFNDirBase') or info.get('outDirBase')}")
+    print(f"Task     {info.get('task')}  ({info.get('backend')}, output={info.get('output')})")
+    print(f"Output   {info.get('outLFNDirBase') or info.get('outDirBase')}")
 
     if info.get("backend") == "crab":
         # CRAB knows which of its own jobs failed, and writes their output to the same place.
@@ -304,11 +347,11 @@ def _cmdResubmit(args):
         return
 
     missing, nPresent, nExpected = condorBackend.missingJobs(args.task)
-    print(f"outputs  {nPresent}/{nExpected} present on EOS")
+    print(f"Outputs  {nPresent}/{nExpected} present on EOS")
     if not missing:
         print("  nothing to resubmit")
         return
-    print(f"missing  {len(missing)} job(s):")
+    print(f"Missing  {len(missing)} job(s):")
     for row in missing[:20]:
         sampleName, index = row.split(",")[0], row.split(",")[1]
         print(f"           {sampleName}  job {index}")
@@ -319,7 +362,7 @@ def _cmdResubmit(args):
     queued = _queuedJobs(info)
     if queued:
         print(f"  {queued} job(s) from this task are still queued or running.")
-        if not args.yes:
+        if not args.forceResubmit:
             sys.exit("  refusing to resubmit while they run. Wait, or pass --yes to submit anyway.")
 
     n, nJobs, code = condorBackend.resubmit(args.task, dryRun=args.dryRun)
@@ -348,10 +391,26 @@ def _queuedJobs(info):
 def _cmdCheck(args):
     """Offline validation of every config file."""
     problems = []
-    cat = loadCatalog()
-    print(f"catalog : {len(cat)} samples in " f"{len({s.get('family') for s in cat})} families")
+    ## Each entry is one named check, so the report says what was verified rather than only a count.
+    ## A check is "warn" when it is incomplete rather than wrong, which must not fail the run.
+    report = []
 
-    ## Every preset resolves within its own era set, for MC and for data
+    def note(label, state, text):
+        report.append((label, state, text))
+
+    cat = loadCatalog()
+    bad = len([s for s in cat if not s["dataset"].startswith("/") or s["dataset"].count("/") != 3])
+    dupes = len(cat) - len({s["name"] for s in cat})
+    for s in cat:
+        if not s["dataset"].startswith("/") or s["dataset"].count("/") != 3:
+            problems.append(f"sample '{s['name']}' has a malformed dataset path")
+    if dupes:
+        problems.append(f"{dupes} duplicate sample name(s)")
+    note("Catalog", "pass" if not bad and not dupes else "fail",
+         f"Every sample is listed once and is well-formatted ({len(cat)} samples in {len({s.get('family') for s in cat})} families)")
+
+    ## Resolving a preset means expanding its include chain, dropping the collections that do not
+    ## apply, and naming a CMSSW plugin for every one that does. That is what a job receives.
     groups = listPresets()
     nOk = nTried = 0
     byEra = {}
@@ -360,38 +419,55 @@ def _cmdCheck(args):
             continue
         era = "2018" if group == "run2" else "Summer24"
         byEra[group] = set(names)
-        for p in names:
+        for preset in names:
             nTried += 1
             try:
-                resolveContent(p, isMC=True, era=era)
-                resolveContent(p, isMC=False, era=era)
+                resolveContent(preset, isMC=True, era=era)
+                resolveContent(preset, isMC=False, era=era)
                 nOk += 1
             except Exception as e:                                    # noqa: BLE001
-                problems.append(f"content preset '{group}/{p}': {e}")
-    print(f"content presets: {nOk}/{nTried} resolve for both MC and data")
+                problems.append(f"content preset '{group}/{preset}': {e}")
+    note("Content presets", "pass" if nOk == nTried else "fail", f"Validated the format of each preset ({nOk}/{nTried})")
 
-    problems += validateEraCopies()
+    ## Resolving a selection means collapsing every era-keyed threshold, trigger list and flag list
+    ## to one value, and checking every cut type and quantity name the config uses.
+    nSel = nSelTried = 0
+    for name in listSelections():
+        for era in (selectionEras(name) or [None]):
+            nSelTried += 1
+            try:
+                resolveSelection(name, era=era)
+                nSel += 1
+            except Exception as e:                                    # noqa: BLE001
+                problems.append(f"selection '{name}' for era '{era}': {e}")
+    note("Selections", "pass" if nSel == nSelTried else "fail", f"Validated the format of every cut ({nSel}/{nSelTried})")
+
+    nTrig = len(listTriggerConfigs())
+    trigProblems = validateTriggers()
+    problems += trigProblems
+    note("Triggers", "pass" if not trigProblems else "fail", f"Every trigger file is parseable ({nTrig - len(trigProblems)}/{nTrig})")
+
+    eraProblems = validateEraCopies()
+    problems += eraProblems
+    note("Era isolation", "pass" if not eraProblems else "fail", "Run 2 and Run 3 keep separate copies of content files")
 
     for s in cat:
-        group = eraGroup(s["era"])
-        if s["content"] not in byEra.get(group, set()):
-            problems.append(f"sample '{s['name']}' is {s['era']} ({group}) but wants content preset '{s['content']}', which that era does not define")
-        if not s["dataset"].startswith("/") or s["dataset"].count("/") != 3:
-            problems.append(f"sample '{s['name']}' has a malformed dataset path")
-    dupes = len(cat) - len({s["name"] for s in cat})
-    if dupes:
-        problems.append(f"{dupes} duplicate sample name(s)")
+        if s["content"] not in byEra.get(eraGroup(s["era"]), set()):
+            problems.append(f"sample '{s['name']}' is {s['era']} ({eraGroup(s['era'])}) but wants content preset '{s['content']}', which that era does not define")
 
     ## foundations/ is a layer, not just a folder: nothing in it may import from above
+    layerProblems = []
     foundDir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "foundations")
     for f in sorted(x for x in os.listdir(foundDir) if x.endswith(".py")):
         for line in open(os.path.join(foundDir, f)):
             if line.startswith("from ..") or (line.startswith("from .") and not line.startswith("from ." + "foundations")):
-                problems.append(f"foundations/{f} imports from above the foundation layer: {line.strip()}")
+                layerProblems.append(f"foundations/{f} imports from above the foundation layer: {line.strip()}")
+    problems += layerProblems
+    note("Layering", "pass" if not layerProblems else "fail", "foundations/ does not import from the rest of the framework")
 
-    problems += validateTriggers()
 
     ## configReaders/ owns the config files: nothing outside it may open one directly
+    accessProblems = []
     pkgDir = os.path.dirname(os.path.abspath(__file__))
     for root, _, files in os.walk(pkgDir):
         if "configReaders" in root or "__pycache__" in root:
@@ -399,30 +475,36 @@ def _cmdCheck(args):
         for f in sorted(x for x in files if x.endswith(".py")):
             for line in open(os.path.join(root, f)):
                 if any("paths." + d in line for d in ("CONFIG_DIR", "SAMPLES_DIR", "CONTENT_DIR", "TRIGGERS_DIR", "SITES_FILE")):
-                    problems.append(f"{os.path.relpath(os.path.join(root, f), pkgDir)} reads a config directory directly; that belongs in configReaders/")
+                    accessProblems.append(f"{os.path.relpath(os.path.join(root, f), pkgDir)} reads a config directory directly; that belongs in configReaders/")
+    problems += accessProblems
+    note("Config access", "pass" if not accessProblems else "fail", "configReaders/ is the only folder containing config access scripts")
 
-    ## A sample cannot be normalized without its full-dataset generator count, so record it when the sample is added
+    ## A sample cannot be normalized without its full-dataset generator sum
     noDas, noSumw = normalization.missingSums([s["name"] for s in cat])
     if noDas:
-        problems.append(f"{len(noDas)} sample(s) have no DAS event count recorded; run 'kamui norm' for them. First few: {noDas[:3]}")
-    if noSumw:
-        print(f"generator sums: {len(cat) - len(noSumw)}/{len(cat)} samples have a weight sum measured")
+        problems.append(f"{len(noDas)} sample(s) have no DAS event count recorded; run 'kamui norm --fromNano --write' for them. First few: {noDas[:3]}")
+    note("Generator sums", "pass" if not noSumw else "warn", f"Samples that know their total generator weight ({len(cat) - len(noSumw)}/{len(cat)})")
 
     sites = loadSites()
-    for k in ("eosRedirector", "sourceRedirector", "stageoutBase", "crabStageoutBase", "crabStorageSite"):
-        if k not in sites:
-            problems.append(f"sites.json is missing '{k}'")
+    missingKeys = [k for k in ("eosRedirector", "sourceRedirector", "stageoutBase", "crabStageoutBase", "crabStorageSite") if k not in sites]
+    missingCfg = [f for f in ("kamuiNtuple_cfg.py", "kamuiTables.py", "inspectMiniAOD.py") if not os.path.exists(os.path.join(paths.CMSSW_DIR, f))]
+    for k in missingKeys:
+        problems.append(f"sites.json is missing '{k}'")
+    for f in missingCfg:
+        problems.append(f"missing cmssw/{f}")
+    note("Sites and CMSSW", "pass" if not missingKeys and not missingCfg else "fail", "Validated sites.json and the CMSSW job script configurations")
 
-    for f in ("kamuiNtuple_cfg.py", "kamuiTables.py", "inspectMiniAOD.py"):
-        if not os.path.exists(os.path.join(paths.CMSSW_DIR, f)):
-            problems.append(f"missing cmssw/{f}")
+    MARK = {"pass": "\u2705", "fail": "\u274c", "warn": "\u26a0\ufe0f "}
+    width = max(len(label) for label, _, _ in report)
+    for label, state, text in report:
+        print(f"{MARK[state]}  {label:<{width}}  {text}")
 
     if problems:
         print("\nPROBLEMS:")
-        for p in problems:
-            print("  " + p)
+        for problem in problems:
+            print("  " + problem)
         return 1
-    print("all configs OK")
+    print("\nAll configs OK")
     return 0
 
 
@@ -433,7 +515,7 @@ def _cmdCache(args):
         print("DAS cache cleared")
         return
     if args.prune:
-        print(f"pruned {das.pruneCache()} expired entry(s)")
+        print(f"Pruned {das.pruneCache()} expired entry(s)")
     st = das.cacheStats()
     print(f"{st['n']} cached DAS response(s), {st['bytes'] / 1e6:.1f} MB in {st['dir']}")
     if st["n"] and st["newestDays"] is not None:
@@ -442,106 +524,155 @@ def _cmdCache(args):
 
 
 # Parser!
-def main(argv=None):
-    p = argparse.ArgumentParser(prog="kamui", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--no-banner", dest="noBanner", action="store_true", help="Skip the startup banner")
-    sub = p.add_subparsers(dest="cmd", required=True)
 
-    q = sub.add_parser("list", help="Show all catalog entries", description=_cmdList.__doc__)
+## The usage line repeats what the help below it already shows, so it is dropped everywhere.
+class _Formatter(argparse.RawDescriptionHelpFormatter):
+    def add_usage(self, usage, actions, groups, prefix=None):
+        return
+
+    def _format_action(self, action):
+        text = super()._format_action(action)
+        ## The subparsers action prints an empty metavar line above the command list.
+        if action.nargs == argparse.PARSER:
+            text = "\n".join(text.split("\n")[1:])
+        return text
+
+
+## A command run with nothing to act on gets the help rather than an error from deep inside the command.
+class _CommandParser(argparse.ArgumentParser):
+    def error(self, message):
+        print(f"Hey, you can't run this command alone! {message[0].upper()}{message[1:]}\n")
+        self.print_help()
+        sys.exit(2)
+
+
+def _titles(q):
+    q._positionals.title = "Positional arguments"
+    q._optionals.title = "Optional arguments"
+    return q
+
+
+## -h still works; it is hidden because a reader who got here already found it.
+def _addCmd(sub, name, help, description):
+    q = sub.add_parser(name, help=help, description=description, formatter_class=_Formatter, add_help=False)
+    q.add_argument("-h", "--help", action="help", help=argparse.SUPPRESS)
+    return _titles(q)
+
+
+def main(argv=None):
+    p = argparse.ArgumentParser(prog="kamui", description=__doc__, formatter_class=_Formatter, add_help=False)
+    p.add_argument("-h", "--help", action="help", help=argparse.SUPPRESS)
+    p.add_argument("--noBanner", action="store_true", help="Skip the startup banner")
+    _titles(p)
+    sub = p.add_subparsers(dest="cmd", metavar="", parser_class=_CommandParser)
+
+    q = _addCmd(sub, "list", help="Show all available samples", description=_cmdList.__doc__)
     _addSelection(q)
     q.add_argument("--datasets", action="store_true", help="Print DAS paths only")
     q.set_defaults(func=_cmdList)
 
-    q = sub.add_parser("content", help="Show or export a content preset", description=_cmdContent.__doc__)
-    q.add_argument("preset", nargs="?", help="Preset name; omit to list them")
+    q = _addCmd(sub, "content", help="Show presets declaring what we save in ntuples", description=_cmdContent.__doc__)
+    q.add_argument("preset", nargs="?", help="Preset name; omit argument to list all of them")
     q.add_argument("--data", action="store_true", help="Resolve as data (drops mcOnly collections)")
-    q.add_argument("--era", help="Era whose content set to resolve against (default: Summer24)")
+    q.add_argument("--era", help="Era configuration we use (default: Summer24)")
     q.add_argument("--write", help="Write the resolved JSON here")
     q.set_defaults(func=_cmdContent)
 
-    q = sub.add_parser("query", help="DAS file/event/size counts (needs a proxy)", description=_cmdQuery.__doc__)
+    q = _addCmd(sub, "query", help="Query DAS for how many files, events and GB each selected sample holds", description=_cmdQuery.__doc__)
     _addSelection(q)
     q.add_argument("--refresh", action="store_true", help="Bypass the DAS cache")
     q.set_defaults(func=_cmdQuery)
 
-    q = sub.add_parser("find", help="Free-form DAS dataset search", description=_cmdFind.__doc__)
+    q = _addCmd(sub, "find", help="Unrestricted DAS dataset search", description=_cmdFind.__doc__)
     q.add_argument("pattern", help="DAS wildcard, e.g. '/*HAHM*/*/MINIAODSIM'")
     q.add_argument("--instance", default="prod/global", help="prod/global for official datasets, prod/phys03 for USER ones")
     q.add_argument("--refresh", action="store_true", help="Bypass the DAS cache")
     q.set_defaults(func=_cmdFind)
 
-    q = sub.add_parser("stage", help="Copy raw MiniAOD to EOS (small test samples)", description=_cmdStage.__doc__)
+    q = _addCmd(sub, "stage", help="Copy raw MiniAOD to EOS", description=_cmdStage.__doc__)
     _addSelection(q)
     q.add_argument("--maxFiles", type=int, help="Hard cap on files copied")
-    q.add_argument("--dry-run", dest="dryRun", action="store_true", help="Print what would be copied, copy nothing")
+    q.add_argument("--dryRun", action="store_true", help="Print what would be copied, but copy nothing")
     q.add_argument("--refresh", action="store_true", help="Bypass the DAS cache")
     q.set_defaults(func=_cmdStage)
 
-    q = sub.add_parser("submit", help="Produce ntuples", description=_cmdSubmit.__doc__)
+    q = _addCmd(sub, "submit", help="Produce ntuples by submitting to condor or CRAB", description=_cmdSubmit.__doc__)
     _addSelection(q)
     q.add_argument("--task", required=True, help="Task name; also the EOS output subdirectory")
-    q.add_argument("--backend", choices=["condor", "crab"], default="condor", help="Where the jobs run (default: condor; crab for large productions)")
+    q.add_argument("--backend", choices=["condor", "crab"], default="condor", help="Where the jobs run (default: condor)")
     q.add_argument("--content", help="Override the per-sample content preset")
-    q.add_argument("--output", choices=["ntuple", "miniaod", "both"], default="ntuple", help="What each job writes (default: ntuple)")
     q.add_argument("--filesPerJob", type=int, help="Input files per job, overriding any per-sample unitsPerJob (default: 5)")
     q.add_argument("--maxFiles", type=int, help="Use at most this many input files per sample")
     q.add_argument("--memoryMB", type=int, default=2500, help="Memory request per job in MB (default: 2500)")
-    q.add_argument("--dry-run", dest="dryRun", action="store_true", help="Write the job area, submit nothing")
+    q.add_argument("--dryRun", action="store_true", help="Write the job area, submit nothing")
     q.add_argument("--refresh", action="store_true", help="Bypass the DAS cache")
-    q.add_argument("--yes", action="store_true", help="Overwrite an existing job area without asking")
+    q.add_argument("--overwrite", action="store_true", help="Overwrite an existing job area without asking")
     q.add_argument("--outputBase", help="Write output under this EOS path instead of the site default")
     q.set_defaults(func=_cmdSubmit)
 
-    q = sub.add_parser("select", help="Apply an event selection to ntuples", description=_cmdSelect.__doc__)
+    q = _addCmd(sub, "resubmit", help="Rerun failed jobs", description=_cmdResubmit.__doc__)
+    q.add_argument("--task", required=True, help="The task to retry")
+    q.add_argument("--dryRun", action="store_true", help="Report what would be resubmitted, submit nothing")
+    q.add_argument("--forceResubmit", action="store_true", help="Resubmit even while jobs from this task are still queued")
+    q.set_defaults(func=_cmdResubmit)
+
+    q = _addCmd(sub, "status", help="Status of a submitted task", description=_cmdStatus.__doc__)
+    q.add_argument("--task", required=True, help="Task name under ntupleProduction/jobs/")
+    q.set_defaults(func=_cmdStatus)
+
+    q = _addCmd(sub, "select", help="Apply an event selection to ntuples", description=_cmdSelect.__doc__)
     _addSelection(q)
     q.add_argument("--selection", required=True, help="Selection config name, e.g. run2Lepton")
     q.add_argument("--task", required=True, help="Name for this selection pass")
     q.add_argument("--inputTask", required=True, help="The ntuple production task to read from")
     q.add_argument("--inputBase", help="EOS base holding the input ntuples (default: the site stageout base)")
     q.add_argument("--outputBase", help="Where to write the selected ntuples")
-    q.add_argument("--cutflow", action="store_true", help="Also write one ntuple per cut, for inspection (local only)")
-    q.add_argument("--backend", choices=["local", "condor"], default="local", help="Where the selection runs (default: local, which is seconds for a small pass)")
+    q.add_argument("--backend", choices=["local", "condor"], default="local", help="Where the selection runs (default: local)")
     q.add_argument("--filesPerJob", type=int, help="Input files per job on condor (default: 5)")
-    q.add_argument("--dry-run", dest="dryRun", action="store_true", help="Write the job area, submit nothing")
+    q.add_argument("--dryRun", action="store_true", help="Write the job area, submit nothing")
     q.set_defaults(func=_cmdSelect)
 
-    q = sub.add_parser("norm", help="Measure and store generator sums for normalization", description=_cmdNorm.__doc__)
-    _addSelection(q)
-    q.add_argument("--inputTask", help="A complete production task to measure the weight sum over; omit to record the DAS count alone")
-    q.add_argument("--inputBase", help="EOS base holding the ntuples (default: the site stageout base)")
-    q.add_argument("--noDas", action="store_true", help="Skip the DAS cross-check of the event count")
-    q.set_defaults(func=_cmdNorm)
-
-    q = sub.add_parser("cutflow", help="Print the cutflow from a select task", description=_cmdCutflow.__doc__)
+    q = _addCmd(sub, "cutflow", help="Print the cutflow for a given task", description=_cmdCutflow.__doc__)
     q.add_argument("--task", required=True, help="Select task name")
     q.set_defaults(func=_cmdCutflow)
 
-    q = sub.add_parser("status", help="Status of a submitted task", description=_cmdStatus.__doc__)
-    q.add_argument("--task", required=True, help="Task name under ntupleProduction/jobs/")
-    q.set_defaults(func=_cmdStatus)
+    q = _addCmd(sub, "norm", help="Measure and store weights for normalization", description=_cmdNorm.__doc__)
+    _addSelection(q)
+    q.add_argument("--inputTask", help="A complete production task to measure the generator weight sum over")
+    q.add_argument("--fromNano", action="store_true", help="Take the generator sums from the sample's central NanoAOD, which needs no production of our own")
+    q.add_argument("--processed", action="store_true", help="Sum the weights surviving that task's processing, for comparison; never stored")
+    q.add_argument("--write", action="store_true", help="Store the generator sums in config/crossSections/generatorSums.json")
+    q.add_argument("--inputBase", help="EOS base holding the ntuples (default: the site stageout base)")
+    q.add_argument("--noDas", action="store_true", help="Skip the DAS cross-check of the event count")
+    q.add_argument("--refresh", action="store_true", help="Bypass the DAS cache")
+    q.set_defaults(func=_cmdNorm)
 
-    q = sub.add_parser("resubmit", help="Resubmit only a task's failed jobs", description=_cmdResubmit.__doc__)
-    q.add_argument("--task", required=True, help="The task to retry")
-    q.add_argument("--dry-run", dest="dryRun", action="store_true", help="Report what would be resubmitted, submit nothing")
-    q.add_argument("--yes", action="store_true", help="Resubmit even while jobs from this task are still queued")
-    q.set_defaults(func=_cmdResubmit)
-
-    q = sub.add_parser("check", help="Validate every config offline", description=_cmdCheck.__doc__)
+    q = _addCmd(sub, "check", help="Validate configuration files", description=_cmdCheck.__doc__)
     q.set_defaults(func=_cmdCheck)
 
-    q = sub.add_parser("cache", help="Inspect or clear the DAS cache", description=_cmdCache.__doc__)
+    q = _addCmd(sub, "cache", help="Inspect or clear the DAS cache", description=_cmdCache.__doc__)
     q.add_argument("--clear", action="store_true", help="Delete every cached response")
     q.add_argument("--prune", action="store_true", help="Delete only the expired entries, keeping the rest")
     q.set_defaults(func=_cmdCache)
 
-    printBanner(enabled="--no-banner" not in (argv if argv is not None else sys.argv))
+    ## The banner is an orientation aid, so it appears with the help and stays out of the way otherwise.
+    given = list(argv if argv is not None else sys.argv[1:])
+    printBanner(enabled=(not given or "-h" in given or "--help" in given) and "--noBanner" not in given)
     args = p.parse_args(argv)
+    ## No command at all is a request to see what the commands are.
+    if not args.cmd:
+        p.print_help()
+        return 0
+    if args.cmd in NEEDS_SELECTION and not any([args.name, args.family, args.era, args.tag, args.match]):
+        print("Hey, you can't run this command alone! Name what it should act on.\n")
+        sub.choices[args.cmd].print_help()
+        return 2
     try:
         return args.func(args)
     except (KeyError, FileNotFoundError, PermissionError, ValueError, das.DasError) as e:
         # Config and DAS problems are user errors - say what is wrong and stop.
         # Anything else still raises.
-        sys.exit(f"error: {e}")
+        sys.exit(f"Error: {e}")
 
 
 if __name__ == "__main__":

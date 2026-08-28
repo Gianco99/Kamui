@@ -42,17 +42,13 @@ open("inputs.txt", "w").write(",".join(files))
 PY
 INPUTS=$(cat inputs.txt)
 
-cmsRun kamuiNtuple_cfg.py content={contentJson} isMC={isMC} output={output} \
-    inputFiles=$INPUTS outputFile=out.root miniaodFile=slim.root maxEvents={maxEvents}
+cmsRun kamuiNtuple_cfg.py content={contentJson} isMC={isMC} \
+    inputFiles=$INPUTS outputFile=out.root maxEvents={maxEvents}
 
 xrdfs {eosRedirector} mkdir -p {outDir}
-for F in out.root:ntuple slim.root:miniaod; do
-  SRC=${{F%%:*}}; TAG=${{F##*:}}
-  [ -f "$SRC" ] || continue
-  DEST={eosRedirector}/{outDir}/${{SAMPLE}}_${{TAG}}_${{IDX}}.root
-  xrdcp -f "$SRC" "$DEST"
-  echo "[job] wrote $DEST"
-done
+DEST={eosRedirector}/{outDir}/${{SAMPLE}}_ntuple_${{IDX}}.root
+xrdcp -f out.root "$DEST"
+echo "[job] wrote $DEST"
 echo "[job] end=$(date)"
 '''
 
@@ -82,7 +78,7 @@ def _scriptName(presetName, isMC, era):
 
 
 # fileLists maps a sample name to the list of LFNs it should run over, resolved by the caller from DAS or EOS.
-def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvents=-1, memoryMB=2500, diskMB=4000000, output="ntuple", cmsswVersion=None, scramArch=None, assumeYes=False, base=None):
+def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvents=-1, memoryMB=2500, diskMB=4000000, cmsswVersion=None, scramArch=None, assumeYes=False, base=None):
     """Write a complete condor submission area. Returns the directory, the job count and the task name used."""
     sites = sites or loadSites()
     base = outputBase(sites, "condor", base)
@@ -130,7 +126,6 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
             contentJson=os.path.basename(contentJson),
             isMC="True" if isMC else "False",
             maxEvents=maxEvents,
-            output=output,
             eosRedirector=sites["eosRedirector"].rstrip("/"),
             outDir="/".join([base, "ntuples", taskName, "$SAMPLE"]),
         )
@@ -149,7 +144,7 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
 
     submitted = [s for s in samples if s["name"] in chunked]
     writeTaskRecord(d, {
-        "task": taskName, "backend": "condor", "output": output, "nJobs": len(jobRows),
+        "task": taskName, "backend": "condor", "nJobs": len(jobRows),
         "samples": sorted(chunked), "droppedSamples": sorted(dropped), "filesPerJob": effective,
         "maxEvents": maxEvents, "memoryMB": memoryMB,
         "nInputFiles": {k: sum(len(g) for g in v) for k, v in sorted(chunked.items())},
@@ -190,9 +185,8 @@ def submit(taskName, dryRun=False, base=None):
 
 # What a finished job leaves on EOS. The run script names outputs <sample>_<tag>_<index>.root, so a job
 # that died anywhere before the copy leaves nothing, and a job that ran twice leaves the same name twice.
-def _expectedOutputs(sampleName, index, output):
-    tags = ["ntuple", "miniaod"] if output == "both" else [output]
-    return [f"{sampleName}_{tag}_{index}.root" for tag in tags]
+def _expectedOutputs(sampleName, index):
+    return [f"{sampleName}_ntuple_{index}.root"]
 
 
 def _eosListing(redirector, directory):
@@ -217,7 +211,6 @@ def missingJobs(taskName, sites=None):
     outDirBase = info.get("outDirBase")
     if not outDirBase:
         raise ValueError(f"task '{taskName}' has no outDirBase recorded, so its outputs cannot be located")
-    output = info.get("output", "ntuple")
     redirector = sites["eosRedirector"].rstrip("/")
 
     rows = [line.strip() for line in open(os.path.join(d, "jobList.txt")) if line.strip()]
@@ -226,7 +219,7 @@ def missingJobs(taskName, sites=None):
         sampleName, index = row.split(",")[0], row.split(",")[1]
         if sampleName not in listings:
             listings[sampleName] = _eosListing(redirector, f"{outDirBase}/{sampleName}")
-        wanted = _expectedOutputs(sampleName, index, output)
+        wanted = _expectedOutputs(sampleName, index)
         nExpected += len(wanted)
         here = [w for w in wanted if w in listings[sampleName]]
         nPresent += len(here)

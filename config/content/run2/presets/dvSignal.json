@@ -3,15 +3,5 @@
   "include": [
     "dvBase",
     "gen"
-  ],
-  "miniaod": {
-    "keep": [
-      "jets",
-      "leptons",
-      "met",
-      "vertices",
-      "triggerObjects",
-      "gen"
-    ]
-  }
+  ]
 }

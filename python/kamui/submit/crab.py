@@ -64,7 +64,7 @@ def _checkRequestNames(taskName, samples):
         seen[r] = s["name"]
 
 
-def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, output="ntuple", assumeYes=False, base=None):
+def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, assumeYes=False, base=None):
     """Write one crabConfig per sample into the task directory. Returns their paths and the task name used."""
     sites = sites or loadSites()
     checkTaskName(taskName)
@@ -95,7 +95,6 @@ def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, o
             pyCfgParams=[
                 f"content={contentJson}",
                 f"isMC={'True' if s['isMC'] else 'False'}",
-                f"output={output}",
             ],
             inputFiles=[contentJson, os.path.join(paths.CMSSW_DIR, "kamuiTables.py")],
             maxMemoryMB=maxMemoryMB,
@@ -112,7 +111,7 @@ def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, o
         written.append(path)
 
     writeTaskRecord(d, {
-        "task": taskName, "backend": "crab", "output": output, "nSamples": len(samples),
+        "task": taskName, "backend": "crab", "nSamples": len(samples),
         "samples": [s["name"] for s in samples],
         "content": sorted({s["content"] for s in samples}),
         "unitsPerJob": effective, "maxMemoryMB": maxMemoryMB,

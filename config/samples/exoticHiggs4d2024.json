@@ -1,5 +1,5 @@
 {
-  "_doc": "Exotic Higgs H->SS->4d. Summer24. Central production. Caveats in CLAUDE.md.",
+  "_doc": "Exotic Higgs H->SS->4d. Summer24. Central production.",
   "family": "exoticHiggs4d2024",
   "defaults": {
     "era": "Summer24",
@@ -14,7 +14,7 @@
   },
   "grids": [
     {
-      "_doc": "Six production modes x mS {15,40,55} GeV x ctau {0.1,1,10} mm = 54 points.",
+      "_doc": "6 production modes x mS {15,40,55} GeV x ctau {0.1,1,10} mm = 54 points.",
       "name": "{mode}-2S-4D_mS{mS}_ctau{ctau}mm_2024",
       "dataset": "/{dasMode}Hto2Sto4D_Par-ctauS-{ctau}-MH-125-MS-{mS}_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
       "axes": {
@@ -56,115 +56,5 @@
         ]
       }
     }
-  ],
-  "overrides": {
-    "ggH-2S-4D_mS15_ctau0p1mm_2024": {
-    },
-    "ggH-2S-4D_mS15_ctau1mm_2024": {
-    },
-    "ggH-2S-4D_mS15_ctau10mm_2024": {
-    },
-    "ggH-2S-4D_mS40_ctau0p1mm_2024": {
-    },
-    "ggH-2S-4D_mS40_ctau1mm_2024": {
-    },
-    "ggH-2S-4D_mS40_ctau10mm_2024": {
-    },
-    "ggH-2S-4D_mS55_ctau0p1mm_2024": {
-    },
-    "ggH-2S-4D_mS55_ctau1mm_2024": {
-    },
-    "ggH-2S-4D_mS55_ctau10mm_2024": {
-    },
-    "VBFH-2S-4D_mS15_ctau0p1mm_2024": {
-    },
-    "VBFH-2S-4D_mS15_ctau1mm_2024": {
-    },
-    "VBFH-2S-4D_mS15_ctau10mm_2024": {
-    },
-    "VBFH-2S-4D_mS40_ctau0p1mm_2024": {
-    },
-    "VBFH-2S-4D_mS40_ctau1mm_2024": {
-    },
-    "VBFH-2S-4D_mS40_ctau10mm_2024": {
-    },
-    "VBFH-2S-4D_mS55_ctau0p1mm_2024": {
-    },
-    "VBFH-2S-4D_mS55_ctau1mm_2024": {
-    },
-    "VBFH-2S-4D_mS55_ctau10mm_2024": {
-    },
-    "WplusH-2S-4D_mS15_ctau0p1mm_2024": {
-    },
-    "WplusH-2S-4D_mS15_ctau1mm_2024": {
-    },
-    "WplusH-2S-4D_mS15_ctau10mm_2024": {
-    },
-    "WplusH-2S-4D_mS40_ctau0p1mm_2024": {
-    },
-    "WplusH-2S-4D_mS40_ctau1mm_2024": {
-    },
-    "WplusH-2S-4D_mS40_ctau10mm_2024": {
-    },
-    "WplusH-2S-4D_mS55_ctau0p1mm_2024": {
-    },
-    "WplusH-2S-4D_mS55_ctau1mm_2024": {
-    },
-    "WplusH-2S-4D_mS55_ctau10mm_2024": {
-    },
-    "WminusH-2S-4D_mS15_ctau0p1mm_2024": {
-    },
-    "WminusH-2S-4D_mS15_ctau1mm_2024": {
-    },
-    "WminusH-2S-4D_mS15_ctau10mm_2024": {
-    },
-    "WminusH-2S-4D_mS40_ctau0p1mm_2024": {
-    },
-    "WminusH-2S-4D_mS40_ctau1mm_2024": {
-    },
-    "WminusH-2S-4D_mS40_ctau10mm_2024": {
-    },
-    "WminusH-2S-4D_mS55_ctau0p1mm_2024": {
-    },
-    "WminusH-2S-4D_mS55_ctau1mm_2024": {
-    },
-    "WminusH-2S-4D_mS55_ctau10mm_2024": {
-    },
-    "ZH-2S-4D_mS15_ctau0p1mm_2024": {
-    },
-    "ZH-2S-4D_mS15_ctau1mm_2024": {
-    },
-    "ZH-2S-4D_mS15_ctau10mm_2024": {
-    },
-    "ZH-2S-4D_mS40_ctau0p1mm_2024": {
-    },
-    "ZH-2S-4D_mS40_ctau1mm_2024": {
-    },
-    "ZH-2S-4D_mS40_ctau10mm_2024": {
-    },
-    "ZH-2S-4D_mS55_ctau0p1mm_2024": {
-    },
-    "ZH-2S-4D_mS55_ctau1mm_2024": {
-    },
-    "ZH-2S-4D_mS55_ctau10mm_2024": {
-    },
-    "ttH-2S-4D_mS15_ctau0p1mm_2024": {
-    },
-    "ttH-2S-4D_mS15_ctau1mm_2024": {
-    },
-    "ttH-2S-4D_mS15_ctau10mm_2024": {
-    },
-    "ttH-2S-4D_mS40_ctau0p1mm_2024": {
-    },
-    "ttH-2S-4D_mS40_ctau1mm_2024": {
-    },
-    "ttH-2S-4D_mS40_ctau10mm_2024": {
-    },
-    "ttH-2S-4D_mS55_ctau0p1mm_2024": {
-    },
-    "ttH-2S-4D_mS55_ctau1mm_2024": {
-    },
-    "ttH-2S-4D_mS55_ctau10mm_2024": {
-    }
-  }
+  ]
 }

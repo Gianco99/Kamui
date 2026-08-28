@@ -132,6 +132,29 @@ def datasetSummary(dataset, instance="prod/global", refresh=False):
     return {"nfiles": 0, "nevents": 0, "sizeGB": 0.0}
 
 
+# The generator weight sum is not in DAS: it is a property of the event payload, so nobody
+# records it centrally. Central NanoAOD carries it in the Runs tree, so the denominator comes
+# from the NanoAOD sibling of whatever MiniAOD a sample names.
+def nanoSibling(dataset, instance="prod/global", refresh=False):
+    """The central NanoAOD dataset matching a MiniAOD one, or None when no match is unambiguous."""
+    primary, processed = dataset.strip("/").split("/")[:2]
+    if "MiniAOD" not in processed:
+        return None
+    campaign = processed.split("MiniAOD")[0]                  # RunIISummer20UL18
+    conditions = processed.split("-", 1)[1] if "-" in processed else ""   # 106X_..._L1v1-v2
+
+    found = findDatasets(f"/{primary}/*/NANOAODSIM", instance=instance, refresh=refresh)
+    ## The campaign pins the era and the conditions tag pins the reprocessing, so a Run 2
+    ## sample can never pick up its own Run 3 twin or a different global tag.
+    matches = [d for d in found
+               if d.strip("/").split("/")[1].startswith(campaign)
+               and (not conditions or conditions in d.strip("/").split("/")[1])]
+    if not matches:
+        return None
+    ## Several NanoAOD versions of one campaign exist; the newest is the one to trust.
+    return sorted(matches)[-1]
+
+
 def findDatasets(pattern, instance="prod/global", refresh=False):
     """Wildcard dataset search, e.g. '/*Hto2Sto4D*/Run3*Summer24*/MINIAODSIM'."""
     return sorted(query(f"dataset dataset={pattern}", instance, refresh))

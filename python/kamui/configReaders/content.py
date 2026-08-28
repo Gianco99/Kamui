@@ -1,6 +1,6 @@
 """
 Turns a content config into a form the cmsRun config consumes.
-The file format is documented in config/content/README.txt, and its details in the CLAUDE.md beside it.
+The file format is documented in config/content/README.md, and its details in the CLAUDE.md beside it.
 """
 
 # Import Block
@@ -11,7 +11,6 @@ import os
 ## Kamui modules
 from ..foundations import paths
 from ..foundations.config import loadWithIncludes
-from .slimming import buildOutputCommands
 
 # CMSSW plugin language
 KIND_TO_PLUGIN = {
@@ -67,7 +66,7 @@ def listCollections(contentDir=None):
 
 
 ## Every top-level key a content config may carry
-CONTENT_FIELDS = {"collections", "triggerBits", "skim", "miniaod"}
+CONTENT_FIELDS = {"collections", "triggerBits", "skim"}
 
 
 ## Which content set an era draws from
@@ -86,7 +85,7 @@ def contentDirs(era, contentDir=None):
 
 
 def resolveContent(name, contentDir=None, isMC=True, era="Summer24"):
-    """Flatten a preset's include chain and translate it into what a job receives: name, isMC, collections, triggerBits, skim, miniaod."""
+    """Flatten a preset's include chain and translate it into what a job receives: name, isMC, collections, triggerBits, skim."""
     cfg = loadWithIncludes(name, contentDirs(era, contentDir))
 
     unknown = sorted(set(cfg) - CONTENT_FIELDS)
@@ -115,26 +114,6 @@ def resolveContent(name, contentDir=None, isMC=True, era="Summer24"):
         "collections": collections,
         "triggerBits": cfg.get("triggerBits", {}),
         "skim":        _resolveSkim(cfg.get("skim", {})),
-        "miniaod":     _resolveMiniaod(cfg.get("miniaod", {}), isMC),
-    }
-
-
-## Every key a miniaod block may carry
-MINIAOD_FIELDS = {"keep", "keepExtra", "drop"}
-
-
-def _resolveMiniaod(cfg, isMC):
-    """Expand the optional slimmed-MiniAOD block into EDM outputCommands."""
-    if not cfg:
-        return {}
-    if not isinstance(cfg, dict):
-        raise ValueError(f"miniaod block must be an object, got {type(cfg).__name__}")
-    unknown = sorted(set(cfg) - MINIAOD_FIELDS)
-    if unknown:
-        raise ValueError(f"miniaod block has unknown key(s) {unknown}; valid keys are {sorted(MINIAOD_FIELDS)}")
-    return {
-        "keep":           cfg.get("keep", []),
-        "outputCommands": buildOutputCommands(cfg, isMC=isMC),
     }
 
 
@@ -306,6 +285,11 @@ def summarize(resolved):
             bits.append(f"maxLen={c['maxLen']}")
         lines.append("  " + " ".join(bits))
     return "\n".join(lines)
+
+
+def listTriggerConfigs():
+    """Names of the trigger configs available."""
+    return sorted(f[:-5] for f in os.listdir(paths.TRIGGERS_DIR) if f.endswith(".json"))
 
 
 def validateTriggers():

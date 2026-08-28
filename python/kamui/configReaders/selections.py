@@ -44,6 +44,12 @@ def listSelections(selectionDir=None):
     return sorted(f[:-5] for f in os.listdir(selectionDir) if f.endswith(".json"))
 
 
+def selectionEras(name, selectionDir=None):
+    """The eras a selection config declares, empty when it names none."""
+    cfg = loadWithIncludes(name, selectionDir or paths.SELECTIONS_DIR)
+    return list(cfg.get("eras") or [])
+
+
 def resolveSelection(name, selectionDir=None, era=None):
     """Flatten a selection config and resolve every era-dependent threshold to a single number."""
     selectionDir = selectionDir or paths.SELECTIONS_DIR

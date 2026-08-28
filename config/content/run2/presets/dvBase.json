@@ -5,14 +5,5 @@
     "jets",
     "leptons",
     "vertices"
-  ],
-  "miniaod": {
-    "keep": [
-      "jets",
-      "leptons",
-      "met",
-      "vertices",
-      "triggerObjects"
-    ]
-  }
+  ]
 }

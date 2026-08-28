@@ -10,121 +10,316 @@
       "complete": false
     },
     "ggH-2S-4D_mS15_ctau0p1mm_2024": {
-      "dasEvents": 5958672
+      "dasEvents": 5958672,
+      "nEvents": 5958672,
+      "sumGenWeight": 138021133.00799996,
+      "sumGenWeight2": 3197388002.1779876,
+      "source": "central NanoAOD /GluGluH-Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "ggH-2S-4D_mS15_ctau1mm_2024": {
-      "dasEvents": 5969256
+      "dasEvents": 5969256,
+      "nEvents": 5969256,
+      "sumGenWeight": 138264082.284,
+      "sumGenWeight2": 3203067313.711675,
+      "source": "central NanoAOD /GluGluH-Hto2Sto4D_Par-ctauS-1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "ggH-2S-4D_mS15_ctau10mm_2024": {
-      "dasEvents": 5780076
+      "dasEvents": 5780076,
+      "nEvents": 5780076,
+      "sumGenWeight": 133882887.74099997,
+      "sumGenWeight2": 3101554449.393578,
+      "source": "central NanoAOD /GluGluH-Hto2Sto4D_Par-ctauS-10-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "ggH-2S-4D_mS40_ctau0p1mm_2024": {
-      "dasEvents": 5868636
+      "dasEvents": 5868636,
+      "nEvents": 5868636,
+      "sumGenWeight": 135933316.623,
+      "sumGenWeight2": 3149075219.3693175,
+      "source": "central NanoAOD /GluGluH-Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "ggH-2S-4D_mS40_ctau1mm_2024": {
-      "dasEvents": 5963600
+      "dasEvents": 5963600,
+      "nEvents": 5963600,
+      "sumGenWeight": 138134036.781,
+      "sumGenWeight2": 3200032337.7069016,
+      "source": "central NanoAOD /GluGluH-Hto2Sto4D_Par-ctauS-1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "ggH-2S-4D_mS40_ctau10mm_2024": {
-      "dasEvents": 5945700
+      "dasEvents": 5945700,
+      "nEvents": 5945700,
+      "sumGenWeight": 137719577.54700002,
+      "sumGenWeight2": 3190427304.028425,
+      "source": "central NanoAOD /GluGluH-Hto2Sto4D_Par-ctauS-10-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "ggH-2S-4D_mS55_ctau0p1mm_2024": {
-      "dasEvents": 5893280
+      "dasEvents": 5799808,
+      "nEvents": 5799808,
+      "sumGenWeight": 134339506.3650001,
+      "sumGenWeight2": 3112142523.390431,
+      "source": "central NanoAOD /GluGluH-Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "ggH-2S-4D_mS55_ctau1mm_2024": {
-      "dasEvents": 5946646
+      "dasEvents": 5946646,
+      "nEvents": 5946646,
+      "sumGenWeight": 137742464.07299998,
+      "sumGenWeight2": 3190934922.00942,
+      "source": "central NanoAOD /GluGluH-Hto2Sto4D_Par-ctauS-1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "ggH-2S-4D_mS55_ctau10mm_2024": {
-      "dasEvents": 5981575
+      "dasEvents": 5981575,
+      "nEvents": 5981575,
+      "sumGenWeight": 138550372.3395001,
+      "sumGenWeight2": 3209677615.939893,
+      "source": "central NanoAOD /GluGluH-Hto2Sto4D_Par-ctauS-10-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "VBFH-2S-4D_mS15_ctau0p1mm_2024": {
-      "dasEvents": 449000
+      "dasEvents": 449000,
+      "nEvents": 449000,
+      "sumGenWeight": 1876582.03036,
+      "sumGenWeight2": 7861106.254672414,
+      "source": "central NanoAOD /VBFH-Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "VBFH-2S-4D_mS15_ctau1mm_2024": {
-      "dasEvents": 450000
+      "dasEvents": 450000,
+      "nEvents": 450000,
+      "sumGenWeight": 1880967.1348400002,
+      "sumGenWeight2": 7878614.286420012,
+      "source": "central NanoAOD /VBFH-Hto2Sto4D_Par-ctauS-1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "VBFH-2S-4D_mS15_ctau10mm_2024": {
-      "dasEvents": 450000
+      "dasEvents": 450000,
+      "nEvents": 450000,
+      "sumGenWeight": 1880406.4440000001,
+      "sumGenWeight2": 7878614.286420011,
+      "source": "central NanoAOD /VBFH-Hto2Sto4D_Par-ctauS-10-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "VBFH-2S-4D_mS40_ctau0p1mm_2024": {
-      "dasEvents": 450000
+      "dasEvents": 450000,
+      "nEvents": 450000,
+      "sumGenWeight": 1880766.2903600002,
+      "sumGenWeight2": 7878614.286420011,
+      "source": "central NanoAOD /VBFH-Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "VBFH-2S-4D_mS40_ctau1mm_2024": {
-      "dasEvents": 450000
+      "dasEvents": 450000,
+      "nEvents": 450000,
+      "sumGenWeight": 1880741.1848000002,
+      "sumGenWeight2": 7878614.28642002,
+      "source": "central NanoAOD /VBFH-Hto2Sto4D_Par-ctauS-1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "VBFH-2S-4D_mS40_ctau10mm_2024": {
-      "dasEvents": 450000
+      "dasEvents": 450000,
+      "nEvents": 450000,
+      "sumGenWeight": 1880766.29036,
+      "sumGenWeight2": 7878614.286420011,
+      "source": "central NanoAOD /VBFH-Hto2Sto4D_Par-ctauS-10-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "VBFH-2S-4D_mS55_ctau0p1mm_2024": {
-      "dasEvents": 448000
+      "dasEvents": 448000,
+      "nEvents": 448000,
+      "sumGenWeight": 1872171.8203200002,
+      "sumGenWeight2": 7843598.22292481,
+      "source": "central NanoAOD /VBFH-Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "VBFH-2S-4D_mS55_ctau1mm_2024": {
-      "dasEvents": 450000
+      "dasEvents": 450000,
+      "nEvents": 450000,
+      "sumGenWeight": 1880406.4440000001,
+      "sumGenWeight2": 7878614.286420011,
+      "source": "central NanoAOD /VBFH-Hto2Sto4D_Par-ctauS-1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "VBFH-2S-4D_mS55_ctau10mm_2024": {
-      "dasEvents": 449000
+      "dasEvents": 449000,
+      "nEvents": 449000,
+      "sumGenWeight": 1876531.81924,
+      "sumGenWeight2": 7861106.254672407,
+      "source": "central NanoAOD /VBFH-Hto2Sto4D_Par-ctauS-10-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WplusH-2S-4D_mS15_ctau0p1mm_2024": {
-      "dasEvents": 129360
+      "dasEvents": 129456,
+      "nEvents": 129456,
+      "sumGenWeight": 938117.4992440001,
+      "sumGenWeight2": 10894585077.02982,
+      "source": "central NanoAOD /WplusH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WplusH-2S-4D_mS15_ctau1mm_2024": {
-      "dasEvents": 129999
+      "dasEvents": 129999,
+      "nEvents": 129999,
+      "sumGenWeight": 1422313.2926999999,
+      "sumGenWeight2": 71168921469.10577,
+      "source": "central NanoAOD /WplusH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WplusH-2S-4D_mS15_ctau10mm_2024": {
-      "dasEvents": 130000
+      "dasEvents": 130000,
+      "nEvents": 130000,
+      "sumGenWeight": 908627.1086580002,
+      "sumGenWeight2": 13108929730.191439,
+      "source": "central NanoAOD /WplusH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WplusH-2S-4D_mS40_ctau0p1mm_2024": {
-      "dasEvents": 129513
+      "dasEvents": 129513,
+      "nEvents": 129513,
+      "sumGenWeight": 701548.1413239999,
+      "sumGenWeight2": 3652416044.0364776,
+      "source": "central NanoAOD /WplusH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WplusH-2S-4D_mS40_ctau1mm_2024": {
-      "dasEvents": 129864
+      "dasEvents": 129897,
+      "nEvents": 129897,
+      "sumGenWeight": 820763.0137760001,
+      "sumGenWeight2": 5122435129.113183,
+      "source": "central NanoAOD /WplusH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WplusH-2S-4D_mS40_ctau10mm_2024": {
-      "dasEvents": 129958
+      "dasEvents": 129958,
+      "nEvents": 129958,
+      "sumGenWeight": 777806.735998,
+      "sumGenWeight2": 13228536541.685799,
+      "source": "central NanoAOD /WplusH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WplusH-2S-4D_mS55_ctau0p1mm_2024": {
-      "dasEvents": 129981
+      "dasEvents": 129981,
+      "nEvents": 129981,
+      "sumGenWeight": 2125545.4763670005,
+      "sumGenWeight2": 61626224184.695175,
+      "source": "central NanoAOD /WplusH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WplusH-2S-4D_mS55_ctau1mm_2024": {
-      "dasEvents": 129876
+      "dasEvents": 129876,
+      "nEvents": 129876,
+      "sumGenWeight": 1039934.747363,
+      "sumGenWeight2": 5414896634.87563,
+      "source": "central NanoAOD /WplusH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WplusH-2S-4D_mS55_ctau10mm_2024": {
-      "dasEvents": 129961
+      "dasEvents": 129961,
+      "nEvents": 129961,
+      "sumGenWeight": 1902875.4368160006,
+      "sumGenWeight2": 132272484336.52457,
+      "source": "central NanoAOD /WplusH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WminusH-2S-4D_mS15_ctau0p1mm_2024": {
-      "dasEvents": 69993
+      "dasEvents": 69993,
+      "nEvents": 69993,
+      "sumGenWeight": 255573.25317699983,
+      "sumGenWeight2": 1298726457.1168292,
+      "source": "central NanoAOD /WminusH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WminusH-2S-4D_mS15_ctau1mm_2024": {
-      "dasEvents": 69926
+      "dasEvents": 69926,
+      "nEvents": 69926,
+      "sumGenWeight": 417578.580921,
+      "sumGenWeight2": 9183935212.12503,
+      "source": "central NanoAOD /WminusH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WminusH-2S-4D_mS15_ctau10mm_2024": {
-      "dasEvents": 69968
+      "dasEvents": 69968,
+      "nEvents": 69968,
+      "sumGenWeight": 163257.58660399998,
+      "sumGenWeight2": 174915541.54870936,
+      "source": "central NanoAOD /WminusH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WminusH-2S-4D_mS40_ctau0p1mm_2024": {
-      "dasEvents": 69912
+      "dasEvents": 69780,
+      "nEvents": 69780,
+      "sumGenWeight": 163348.74753999998,
+      "sumGenWeight2": 204204048.24276417,
+      "source": "central NanoAOD /WminusH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WminusH-2S-4D_mS40_ctau1mm_2024": {
-      "dasEvents": 69970
+      "dasEvents": 69970,
+      "nEvents": 69970,
+      "sumGenWeight": 189050.58325399997,
+      "sumGenWeight2": 384281516.6745406,
+      "source": "central NanoAOD /WminusH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WminusH-2S-4D_mS40_ctau10mm_2024": {
-      "dasEvents": 69963
+      "dasEvents": 69963,
+      "nEvents": 69963,
+      "sumGenWeight": 218517.34252699994,
+      "sumGenWeight2": 612462785.7756994,
+      "source": "central NanoAOD /WminusH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-40_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WminusH-2S-4D_mS55_ctau0p1mm_2024": {
-      "dasEvents": 69994
+      "dasEvents": 69994,
+      "nEvents": 69994,
+      "sumGenWeight": 181183.05188999997,
+      "sumGenWeight2": 230469319.60291612,
+      "source": "central NanoAOD /WminusH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WminusH-2S-4D_mS55_ctau1mm_2024": {
-      "dasEvents": 69991
+      "dasEvents": 69991,
+      "nEvents": 69991,
+      "sumGenWeight": 202648.7203300001,
+      "sumGenWeight2": 370817520.8226974,
+      "source": "central NanoAOD /WminusH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "WminusH-2S-4D_mS55_ctau10mm_2024": {
-      "dasEvents": 69995
+      "dasEvents": 69995,
+      "nEvents": 69995,
+      "sumGenWeight": 201367.3180029999,
+      "sumGenWeight2": 376895367.89180017,
+      "source": "central NanoAOD /WminusH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-55_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "ZH-2S-4D_mS15_ctau0p1mm_2024": {
-      "dasEvents": 129963
+      "dasEvents": 129963,
+      "nEvents": 129963,
+      "sumGenWeight": 1595147.5935929995,
+      "sumGenWeight2": 576568367482.3625,
+      "source": "central NanoAOD /ZH_Hto2Sto4D_Par-ctauS-0p1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "ZH-2S-4D_mS15_ctau1mm_2024": {
-      "dasEvents": 129968
+      "dasEvents": 129968,
+      "nEvents": 129968,
+      "sumGenWeight": 225319.54817799985,
+      "sumGenWeight2": 9377348564.87978,
+      "source": "central NanoAOD /ZH_Hto2Sto4D_Par-ctauS-1-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "ZH-2S-4D_mS15_ctau10mm_2024": {
-      "dasEvents": 129636
+      "dasEvents": 129618,
+      "nEvents": 129618,
+      "sumGenWeight": 119093.07104899999,
+      "sumGenWeight2": 505050720.7391606,
+      "source": "central NanoAOD /ZH_Hto2Sto4D_Par-ctauS-10-MH-125-MS-15_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24NanoAODv15-150X_mcRun3_2024_realistic_v2-v2/NANOAODSIM",
+      "complete": true
     },
     "ZH-2S-4D_mS40_ctau0p1mm_2024": {
       "dasEvents": 129996
@@ -434,6 +629,14 @@
     },
     "StealthSYY_mStop900_mSo675_ctau10mm_2024": {
       "dasEvents": 82218
+    },
+    "tutorialZH2018": {
+      "nEvents": 49999,
+      "sumGenWeight": 3966.4178707000005,
+      "sumGenWeight2": 355.13954632751484,
+      "source": "central NanoAOD /ZH_HToSSTodddd_ZToLL_MH-125_MS-55_ctauS-1_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL18NanoAODv9-106X_upgrade2018_realistic_v16_L1v1-v2/NANOAODSIM",
+      "dasEvents": 49999,
+      "complete": true
     }
   }
 }

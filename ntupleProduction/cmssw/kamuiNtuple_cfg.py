@@ -1,5 +1,5 @@
 """
-cmsRun configuration: MiniAOD in, one flat ROOT tree out.
+cmsRun configuration: MiniAOD in, one ntuple out.
 
 All content decisions come from a resolved content JSON (see
 config/content/). This file only wires things together, so it
@@ -14,7 +14,7 @@ Local run:
 On a worker node the resolved JSON travels with the job, so `content` is just
 a filename in the scratch directory.
 
-Output tree: `Events`, flat, readable with uproot/RDataFrame - no CMSSW needed
+Output tree: `Events`, one entry per event, readable with uproot/RDataFrame - no CMSSW needed
 downstream. run / luminosityBlock / event are written automatically.
 """
 
@@ -39,11 +39,6 @@ opts.register("nThreads",    1,         VarParsing.multiplicity.singleton, VarPa
               "number of cmsRun threads")
 opts.register("reportEvery", 1000,      VarParsing.multiplicity.singleton, VarParsing.varType.int,
               "MessageLogger reporting interval")
-opts.register("output",      "",        VarParsing.multiplicity.singleton, VarParsing.varType.string,
-              "what to write: ntuple, miniaod, or both. Empty means 'both' if the content "
-              "declares a miniaod block, else 'ntuple'.")
-opts.register("miniaodFile", "dvSlim.root", VarParsing.multiplicity.singleton, VarParsing.varType.string,
-              "filename for the slimmed MiniAOD output")
 opts.setDefault("outputFile", "kamuiNtuple.root")
 opts.setDefault("maxEvents", -1)
 opts.parseArguments()
@@ -123,52 +118,22 @@ if trig.get("keepAll", True):
     for proc in processes:
         outputCommands.append("keep edmTriggerResults_*_*_%s" % proc)
 
-miniaodCfg = content.get("miniaod", {})
-# Default is the flat tree only. A content preset may DEFINE a miniaod keep list
-# without every job paying for it; ask for it with output=miniaod or output=both.
-mode = opts.output or "ntuple"
-if mode not in ("ntuple", "miniaod", "both"):
-    raise RuntimeError(f"output={mode} is not one of ntuple / miniaod / both")
-if mode in ("miniaod", "both") and not miniaodCfg:
-    raise RuntimeError(f"output={mode} but content preset '{content.get('name')}' has no miniaod block")
-
-endPaths = []
-if mode in ("ntuple", "both"):
-    process.out = cms.OutputModule(
-        "NanoAODOutputModule",
-        fileName=cms.untracked.string(opts.outputFile),
-        outputCommands=cms.untracked.vstring(*outputCommands),
-        compressionLevel=cms.untracked.int32(9),
-        compressionAlgorithm=cms.untracked.string("LZMA"),
-        dataset=cms.untracked.PSet(
-            filterName=cms.untracked.string(""),
-            dataTier=cms.untracked.string("NANOAODSIM" if opts.isMC else "NANOAOD"),
-        ),
-        SelectEvents=selectEvents,
-    )
-    process.endNtuple = cms.EndPath(process.out)
-    endPaths.append("ntuple -> " + opts.outputFile)
-
-if mode in ("miniaod", "both"):
-    # Same skim as the tree, so the two outputs always describe the same events.
-    process.slimOut = cms.OutputModule(
-        "PoolOutputModule",
-        fileName=cms.untracked.string(opts.miniaodFile),
-        outputCommands=cms.untracked.vstring(*miniaodCfg["outputCommands"]),
-        compressionLevel=cms.untracked.int32(9),
-        compressionAlgorithm=cms.untracked.string("LZMA"),
-        dataset=cms.untracked.PSet(
-            filterName=cms.untracked.string(""),
-            dataTier=cms.untracked.string("MINIAODSIM" if opts.isMC else "MINIAOD"),
-        ),
-        SelectEvents=selectEvents,
-        overrideInputFileSplitLevels=cms.untracked.bool(True),
-    )
-    process.endMiniaod = cms.EndPath(process.slimOut)
-    endPaths.append("slimmed MiniAOD -> " + opts.miniaodFile)
+process.out = cms.OutputModule(
+    "NanoAODOutputModule",
+    fileName=cms.untracked.string(opts.outputFile),
+    outputCommands=cms.untracked.vstring(*outputCommands),
+    compressionLevel=cms.untracked.int32(9),
+    compressionAlgorithm=cms.untracked.string("LZMA"),
+    dataset=cms.untracked.PSet(
+        filterName=cms.untracked.string(""),
+        dataTier=cms.untracked.string("NANOAODSIM" if opts.isMC else "NANOAOD"),
+    ),
+    SelectEvents=selectEvents,
+)
+process.endNtuple = cms.EndPath(process.out)
 
 print("[kamui] content preset : %s (isMC=%s)" % (content.get("name"), content.get("isMC")))
-print("[kamui] output         : %s" % "; ".join(endPaths))
+print("[kamui] output         : %s" % opts.outputFile)
 print("[kamui] collections    : %s" % ", ".join(sorted(content["collections"])))
 if skimFilter is not None:
     print("[kamui] HLT skim       : %s" % ", ".join(content["skim"]["hltPaths"]))

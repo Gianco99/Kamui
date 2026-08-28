@@ -6,7 +6,7 @@ Studies and planning documents that are finished. Documents in docs/ are transie
 How to archive a document
 -------------------------
 
-One subfolder per study, named for the study. Inside it, put the document itself and a README.txt containing:
+One subfolder per study, named for the study. Inside it, put the document itself and a README.md containing:
 
   - what the goal of the study was
   - what was actually accomplished, including anything that did not work

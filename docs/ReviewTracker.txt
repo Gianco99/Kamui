@@ -1,0 +1,80 @@
+Documentation and CLI review tracker
+====================================
+What has been reviewed against the code, and what has not. Updated as we go. A line moves to Reviewed only after someone has read it against the thing it describes, not merely edited it.
+
+
+Reviewed, 2026-08-28
+--------------------
+
+CLI help output
+  Every command's help text and its one-line description, checked against the command table in the root README. Text and registration order match for all thirteen. Verified each command's help renders and that -h still works everywhere.
+
+Root README.md and CLAUDE.md
+  Layout, the two-stage description, the quick starts, the command table, the writing rules and the conventions.
+
+The check command
+  What it validates, that each check has power, and that it exits non-zero on a real failure. Confirmed by breaking a selection config on purpose and watching it fail. Its output was rewritten to name all nine checks, split them into config and architecture, and mark each with a status. Selection configs are now resolved, which they were not before.
+
+python/kamui/README.md and CLAUDE.md, the check sections only
+  The check entry in the README and the check bullets in the CLAUDE.md. The per-command list in the CLAUDE.md was removed as a duplicate of the README.
+
+
+Edited but not reviewed
+-----------------------
+These were changed while fixing something else, which is not the same as having been read against the code. They stay unreviewed.
+
+python/kamui/README.md, the stage, submit, select and resubmit sections
+  Renamed --dry-run to --dryRun and removed the slimming.py entry, since that module no longer exists.
+
+python/kamui/CLAUDE.md, the submit/ and helpers/ sections
+  Same flag rename, plus the banner note, which now only draws for help output.
+
+
+Next up
+-------
+The order commands are presented in follows the workflow, so a reader meets each one at the point they would actually need it. find comes first because it is the only command that ignores the catalog: everything else answers questions about samples already written down, while find asks DAS what exists.
+
+1. find, query and cache
+   Review the code and the docs for the three commands used before a sample is registered. find searches DAS, query sizes up a candidate, cache matters when DAS answers go stale. stage belongs here too, as the optional step of pulling one file locally to look at it.
+2. Registration
+   Done 2026-08-28. config/samples/ README and CLAUDE.md, the tutorial family, subdirectory loading.
+3. list
+   Done 2026-08-28, on the sample side. The list command's own documentation still needs reading against the code, since its output gained a column header today.
+4. Slides for all of the above.
+5. Restart the generator sums job, see below.
+
+
+Unfinished work
+---------------
+
+Generator sums are only partly filled
+  kamui norm --match '*' --fromNano --write was run in the background and stopped partway. Resume it with that same command; it skips nothing and rewrites entries it has already done. Progress is visible in the Generator sums line of kamui check.
+
+
+Known gaps, deliberately not closed
+-----------------------------------
+
+Trigger paths are never verified to exist
+  check confirms a trigger file parses and lists some paths. Nothing checks that an HLT path was ever in a real menu. A typo passes here, then matches no branch at runtime and silently drops out of the trigger OR.
+
+Nothing keeps the CLI and the root README in step
+  The root README command table is the source of the thirteen one-line help strings. Only convention keeps them equal. check could assert it in a few lines.
+
+
+Not yet reviewed
+----------------
+
+python/kamui/README.md and CLAUDE.md, everything except check
+  The other twelve commands, and the module sections: foundations/, configReaders/, grid/, submit/, select/, helpers/.
+
+config/
+  README.md and CLAUDE.md for config/ itself, and for samples/, content/, triggers/, selections/, crossSections/.
+
+ntupleProduction/ and ntupleSelection/
+  README.md and CLAUDE.md for both stages.
+
+tools/ and docs/
+  README.md and CLAUDE.md.
+
+docs/JetID.txt and docs/GlueballSurvey.txt
+  Reference notes, not yet checked against the code they describe.
