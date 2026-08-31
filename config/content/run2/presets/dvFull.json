@@ -1,5 +1,5 @@
 {
-  "_doc": "Adds tracks to dvSignal. Needed for offline vertexing, and much larger.",
+  "_doc": "Adds tracks to dvSignal.",
   "include": [
     "dvSignal",
     "tracks"

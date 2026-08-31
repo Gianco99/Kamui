@@ -1,0 +1,50 @@
+{
+  "_doc": "Higgs production cross sections at mS=125 assuming BR(H -> long-lived pair) = 1.",
+  "_units": "pb",
+  "_note": "JMTucker multiplies xsec by filterEff at load time. Kamui keeps them separate.",
+  "processes": {
+    "ggH": {
+      "xsec": 48.09,
+      "source": "https://gitlab.cern.ch/LHCHIGGSXS/LHCHXSWG1/crosssections"
+    },
+    "VBFH": {
+      "xsec": 3.813,
+      "source": "https://gitlab.cern.ch/LHCHIGGSXS/LHCHXSWG1/crosssections"
+    },
+    "WplusH": {
+      "xsec": 0.28623,
+      "_derivation": "3 x 9.541e-02, inclusive W+H 0.8502 times BR(W to lv), once per lepton flavor",
+      "source": "https://gitlab.cern.ch/LHCHIGGSXS/LHCHXSWG1/crosssections"
+    },
+    "WminusH": {
+      "xsec": 0.17943,
+      "_derivation": "3 x 5.981e-02, inclusive W-H 0.5328 times BR(W to lv), once per lepton flavor",
+      "source": "https://gitlab.cern.ch/LHCHIGGSXS/LHCHXSWG1/crosssections"
+    },
+    "ZH": {
+      "xsec": 0.07788,
+      "_derivation": "3 x 2.596e-02, qq-initiated ZH to llH, total ZH per flavor 2.996e-02 minus the gg component 3.995e-03",
+      "source": "https://gitlab.cern.ch/LHCHIGGSXS/LHCHXSWG1/crosssections"
+    },
+    "ggZH": {
+      "xsec": 0.011985,
+      "_derivation": "3 x 3.995e-03, gg-initiated ZH to llH, inclusive ggZH 0.1184 times BR(Z to ll), once per lepton flavor",
+      "source": "https://gitlab.cern.ch/LHCHIGGSXS/LHCHXSWG1/crosssections"
+    },
+    "ttH": {
+      "xsec": 0.5306,
+      "source": "https://gitlab.cern.ch/LHCHIGGSXS/LHCHXSWG1/crosssections"
+    }
+  },
+  "_filterEffNote": "The ggH => SS => 4d samples carry a generator filter depending on the scalar mass.",
+  "filterEfficiencies": {
+    "HToSSTo4d": {
+      "byScalarMass": {
+        "15": 0.106,
+        "40": 0.085,
+        "55": 0.082
+      },
+      "source": "JMTucker Tools/python/Samples.py"
+    }
+  }
+}

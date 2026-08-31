@@ -31,7 +31,7 @@ A dataset is processed in two stages, each driven by their own configuration fil
 
 An **ntuple** here is a ROOT file holding an `Events` tree with one entry per event, carrying the collections and variables a content preset names.
 
-Cross sections, filter efficiencies, generator weight sums and luminosities live in `config/crossSections/` and `config/lumi.json`. These are only applied in post-processing when reporting or analyzing yields, not directly to the ntuples.
+Cross sections, filter efficiencies, generator weight sums and luminosities live in `config/normalizations/` and `config/normalizations/lumi.json`. These are only applied in post-processing when reporting or analyzing yields, not directly to the ntuples.
 
 We have performed a validation against [JMTucker](https://github.com/DisplacedVertices/cmssw-usercode/tree/UL_Lepton) using the Low-HT analysis' Run 2 selections reproduced in `config/selections/`. We are able to reproduce results event-by-event, after **only applying the trigger selection**, in both the lepton- and displacement-triggered channels for representative signal points. 
 

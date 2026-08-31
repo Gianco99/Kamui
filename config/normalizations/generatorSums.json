@@ -1,0 +1,594 @@
+{
+  "samples": {
+    "ZHToSSTo4d_mS55_ctau1mm_2018": {
+      "genEvents": 49999,
+      "sumGenWeight": 3966.4178707000005,
+      "sumGenWeight2": 355.13954632751484
+    },
+    "ggH-2S-4D_mS15_ctau0p1mm_2024": {
+      "genEvents": 5958672,
+      "sumGenWeight": 138021133.00799996,
+      "sumGenWeight2": 3197388002.1779876
+    },
+    "ggH-2S-4D_mS15_ctau1mm_2024": {
+      "genEvents": 5969256,
+      "sumGenWeight": 138264082.284,
+      "sumGenWeight2": 3203067313.711675
+    },
+    "ggH-2S-4D_mS15_ctau10mm_2024": {
+      "genEvents": 5780076,
+      "sumGenWeight": 133882887.74099997,
+      "sumGenWeight2": 3101554449.393578
+    },
+    "ggH-2S-4D_mS40_ctau0p1mm_2024": {
+      "genEvents": 5868636,
+      "sumGenWeight": 135933316.623,
+      "sumGenWeight2": 3149075219.3693175
+    },
+    "ggH-2S-4D_mS40_ctau1mm_2024": {
+      "genEvents": 5963600,
+      "sumGenWeight": 138134036.781,
+      "sumGenWeight2": 3200032337.7069016
+    },
+    "ggH-2S-4D_mS40_ctau10mm_2024": {
+      "genEvents": 5945700,
+      "sumGenWeight": 137719577.54700002,
+      "sumGenWeight2": 3190427304.028425
+    },
+    "ggH-2S-4D_mS55_ctau0p1mm_2024": {
+      "genEvents": 5799808,
+      "sumGenWeight": 134339506.3650001,
+      "sumGenWeight2": 3112142523.390431
+    },
+    "ggH-2S-4D_mS55_ctau1mm_2024": {
+      "genEvents": 5946646,
+      "sumGenWeight": 137742464.07299998,
+      "sumGenWeight2": 3190934922.00942
+    },
+    "ggH-2S-4D_mS55_ctau10mm_2024": {
+      "genEvents": 5981575,
+      "sumGenWeight": 138550372.3395001,
+      "sumGenWeight2": 3209677615.939893
+    },
+    "VBFH-2S-4D_mS15_ctau0p1mm_2024": {
+      "genEvents": 449000,
+      "sumGenWeight": 1876582.03036,
+      "sumGenWeight2": 7861106.254672414
+    },
+    "VBFH-2S-4D_mS15_ctau1mm_2024": {
+      "genEvents": 450000,
+      "sumGenWeight": 1880967.1348400002,
+      "sumGenWeight2": 7878614.286420012
+    },
+    "VBFH-2S-4D_mS15_ctau10mm_2024": {
+      "genEvents": 450000,
+      "sumGenWeight": 1880406.4440000001,
+      "sumGenWeight2": 7878614.286420011
+    },
+    "VBFH-2S-4D_mS40_ctau0p1mm_2024": {
+      "genEvents": 450000,
+      "sumGenWeight": 1880766.2903600002,
+      "sumGenWeight2": 7878614.286420011
+    },
+    "VBFH-2S-4D_mS40_ctau1mm_2024": {
+      "genEvents": 450000,
+      "sumGenWeight": 1880741.1848000002,
+      "sumGenWeight2": 7878614.28642002
+    },
+    "VBFH-2S-4D_mS40_ctau10mm_2024": {
+      "genEvents": 450000,
+      "sumGenWeight": 1880766.29036,
+      "sumGenWeight2": 7878614.286420011
+    },
+    "VBFH-2S-4D_mS55_ctau0p1mm_2024": {
+      "genEvents": 448000,
+      "sumGenWeight": 1872171.8203200002,
+      "sumGenWeight2": 7843598.22292481
+    },
+    "VBFH-2S-4D_mS55_ctau1mm_2024": {
+      "genEvents": 450000,
+      "sumGenWeight": 1880406.4440000001,
+      "sumGenWeight2": 7878614.286420011
+    },
+    "VBFH-2S-4D_mS55_ctau10mm_2024": {
+      "genEvents": 449000,
+      "sumGenWeight": 1876531.81924,
+      "sumGenWeight2": 7861106.254672407
+    },
+    "WplusH-2S-4D_mS15_ctau0p1mm_2024": {
+      "genEvents": 129456,
+      "sumGenWeight": 938117.4992440001,
+      "sumGenWeight2": 10894585077.02982
+    },
+    "WplusH-2S-4D_mS15_ctau1mm_2024": {
+      "genEvents": 129999,
+      "sumGenWeight": 1422313.2926999999,
+      "sumGenWeight2": 71168921469.10577
+    },
+    "WplusH-2S-4D_mS15_ctau10mm_2024": {
+      "genEvents": 130000,
+      "sumGenWeight": 908627.1086580002,
+      "sumGenWeight2": 13108929730.191439
+    },
+    "WplusH-2S-4D_mS40_ctau0p1mm_2024": {
+      "genEvents": 129513,
+      "sumGenWeight": 701548.1413239999,
+      "sumGenWeight2": 3652416044.0364776
+    },
+    "WplusH-2S-4D_mS40_ctau1mm_2024": {
+      "genEvents": 129897,
+      "sumGenWeight": 820763.0137760001,
+      "sumGenWeight2": 5122435129.113183
+    },
+    "WplusH-2S-4D_mS40_ctau10mm_2024": {
+      "genEvents": 129958,
+      "sumGenWeight": 777806.735998,
+      "sumGenWeight2": 13228536541.685799
+    },
+    "WplusH-2S-4D_mS55_ctau0p1mm_2024": {
+      "genEvents": 129981,
+      "sumGenWeight": 2125545.4763670005,
+      "sumGenWeight2": 61626224184.695175
+    },
+    "WplusH-2S-4D_mS55_ctau1mm_2024": {
+      "genEvents": 129876,
+      "sumGenWeight": 1039934.747363,
+      "sumGenWeight2": 5414896634.87563
+    },
+    "WplusH-2S-4D_mS55_ctau10mm_2024": {
+      "genEvents": 129961,
+      "sumGenWeight": 1902875.4368160006,
+      "sumGenWeight2": 132272484336.52457
+    },
+    "WminusH-2S-4D_mS15_ctau0p1mm_2024": {
+      "genEvents": 69993,
+      "sumGenWeight": 255573.25317699983,
+      "sumGenWeight2": 1298726457.1168292
+    },
+    "WminusH-2S-4D_mS15_ctau1mm_2024": {
+      "genEvents": 69926,
+      "sumGenWeight": 417578.580921,
+      "sumGenWeight2": 9183935212.12503
+    },
+    "WminusH-2S-4D_mS15_ctau10mm_2024": {
+      "genEvents": 69968,
+      "sumGenWeight": 163257.58660399998,
+      "sumGenWeight2": 174915541.54870936
+    },
+    "WminusH-2S-4D_mS40_ctau0p1mm_2024": {
+      "genEvents": 69780,
+      "sumGenWeight": 163348.74753999998,
+      "sumGenWeight2": 204204048.24276417
+    },
+    "WminusH-2S-4D_mS40_ctau1mm_2024": {
+      "genEvents": 69970,
+      "sumGenWeight": 189050.58325399997,
+      "sumGenWeight2": 384281516.6745406
+    },
+    "WminusH-2S-4D_mS40_ctau10mm_2024": {
+      "genEvents": 69963,
+      "sumGenWeight": 218517.34252699994,
+      "sumGenWeight2": 612462785.7756994
+    },
+    "WminusH-2S-4D_mS55_ctau0p1mm_2024": {
+      "genEvents": 69994,
+      "sumGenWeight": 181183.05188999997,
+      "sumGenWeight2": 230469319.60291612
+    },
+    "WminusH-2S-4D_mS55_ctau1mm_2024": {
+      "genEvents": 69991,
+      "sumGenWeight": 202648.7203300001,
+      "sumGenWeight2": 370817520.8226974
+    },
+    "WminusH-2S-4D_mS55_ctau10mm_2024": {
+      "genEvents": 69995,
+      "sumGenWeight": 201367.3180029999,
+      "sumGenWeight2": 376895367.89180017
+    },
+    "ZH-2S-4D_mS15_ctau0p1mm_2024": {
+      "genEvents": 129963,
+      "sumGenWeight": 1595147.5935929995,
+      "sumGenWeight2": 576568367482.3625
+    },
+    "ZH-2S-4D_mS15_ctau1mm_2024": {
+      "genEvents": 129968,
+      "sumGenWeight": 225319.54817799985,
+      "sumGenWeight2": 9377348564.87978
+    },
+    "ZH-2S-4D_mS15_ctau10mm_2024": {
+      "genEvents": 129618,
+      "sumGenWeight": 119093.07104899999,
+      "sumGenWeight2": 505050720.7391606
+    },
+    "ZH-2S-4D_mS40_ctau0p1mm_2024": {
+      "genEvents": 129996,
+      "sumGenWeight": 239816.47056800002,
+      "sumGenWeight2": 10934007298.97584
+    },
+    "ZH-2S-4D_mS40_ctau1mm_2024": {
+      "genEvents": 129972,
+      "sumGenWeight": 88424.86750999998,
+      "sumGenWeight2": 72261270.18533629
+    },
+    "ZH-2S-4D_mS40_ctau10mm_2024": {
+      "genEvents": 129741,
+      "sumGenWeight": 305905.3705910001,
+      "sumGenWeight2": 51346168005.85114
+    },
+    "ZH-2S-4D_mS55_ctau0p1mm_2024": {
+      "genEvents": 129915,
+      "sumGenWeight": 121839.06190500014,
+      "sumGenWeight2": 1.0202096327872416e+17
+    },
+    "ZH-2S-4D_mS55_ctau1mm_2024": {
+      "genEvents": 129966,
+      "sumGenWeight": 99620.46065199997,
+      "sumGenWeight2": 379631415.82497174
+    },
+    "ZH-2S-4D_mS55_ctau10mm_2024": {
+      "genEvents": 129679,
+      "sumGenWeight": 92511.61656400005,
+      "sumGenWeight2": 9852252040813.525
+    },
+    "ttH-2S-4D_mS15_ctau0p1mm_2024": {
+      "genEvents": 70000,
+      "sumGenWeight": 40144.928184000004,
+      "sumGenWeight2": 24062.09205463
+    },
+    "ttH-2S-4D_mS15_ctau1mm_2024": {
+      "genEvents": 70000,
+      "sumGenWeight": 40067.53698,
+      "sumGenWeight2": 24062.092054629982
+    },
+    "ttH-2S-4D_mS15_ctau10mm_2024": {
+      "genEvents": 70000,
+      "sumGenWeight": 40121.476303999996,
+      "sumGenWeight2": 24062.092054629997
+    },
+    "ttH-2S-4D_mS40_ctau0p1mm_2024": {
+      "genEvents": 70000,
+      "sumGenWeight": 40127.339274,
+      "sumGenWeight2": 24062.092054630004
+    },
+    "ttH-2S-4D_mS40_ctau1mm_2024": {
+      "genEvents": 70000,
+      "sumGenWeight": 40136.720025999995,
+      "sumGenWeight2": 24062.092054630004
+    },
+    "ttH-2S-4D_mS40_ctau10mm_2024": {
+      "genEvents": 70000,
+      "sumGenWeight": 40141.410402,
+      "sumGenWeight2": 24062.092054629997
+    },
+    "ttH-2S-4D_mS55_ctau0p1mm_2024": {
+      "genEvents": 70000,
+      "sumGenWeight": 40080.435514,
+      "sumGenWeight2": 24062.092054629997
+    },
+    "ttH-2S-4D_mS55_ctau1mm_2024": {
+      "genEvents": 70000,
+      "sumGenWeight": 40076.91773199999,
+      "sumGenWeight2": 24062.092054629997
+    },
+    "ttH-2S-4D_mS55_ctau10mm_2024": {
+      "genEvents": 70000,
+      "sumGenWeight": 40147.27337199998,
+      "sumGenWeight2": 24062.092054629993
+    },
+    "StopStopbar-2Dbar2D_M400_ctau10mm_2024": {
+      "genEvents": 100000
+    },
+    "rpvStopDD_M400_ctau1mm_2016APV": {
+      "genEvents": 25000,
+      "sumGenWeight": 25000.0,
+      "sumGenWeight2": 25000.0
+    },
+    "rpvStopDD_M400_ctau1mm_2016": {
+      "genEvents": 25000,
+      "sumGenWeight": 25000.0,
+      "sumGenWeight2": 25000.0
+    },
+    "rpvStopDD_M400_ctau1mm_2017": {
+      "genEvents": 50000,
+      "sumGenWeight": 50000.0,
+      "sumGenWeight2": 50000.0
+    },
+    "rpvStopDD_M400_ctau1mm_2018": {
+      "genEvents": 50000,
+      "sumGenWeight": 50000.0,
+      "sumGenWeight2": 50000.0
+    },
+    "rpvStopDD_M600_ctau1mm_2016APV": {
+      "genEvents": 18000,
+      "sumGenWeight": 18000.0,
+      "sumGenWeight2": 18000.0
+    },
+    "rpvStopDD_M600_ctau1mm_2016": {
+      "genEvents": 18000,
+      "sumGenWeight": 18000.0,
+      "sumGenWeight2": 18000.0
+    },
+    "rpvStopDD_M600_ctau1mm_2017": {
+      "genEvents": 36000,
+      "sumGenWeight": 36000.0,
+      "sumGenWeight2": 36000.0
+    },
+    "rpvStopDD_M600_ctau1mm_2018": {
+      "genEvents": 36000,
+      "sumGenWeight": 36000.0,
+      "sumGenWeight2": 36000.0
+    },
+    "ggHToSSTo4d_mS55_ctau1mm_2016APV": {
+      "genEvents": 256935,
+      "sumGenWeight": 5555744.161200002,
+      "sumGenWeight2": 120939062.81666163
+    },
+    "ggHToSSTo4d_mS55_ctau1mm_2016": {
+      "genEvents": 271240,
+      "sumGenWeight": 5867401.4552000025,
+      "sumGenWeight2": 127672412.86080642
+    },
+    "ggHToSSTo4d_mS55_ctau1mm_2017": {
+      "genEvents": 525699,
+      "sumGenWeight": 11369253.746000005,
+      "sumGenWeight2": 247446024.80649266
+    },
+    "ggHToSSTo4d_mS55_ctau1mm_2018": {
+      "genEvents": 546940,
+      "sumGenWeight": 11827746.860800005,
+      "sumGenWeight2": 257444143.52635846
+    },
+    "ZHToSSTo4d_mS55_ctau1mm_2016APV": {
+      "genEvents": 49990,
+      "sumGenWeight": 3968.8619588,
+      "sumGenWeight2": 355.07561993064786
+    },
+    "ZHToSSTo4d_mS55_ctau1mm_2016": {
+      "genEvents": 49998,
+      "sumGenWeight": 3967.3449386,
+      "sumGenWeight2": 355.1324433945298
+    },
+    "ZHToSSTo4d_mS55_ctau1mm_2017": {
+      "genEvents": 49997,
+      "sumGenWeight": 3961.5296945000005,
+      "sumGenWeight2": 355.12534046154445
+    },
+    "WplusHToSSTo4d_mS55_ctau1mm_2016APV": {
+      "genEvents": 24999,
+      "sumGenWeight": 7064.169141000002,
+      "sumGenWeight2": 2230.5874399583195
+    },
+    "WplusHToSSTo4d_mS55_ctau1mm_2016": {
+      "genEvents": 24998,
+      "sumGenWeight": 7049.532400000002,
+      "sumGenWeight2": 2230.498212891638
+    },
+    "WplusHToSSTo4d_mS55_ctau1mm_2017": {
+      "genEvents": 49991,
+      "sumGenWeight": 14119.078303000006,
+      "sumGenWeight2": 4460.550290449872
+    },
+    "WplusHToSSTo4d_mS55_ctau1mm_2018": {
+      "genEvents": 49994,
+      "sumGenWeight": 14070.986154000006,
+      "sumGenWeight2": 4460.817971649914
+    },
+    "WminusHToSSTo4d_mS55_ctau1mm_2016APV": {
+      "genEvents": 24995,
+      "sumGenWeight": 4383.530148,
+      "sumGenWeight2": 864.0205057311201
+    },
+    "WminusHToSSTo4d_mS55_ctau1mm_2016": {
+      "genEvents": 24998,
+      "sumGenWeight": 4401.936624,
+      "sumGenWeight2": 864.1242089324481
+    },
+    "WminusHToSSTo4d_mS55_ctau1mm_2017": {
+      "genEvents": 49995,
+      "sumGenWeight": 8780.632748,
+      "sumGenWeight2": 1728.2138501311208
+    },
+    "WminusHToSSTo4d_mS55_ctau1mm_2018": {
+      "genEvents": 49995,
+      "sumGenWeight": 8810.752435999999,
+      "sumGenWeight2": 1728.2138501311208
+    },
+    "StealthSHH_mStop300_mSo100_ctau0p1mm_2024": {
+      "genEvents": 107540
+    },
+    "StealthSHH_mStop300_mSo100_ctau1mm_2024": {
+      "genEvents": 116450
+    },
+    "StealthSHH_mStop300_mSo100_ctau3mm_2024": {
+      "genEvents": 107739
+    },
+    "StealthSHH_mStop300_mSo100_ctau10mm_2024": {
+      "genEvents": 112788
+    },
+    "StealthSHH_mStop325_mSo100_ctau0p1mm_2024": {
+      "genEvents": 111274
+    },
+    "StealthSHH_mStop325_mSo100_ctau1mm_2024": {
+      "genEvents": 112756
+    },
+    "StealthSHH_mStop325_mSo100_ctau3mm_2024": {
+      "genEvents": 100286
+    },
+    "StealthSHH_mStop325_mSo100_ctau10mm_2024": {
+      "genEvents": 108213
+    },
+    "StealthSHH_mStop500_mSo100_ctau0p1mm_2024": {
+      "genEvents": 94446
+    },
+    "StealthSHH_mStop500_mSo100_ctau1mm_2024": {
+      "genEvents": 88939
+    },
+    "StealthSHH_mStop500_mSo100_ctau3mm_2024": {
+      "genEvents": 90236
+    },
+    "StealthSHH_mStop500_mSo100_ctau10mm_2024": {
+      "genEvents": 92895
+    },
+    "StealthSHH_mStop500_mSo275_ctau0p1mm_2024": {
+      "genEvents": 95106
+    },
+    "StealthSHH_mStop500_mSo275_ctau1mm_2024": {
+      "genEvents": 93533
+    },
+    "StealthSHH_mStop500_mSo275_ctau3mm_2024": {
+      "genEvents": 91982
+    },
+    "StealthSHH_mStop500_mSo275_ctau10mm_2024": {
+      "genEvents": 96308
+    },
+    "StealthSHH_mStop700_mSo100_ctau0p1mm_2024": {
+      "genEvents": 85849
+    },
+    "StealthSHH_mStop700_mSo100_ctau1mm_2024": {
+      "genEvents": 85932
+    },
+    "StealthSHH_mStop700_mSo100_ctau3mm_2024": {
+      "genEvents": 83996
+    },
+    "StealthSHH_mStop700_mSo100_ctau10mm_2024": {
+      "genEvents": 83170
+    },
+    "StealthSHH_mStop700_mSo475_ctau0p1mm_2024": {
+      "genEvents": 86221
+    },
+    "StealthSHH_mStop700_mSo475_ctau1mm_2024": {
+      "genEvents": 87244
+    },
+    "StealthSHH_mStop700_mSo475_ctau3mm_2024": {
+      "genEvents": 82189
+    },
+    "StealthSHH_mStop700_mSo475_ctau10mm_2024": {
+      "genEvents": 86490
+    },
+    "StealthSHH_mStop900_mSo100_ctau0p1mm_2024": {
+      "genEvents": 80188
+    },
+    "StealthSHH_mStop900_mSo100_ctau1mm_2024": {
+      "genEvents": 76667
+    },
+    "StealthSHH_mStop900_mSo100_ctau3mm_2024": {
+      "genEvents": 79509
+    },
+    "StealthSHH_mStop900_mSo100_ctau10mm_2024": {
+      "genEvents": 72304
+    },
+    "StealthSHH_mStop900_mSo675_ctau0p1mm_2024": {
+      "genEvents": 79509
+    },
+    "StealthSHH_mStop900_mSo675_ctau1mm_2024": {
+      "genEvents": 80733
+    },
+    "StealthSHH_mStop900_mSo675_ctau3mm_2024": {
+      "genEvents": 83483
+    },
+    "StealthSHH_mStop900_mSo675_ctau10mm_2024": {
+      "genEvents": 77303
+    },
+    "StealthSYY_mStop300_mSo100_ctau0p1mm_2024": {
+      "genEvents": 109818
+    },
+    "StealthSYY_mStop300_mSo100_ctau1mm_2024": {
+      "genEvents": 117890
+    },
+    "StealthSYY_mStop300_mSo100_ctau3mm_2024": {
+      "genEvents": 114617
+    },
+    "StealthSYY_mStop300_mSo100_ctau10mm_2024": {
+      "genEvents": 116439
+    },
+    "StealthSYY_mStop325_mSo100_ctau0p1mm_2024": {
+      "genEvents": 111326
+    },
+    "StealthSYY_mStop325_mSo100_ctau1mm_2024": {
+      "genEvents": 113632
+    },
+    "StealthSYY_mStop325_mSo100_ctau3mm_2024": {
+      "genEvents": 109795
+    },
+    "StealthSYY_mStop325_mSo100_ctau10mm_2024": {
+      "genEvents": 104873
+    },
+    "StealthSYY_mStop500_mSo100_ctau0p1mm_2024": {
+      "genEvents": 93244
+    },
+    "StealthSYY_mStop500_mSo100_ctau1mm_2024": {
+      "genEvents": 90278
+    },
+    "StealthSYY_mStop500_mSo100_ctau3mm_2024": {
+      "genEvents": 92820
+    },
+    "StealthSYY_mStop500_mSo100_ctau10mm_2024": {
+      "genEvents": 90999
+    },
+    "StealthSYY_mStop500_mSo275_ctau0p1mm_2024": {
+      "genEvents": 95032
+    },
+    "StealthSYY_mStop500_mSo275_ctau1mm_2024": {
+      "genEvents": 96122
+    },
+    "StealthSYY_mStop500_mSo275_ctau3mm_2024": {
+      "genEvents": 92603
+    },
+    "StealthSYY_mStop500_mSo275_ctau10mm_2024": {
+      "genEvents": 96750
+    },
+    "StealthSYY_mStop700_mSo100_ctau0p1mm_2024": {
+      "genEvents": 84575
+    },
+    "StealthSYY_mStop700_mSo100_ctau1mm_2024": {
+      "genEvents": 88860
+    },
+    "StealthSYY_mStop700_mSo100_ctau3mm_2024": {
+      "genEvents": 90316
+    },
+    "StealthSYY_mStop700_mSo100_ctau10mm_2024": {
+      "genEvents": 84209
+    },
+    "StealthSYY_mStop700_mSo475_ctau0p1mm_2024": {
+      "genEvents": 87039
+    },
+    "StealthSYY_mStop700_mSo475_ctau1mm_2024": {
+      "genEvents": 78446
+    },
+    "StealthSYY_mStop700_mSo475_ctau3mm_2024": {
+      "genEvents": 90553
+    },
+    "StealthSYY_mStop700_mSo475_ctau10mm_2024": {
+      "genEvents": 84012
+    },
+    "StealthSYY_mStop900_mSo100_ctau0p1mm_2024": {
+      "genEvents": 84567
+    },
+    "StealthSYY_mStop900_mSo100_ctau1mm_2024": {
+      "genEvents": 82085
+    },
+    "StealthSYY_mStop900_mSo100_ctau3mm_2024": {
+      "genEvents": 79635
+    },
+    "StealthSYY_mStop900_mSo100_ctau10mm_2024": {
+      "genEvents": 76113
+    },
+    "StealthSYY_mStop900_mSo675_ctau0p1mm_2024": {
+      "genEvents": 78458
+    },
+    "StealthSYY_mStop900_mSo675_ctau1mm_2024": {
+      "genEvents": 82799
+    },
+    "StealthSYY_mStop900_mSo675_ctau3mm_2024": {
+      "genEvents": 79866
+    },
+    "StealthSYY_mStop900_mSo675_ctau10mm_2024": {
+      "genEvents": 82218
+    },
+    "tutorialZH2018": {
+      "genEvents": 49999,
+      "sumGenWeight": 3966.4178707000005,
+      "sumGenWeight2": 355.13954632751484
+    }
+  }
+}

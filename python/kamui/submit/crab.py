@@ -139,7 +139,7 @@ def submit(configPaths, dryRun=False, sites=None, taskName=None, base=None):
     ok, bad = [], []
     for p in configPaths:
         if dryRun:
-            print(f"  [dry-run] crab submit -c {p}")
+            print(f"  [dryRun] crab submit -c {p}")
             ok.append(p)
             continue
         r = subprocess.run(["crab", "submit", "-c", p], capture_output=True, text=True)
@@ -171,7 +171,7 @@ def resubmit(taskName, dryRun=False):
             continue
         n += 1
         if dryRun:
-            print(f"  [dry-run] crab resubmit -d {full}")
+            print(f"  [dryRun] crab resubmit -d {full}")
             continue
         print(f"\n=== {proj}")
         subprocess.run(["crab", "resubmit", "-d", full])

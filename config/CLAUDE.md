@@ -1,6 +1,6 @@
 # config
 
-`README.md` covers the layout, `sites.json` and `lumi.json`. `samples/`, `content/`, `triggers/` and `crossSections/` each have their own pair of docs; `selections/` has a README only.
+`README.md` covers the layout, `sites.json` and `lumi.json`. `samples/`, `content/`, `triggers/` and `normalizations/` each have their own pair of docs; `selections/` has a README only.
 
 ## Nothing Outside configReaders/ May Open These Files
 `./kamui check` enforces it by scanning every `.py` outside `python/kamui/configReaders/` for `paths.CONFIG_DIR`, `paths.SAMPLES_DIR`, `paths.CONTENT_DIR`, `paths.TRIGGERS_DIR` and `paths.SITES_FILE`. This is why `loadSites` lives in `configReaders/sites.py`.

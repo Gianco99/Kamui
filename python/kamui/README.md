@@ -15,7 +15,7 @@ KAMUI_NO_BANNER=1                 # or set this once and never see it again
 
 ## Picking samples
 
-Six commands take the same five flags, and they combine: passing several narrows the set. `--name` may be repeated.
+Six commands take the same five flags. `--name` may be repeated.
 
 | Flag | What it matches |
 | --- | --- |
@@ -25,9 +25,7 @@ Six commands take the same five flags, and they combine: passing several narrows
 | `--tag` | A tag from the sample config, e.g. `validation`, `signal`, `leptonTriggered` |
 | `--match` | Wildcard on the sample name; quote it or the shell eats it first |
 
-The commands that take them are `list`, `query`, `stage`, `submit`, `select` and `norm`. Every one of them except `list` exits when nothing matched.
-
-
+The commands that take them are `list`, `query`, `stage`, `submit`, `select` and `norm`. Every one of them exits when nothing matched, except that `list` tolerates a `--match` that matches nothing. An unknown `--name`, `--tag` or `--family` is always an error.
 ## Commands
 
 ### list
@@ -77,11 +75,11 @@ Asks DAS how many files, events and gigabytes each selected sample holds, and to
 
 | Flag | Meaning |
 | --- | --- |
-| the five sample flags | |
+| The five sample flags | |
 | `--refresh` | Ignore the cache and ask DAS again |
 
 ```
-./kamui query --tag validation                     The 24 Run 2 samples, with a total at the bottom
+./kamui query --tag validation                     The 24 Run 2 samples
 ./kamui query --family exoticHiggs4d2024           A whole family
 ./kamui query --tag rpv --refresh                  Ignore the cache
 ```
@@ -92,7 +90,7 @@ Searches DAS for datasets matching a wildcard, whether or not we have them in ou
 
 | Flag | Meaning |
 | --- | --- |
-| `pattern` | Positional, required. Quote it |
+| `pattern` | Positional, required. Put it in quotes! |
 | `--instance` | `prod/global` for official datasets (default), `prod/phys03` for USER ones |
 | `--refresh` | Bypass the DAS cache |
 
@@ -104,12 +102,12 @@ Searches DAS for datasets matching a wildcard, whether or not we have them in ou
 
 ### stage
 
-Copies raw MiniAOD from the grid to our EOS area, for inspecting files and prototyping content presets. Files already on EOS are skipped. It copies the whole dataset unless `--maxFiles` caps it.
+Copies raw MiniAOD from the grid to our EOS area, for local tests. It copies the whole dataset unless `--maxFiles` caps it.
 
 | Flag | Meaning |
 | --- | --- |
-| the five sample flags | |
-| `--maxFiles N` | Hard cap on files copied |
+| The five sample flags | |
+| `--maxFiles N` | Cap on files copied |
 | `--dryRun` | Print what would be copied, copy nothing |
 | `--refresh` | Bypass the DAS cache |
 
@@ -171,7 +169,6 @@ Applies an event-level selection to ntuples a `submit` task produced, and writes
 | `--inputTask NAME` | Required. The ntuple production task to read from |
 | `--inputBase` | EOS base holding the input ntuples (default: the site stageout base) |
 | `--outputBase` | Where to write the selected ntuples |
-| `--cutflow` | Also write one ntuple per cut, for inspection. Local backend only |
 | `--backend` | `local` (default) or `condor` |
 | `--filesPerJob N` | Input files per job on condor (default 5) |
 | `--dryRun` | Write the job area, submit nothing |
@@ -182,28 +179,27 @@ Locally, the output and the cutflow land under `ntupleSelection/out/<task>/`. On
 
 ```
 ./kamui select --tag leptonTriggered --selection run2Lepton --task lepPass --inputTask run2Val            Run it here, seconds for a small pass
-./kamui select --tag leptonTriggered --selection run2Lepton --task lepPass --inputTask run2Val --cutflow  Keep one ntuple per cut
 ./kamui select --tag displacementTriggered --selection run2Displaced --task dispPass --inputTask run2Val --backend condor
 ```
 
 ### norm
 
-Measures a sample's generator sums over a complete production and stores them in `config/crossSections/generatorSums.json`, which is the denominator every yield is normalized by. With no `--inputTask` it records the DAS event count alone, which is what you can do the moment a sample is added.
-
+Records the generator weight sum for normalization, in `config/normalizations/generatorSums.json`. The sums are read from the sample's central NanoAOD.
 | Flag | Meaning |
 | --- | --- |
-| the five sample flags | |
-| `--inputTask NAME` | A complete production task to measure the weight sum over |
-| `--inputBase` | EOS base holding the ntuples (default: the site stageout base) |
-| `--noDas` | Skip the DAS cross-check of the event count |
-
-The measured event count is compared against DAS, and an entry that does not match is flagged INCOMPLETE. Do not normalize with one.
+| The five sample flags | |
+| `--write` | Write results to the JSON |
+| `--refresh` | Bypass the DAS cache |
 
 ```
-./kamui norm --tag validation                                  Record the DAS counts for the Run 2 samples
-./kamui norm --tag validation --inputTask run2Val              Measure the weight sums over a finished production
-./kamui norm --name rpvStopDD_M400_ctau1mm_2018 --noDas --inputTask run2Val
+./kamui norm --family tutorial            Report the sums, write nothing
+./kamui norm --family tutorial --write    Record them
+./kamui norm --tag validation --write     A whole tag at once
 ```
+
+A sample whose dataset has no central NanoAOD is skipped. 
+
+Use `./kamui check` to see how many catalogued samples have a sum recorded.
 
 ### cutflow
 
@@ -280,11 +276,10 @@ Run it after editing any config, and before submitting anything. It exits non-ze
 
 ### cache
 
-Describes the DAS cache, or thins it out. DAS is slow, so every answer is kept on disk and reused. Prints how many responses are held, how much space they take, how old they are, and how many have passed the 30 day age limit. Expired entries are ignored when read but sit on disk until removed.
-
+Describes the DAS cache, or thins it out. DAS is slow, so every answer is kept on disk and reused. Prints how many responses are held, how much space they take, how old they are, and how many have passed the 30 day age limit.
 | Flag | Meaning |
 | --- | --- |
-| `--prune` | Delete only the expired entries, keeping the rest |
+| `--prune` | Delete expired entries |
 | `--clear` | Delete every cached response |
 
 ```
@@ -369,11 +364,11 @@ Everything behind the `select`, `cutflow` and `norm` commands. Inputs are the nt
 
 `runOne.py` - What a worker runs: `python3 -m kamui.select.runOne <selectionJson> <outputFile> <input> [input ...]`. It applies the already-resolved selection to one group of files and writes the cutflow beside the output.
 
-`normalization.py` - The generator sums a sample must be normalized by. It sums the run-level counters over a complete production, records them against the DAS event count, and refuses to hand back a denominator measured over an incomplete one.
+`normalization.py` - The generator sums a sample must be normalized by. It sums the run-level counters over a sample's central NanoAOD, read remotely over xrootd, and raises rather than returning a short sum when a file cannot be read.
 
 
 ## Extras - helpers/
 
 Small things that are not part of the analysis.
 
-`banner.py` - Draws the Sharingan when you run a command. Turn it off with `--noBanner`, which goes before the command, or set `KAMUI_NO_BANNER=1` to never see it again.
+`banner.py` - Draws the Sharingan when you run a command.

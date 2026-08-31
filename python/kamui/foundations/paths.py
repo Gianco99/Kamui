@@ -22,8 +22,8 @@ CONTENT_DIR  = os.path.join(CONFIG_DIR, "content")
 TRIGGERS_DIR = os.path.join(CONFIG_DIR, "triggers")
 SITES_FILE   = os.path.join(CONFIG_DIR, "sites.json")
 SELECTIONS_DIR = os.path.join(CONFIG_DIR, "selections")
-XSEC_DIR       = os.path.join(CONFIG_DIR, "crossSections")
-LUMI_FILE      = os.path.join(CONFIG_DIR, "lumi.json")
+NORM_DIR       = os.path.join(CONFIG_DIR, "normalizations")
+LUMI_FILE      = os.path.join(NORM_DIR, "lumi.json")
 
 ## Everything else we need for job submission and querying DAS
 CMSSW_DIR    = os.path.join(PRODUCTION_DIR, "cmssw")       # cmsRun cfg and table builder

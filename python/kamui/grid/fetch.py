@@ -46,10 +46,10 @@ def stage(sample, sites=None, maxFiles=None, dryRun=False, refresh=False):
     total = len(lfns)
     if cap is not None and total > cap:
         lfns = lfns[:cap]
-    print(f"  {total} file(s) in DAS, copying {len(lfns)}")
+    print(f"  {total} file{'' if total == 1 else 's'} in DAS, copying {len(lfns)}")
 
     if dryRun:
-        print(f"  [dry-run] xrdfs {eosRed} mkdir -p {dest}")
+        print(f"  [dryRun] xrdfs {eosRed} mkdir -p {dest}")
     else:
         subprocess.run(["xrdfs", eosRed, "mkdir", "-p", dest], capture_output=True, text=True)
 
@@ -64,7 +64,7 @@ def stage(sample, sites=None, maxFiles=None, dryRun=False, refresh=False):
             continue
         src, dst = f"{srcRed}/{lfn}", f"{eosRed}/{dest}/{fn}"
         if dryRun:
-            print(f"  [dry-run] xrdcp {src} {dst}")
+            print(f"  [dryRun] xrdcp {src} {dst}")
             ok += 1
             continue
         r = subprocess.run(["xrdcp", "-f", src, dst], capture_output=True, text=True)

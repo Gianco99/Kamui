@@ -8,6 +8,7 @@ Wraps dasgoclient and caches what it returns.
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -111,7 +112,7 @@ def listFiles(dataset, instance="prod/global", refresh=False):
 
 
 def datasetSummary(dataset, instance="prod/global", refresh=False):
-    """{'nfiles','nevents','sizeGB'} for a dataset, or zeros if DAS has nothing."""
+    """{'nfiles','nevents','sizeGB','found'} for a dataset. found is False when DAS knows nothing about it, which is a different thing from a dataset that is genuinely empty."""
     rows = query(f"summary dataset={dataset}", instance, refresh, jsonOut=True)
     def num(v, cast):
         try:
@@ -124,12 +125,15 @@ def datasetSummary(dataset, instance="prod/global", refresh=False):
         for s in row.get("summary") or []:
             if not isinstance(s, dict):
                 continue
+            ## DAS answers a name it does not know with a full summary of zeros and null dates
+            ## rather than with nothing, so the dates are what separate "unknown" from "empty".
             return {
                 "nfiles":  num(s.get("nfiles", 0), int),
                 "nevents": num(s.get("nevents", 0), int),
                 "sizeGB":  num(s.get("file_size", 0), float) / 1e9,
+                "found":   s.get("max_ldate") is not None or num(s.get("nfiles", 0), int) > 0,
             }
-    return {"nfiles": 0, "nevents": 0, "sizeGB": 0.0}
+    return {"nfiles": 0, "nevents": 0, "sizeGB": 0.0, "found": False}
 
 
 # The generator weight sum is not in DAS: it is a property of the event payload, so nobody
@@ -141,7 +145,10 @@ def nanoSibling(dataset, instance="prod/global", refresh=False):
     if "MiniAOD" not in processed:
         return None
     campaign = processed.split("MiniAOD")[0]                  # RunIISummer20UL18
-    conditions = processed.split("-", 1)[1] if "-" in processed else ""   # 106X_..._L1v1-v2
+    conditions = processed.split("-", 1)[1] if "-" in processed else ""
+    ## The trailing -vN is the dataset version, which MiniAOD and NanoAOD reprocess
+    ## independently, so only the global tag ahead of it can pin the reprocessing.
+    conditions = re.sub(r"-v\d+$", "", conditions)   # 106X_..._L1v1
 
     found = findDatasets(f"/{primary}/*/NANOAODSIM", instance=instance, refresh=refresh)
     ## The campaign pins the era and the conditions tag pins the reprocessing, so a Run 2

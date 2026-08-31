@@ -98,10 +98,6 @@ def resolveContent(name, contentDir=None, isMC=True, era="Summer24"):
     for cname, c in cfg.get("collections", {}).items():
         if not isinstance(c, dict):
             raise ValueError(f"content config '{name}': collection '{cname}' must be an object, got {type(c).__name__}")
-        if c.get("drop"):                       # an including config can delete an inherited collection
-            if "type" not in c:
-                raise ValueError(f"content config '{name}': collection '{cname}' is dropped but never defined; check the spelling")
-            continue
         if c.get("mcOnly") and not isMC:
             continue
         if c.get("dataOnly") and isMC:
@@ -127,12 +123,6 @@ def loadTriggerPaths(name):
     if "paths" not in trig:
         raise ValueError(f"trigger config '{name}' defines no 'paths'")
     return list(trig["paths"])
-
-
-def loadTriggerVetoes(name):
-    """The veto blocks a trigger config defines, each pairing a path list with an offline description."""
-    trig = loadWithIncludes(name, paths.TRIGGERS_DIR)
-    return list(trig.get("vetoes", []))
 
 
 def _resolveSkim(skim):
@@ -164,7 +154,7 @@ def _resolveSkim(skim):
 
 
 ## Every key a collection may carry
-COLLECTION_FIELDS = {"type", "src", "doc", "cut", "maxLen", "variables", "params", "singleton", "extension", "mcOnly", "dataOnly", "drop"}
+COLLECTION_FIELDS = {"type", "src", "doc", "cut", "maxLen", "variables", "singleton", "mcOnly", "dataOnly"}
 VARIABLE_FIELDS = {"expr", "type", "doc", "precision"}
 EXTVAR_FIELDS = {"src", "type", "doc"}
 
@@ -184,10 +174,8 @@ def _translate(cname, c):
         "plugin":    KIND_TO_PLUGIN[kind],
         "kind":      kind,
         "doc":       c.get("doc", ""),
-        "extension": bool(c.get("extension", False)),
     }
     if kind in FIXED_CONTENT_KINDS:
-        out["params"] = c.get("params", {})
         if "src" in c:
             out["src"] = c["src"]
         return out
@@ -307,7 +295,7 @@ def validateTriggers():
 
 
 ## Collections that are meant to differ between the two era sets
-ERA_SPECIFIC_COLLECTIONS = {"leptons"}
+ERA_SPECIFIC_COLLECTIONS = {"leptons", "jets"}
 
 
 def validateEraCopies(contentDir=None):

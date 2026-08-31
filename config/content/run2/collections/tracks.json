@@ -1,10 +1,10 @@
 {
-  "_doc": "Tracks and lost tracks, the input to offline vertexing. Much the largest table.",
+  "_doc": "Tracks and lost tracks.",
   "collections": {
     "Track": {
       "type": "packedCandidate",
       "src": "packedPFCandidates",
-      "cut": "charge != 0 && hasTrackDetails() && pt > 1.0",
+      "cut": "charge != 0 && hasTrackDetails() && pt > 1.0 && pixelLayersWithMeasurement() >= 2 && stripLayersWithMeasurement() >= 6",
       "doc": "Charged packedPFCandidates with full track details, pT > 1 GeV",
       "variables": {
         "pt": {
@@ -99,7 +99,7 @@
         "fromPV": {
           "expr": "fromPV()",
           "type": "uint8",
-          "doc": "PV association quality (3 = used in PV fit, 0 = unrelated)"
+          "doc": "PV association quality"
         },
         "pvIdx": {
           "expr": "vertexRef().key()",
@@ -109,15 +109,15 @@
         "lostInnerHits": {
           "expr": "lostInnerHits()",
           "type": "int16",
-          "doc": "-1 valid inner hit, 0 none lost, 1+ inner hits lost (displaced-track handle)"
+          "doc": "-1 valid inner hit, 0 none lost, 1+ inner hits lost"
         }
       }
     },
     "LostTrack": {
       "type": "packedCandidate",
       "src": "lostTracks",
-      "cut": "charge != 0 && hasTrackDetails() && pt > 1.0",
-      "doc": "Tracks not associated to any PF candidate - a large fraction of genuinely displaced tracks",
+      "cut": "charge != 0 && hasTrackDetails() && pt > 1.0 && pixelLayersWithMeasurement() >= 2 && stripLayersWithMeasurement() >= 6",
+      "doc": "Tracks not associated to any PF candidate",
       "variables": {
         "pt": {
           "expr": "pt()",

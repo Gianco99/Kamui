@@ -1,0 +1,55 @@
+{
+  "_doc": "Integrated luminosity per era.",
+  "_units": "pb^-1",
+  "eras": {
+    "2016APV": {
+      "lumi": 19502.0,
+      "source": "JMTucker MFVNeutralino/interface/AnalysisConstants.h, int_lumi_20161"
+    },
+    "2016": {
+      "lumi": 16812.0,
+      "source": "JMTucker MFVNeutralino/interface/AnalysisConstants.h, int_lumi_20162"
+    },
+    "2017": {
+      "lumi": 42068.0,
+      "source": "JMTucker MFVNeutralino/interface/AnalysisConstants.h, int_lumi_2017"
+    },
+    "2018": {
+      "lumi": 59561.0,
+      "source": "JMTucker MFVNeutralino/interface/AnalysisConstants.h, int_lumi_2018"
+    },
+    "Summer22": {
+      "lumi": 8086.0,
+      "source": "brilcalc lumi -b \"STABLE BEAMS\" -u /pb --normtag /cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_PHYSICS.json -i https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions2022/Cert_Collisions2022_355100_362760_Golden.json --begin 355100 --end 357900"
+    },
+    "Summer22EE": {
+      "lumi": 26675.0,
+      "source": "brilcalc lumi -b \"STABLE BEAMS\" -u /pb --normtag /cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_PHYSICS.json -i https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions2022/Cert_Collisions2022_355100_362760_Golden.json --begin 359022 --end 362760"
+    },
+    "Summer23": {
+      "lumi": 18605.0,
+      "source": "brilcalc lumi -b \"STABLE BEAMS\" -u /pb --normtag /cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_PHYSICS.json -i https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions2023/Cert_Collisions2023_366442_370790_Golden.json --begin 366442 --end 369802"
+    },
+    "Summer23BPix": {
+      "lumi": 9677.0,
+      "source": "brilcalc lumi -b \"STABLE BEAMS\" -u /pb --normtag /cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_PHYSICS.json -i https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions2023/Cert_Collisions2023_366442_370790_Golden.json --begin 369803 --end 370790"
+    },
+    "Summer24": {
+      "lumi": 109947.0,
+      "source": "brilcalc lumi -b \"STABLE BEAMS\" -u /pb --normtag /cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_PHYSICS.json -i https://cms-service-dqmdc.web.cern.ch/CAF/certification/Collisions2024/Cert_Collisions2024_378981_386951_Golden.json"
+    }
+  },
+  "_channelNote": "The b-jet triggers were not active for the whole of 2017 and 2018, so the displacement-triggered channel integrates less luminosity than the era total.",
+  "channels": {
+    "displaced": {
+      "2017": {
+        "lumi": 37187.0,
+        "source": "JMTucker AnalysisConstants.h, int_lumi_bjet_trig_2017"
+      },
+      "2018": {
+        "lumi": 54286.0,
+        "source": "JMTucker AnalysisConstants.h, int_lumi_bjet_trig_2018"
+      }
+    }
+  }
+}

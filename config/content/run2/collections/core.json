@@ -1,10 +1,10 @@
 {
-  "_doc": "Event-level content every ntuple needs. Included by every preset.",
+  "_doc": "Event-level content every ntuple needs.",
   "collections": {
     "PV": {
       "type": "vertex",
       "src": "offlineSlimmedPrimaryVertices",
-      "doc": "Offline primary vertices (all of them, so nPV is the true PV multiplicity)",
+      "doc": "Offline primary vertices",
       "variables": {
         "x": {
           "expr": "position().x()",
@@ -74,7 +74,7 @@
     "BeamSpot": {
       "type": "beamSpot",
       "src": "offlineBeamSpot",
-      "doc": "Offline beamspot - the reference for dxy of displaced tracks",
+      "doc": "Offline beamspot",
       "variables": {
         "x": {
           "expr": "x0()",
@@ -197,7 +197,7 @@
         "fastjetAll": {
           "src": "fixedGridRhoFastjetAll",
           "type": "double",
-          "doc": "Rho from all PF candidates (used by JECs)"
+          "doc": "Rho from all PF candidates"
         },
         "fastjetCentral": {
           "src": "fixedGridRhoFastjetCentral",
@@ -213,7 +213,6 @@
       "PAT",
       "RECO"
     ],
-    "keepAll": true,
-    "_doc": "HLT decisions come from the HLT process; the MET filter decisions are recomputed in PAT for MC and RECO for data. A process that is absent from a file matches nothing."
+    "keepAll": true
   }
 }

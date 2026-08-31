@@ -1,5 +1,5 @@
 {
-  "_doc": "IVF secondary vertices from MiniAOD. Not the analysis displaced vertices.",
+  "_doc": "IVF secondary vertices from MiniAOD.",
   "collections": {
     "SV": {
       "type": "secondaryVertex",

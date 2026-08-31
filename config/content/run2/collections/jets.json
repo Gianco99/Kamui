@@ -1,9 +1,9 @@
 {
-  "_doc": "AK4 PUPPI jets. Energy fractions kept raw so jet ID is applied downstream.",
+  "_doc": "AK4 PUPPI jets.",
   "collections": {
     "Jet": {
       "type": "patJet",
-      "src": "slimmedJetsPuppi",
+      "src": "slimmedJets",
       "cut": "pt > 20 && abs(eta) < 5.0",
       "maxLen": 40,
       "doc": "AK4 PUPPI jets, pT > 20 GeV, |eta| < 5",
@@ -98,7 +98,7 @@
         "btagUParTAK4B": {
           "expr": "bDiscriminator('pfUnifiedParticleTransformerAK4DiscriminatorsJetTags:BvsAll')",
           "type": "float",
-          "doc": "UnifiedParT b vs udscg (-1000 if the tagger is absent in this MiniAOD version)",
+          "doc": "UnifiedParT b vs udscg",
           "precision": 10
         },
         "nSVs": {
@@ -123,7 +123,7 @@
       "src": "slimmedCaloJets",
       "cut": "",
       "maxLen": 40,
-      "doc": "Uncorrected AK4 calo jets, the full collection. The displaced-dijet triggers are emulated offline from these, and JMTucker uses their raw pT, so no correction is applied here either",
+      "doc": "Uncorrected AK4 calo jets",
       "variables": {
         "pt": {
           "expr": "pt()",

@@ -1,5 +1,5 @@
 {
-  "_doc": "Leptons for Run 2. Electron IDs are the Fall17 working points, the only ones present in Run 2 MiniAOD.",
+  "_doc": "Leptons for Run 2.",
   "collections": {
     "Muon": {
       "type": "patMuon",

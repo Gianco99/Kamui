@@ -2,21 +2,15 @@
 
 ## Design Premise
 - Kamui is the CLI for the whole analysis framework.
-- Two stages exist: sample processing (`submit`, everything under `submit/`) and event selection (`select`, everything under `select/`).
-- When a new stage is added it belongs here as commands, not as a separate script alongside kamui.
+- Two stages exist: sample processing (`submit`) and event selection (`select`).
+- When a new stage is added it belongs here as commands.
 
-The design principle the whole package serves is that the physics lives in configuration files and this code only executes what they say. When reviewing or extending anything here, that is the constraint to protect.
-
-
+The design principle the whole package serves is that the physics lives in configuration files and this code only executes what they say.
 ## Main Driver - cli.py
-- Every command lives in this one file. Adding one is two edits here: a `_cmdX` handler, and an `_addCmd(sub, ...)` block that points at it. Registration order is the order `--help` lists them, and it follows the root README's command table.
+- Every command lives in this one file. 
+  - Adding one is two edits here: a `_cmdX` handler, and an `_addCmd(sub, ...)` block that points at it. 
+  - Registration order is the order `--help` lists them, and it follows the root README's command table.
 - Keep it thin. It parses, calls a module, and prints. The actual behavior belongs in the modules so they can be imported without the CLI.
-- `check` on the sample catalog
-    - A newly added sample has no `dasEvents` recorded, which `check` treats as a problem rather than a warning, so it returns 1 until `./kamui norm --name <sample> --fromNano --write` clears it.
-    - It never asks whether a dataset exists or whether its path is spelled right. `./kamui query` does, and needs a proxy.
-- `main()` passes each `_cmdX` docstring to argparse as `description=`, so a command's docstring is its `--help` text. The root README's command table is the source of the one-line `help=` strings, and nothing enforces that the two agree.
-
-
 ## The Basics - foundations/
 - Nothing here may import from anywhere else in kamui.
 - `paths.py` is the only module allowed to know the repository layout. Anything else that hardcodes a directory name is a bug, and moving a directory should mean editing this file alone.
@@ -30,7 +24,7 @@ The design principle the whole package serves is that the physics lives in confi
 - Nothing outside this folder may open a config file.
     - `./kamui check` enforces it by scanning for `paths.*_DIR` and `paths.SITES_FILE` outside `configReaders/`.
     - This is why `loadSites` lives here, and why `_cmdCheck` calls `validateTriggers()` to reach the trigger directory.
-    - `select/normalization.py` is the one place that writes a config file, `config/crossSections/generatorSums.json`. It is measured data rather than hand-written physics, which is why it does not go through a reader.
+    - `select/normalization.py` is the one place that writes a config file, `config/normalizations/generatorSums.json`. It is measured data rather than hand-written physics, which is why it does not go through a reader.
 - `catalog.py` reads the sample configs and answers which samples a command means.
     - The `Sample` class is a dict subclass giving attribute access, `sample.name`.
     - `select` backs the five sample flags on every command that takes them, and they do not behave alike. `--family`, `--era` and `--tag` resolve case-insensitively against what exists and raise on a value matching nothing, naming every value that does exist; two spellings differing only in case are ambiguous and also raise. `--name` is exact and case-sensitive. `--match` is a plain glob with no check at all, so a pattern matching nothing leaves the selection empty and the command exits with "No samples matched the selection".
@@ -50,15 +44,14 @@ The design principle the whole package serves is that the physics lives in confi
 
 
 ## Talking to the Grid - grid/
-- `das.py` caches every answer on disk under `.dasCache/`, keyed by (instance, query, jsonOut). DAS is slow and its answers rarely change. `--refresh` bypasses it.
-    - `CACHE_MAX_AGE_DAYS` is the single definition of stale, shared by `query`, `cacheStats` and `pruneCache`. Reading and pruning have to agree on it or prune deletes entries still in use.
+- `das.py` caches every answer on disk under `.dasCache/`, keyed by (instance, query, jsonOut). 
+  - DAS is slow and its answers rarely change. `--refresh` bypasses it.
+   - `CACHE_MAX_AGE_DAYS` is the definition of stale, shared by `query`, `cacheStats` and `pruneCache`.
     - An entry past the limit is skipped on read but never removed, so the cache grows until something prunes it.
-    - `pruneCache` removes what `query` refuses: expired, unparseable, or result-less entries, aged by file mtime, the same clock `query` reads.
-    - Cache layout is known only to `das.py`; anything counting or measuring entries calls `cacheStats`.
-- It refuses to run without a valid proxy.
-- `fetch.py` copies whole files and skips anything already on EOS. Nothing in the production path uses it: `submit` streams from the grid instead.
-
-
+    - `pruneCache` can be used to remove stale entries
+- DAS answers a dataset name it does not know with a full summary record of zeros and null dates. 
+  - `datasetSummary` therefore decides a dataset exists from `max_ldate`
+- Need a valid proxy!
 ## Submitting Jobs - submit/
 - `prepare` writes the job area, `submit` only shells out. `--dryRun` runs the first and skips the second, so the files it leaves are the ones a real submission would use.
 - Re-using a task name prompts before overwriting, because the old area is the only local record of a submission that may still be running. Declining writes to `<task>_n`, and `prepare` returns the name it actually used, so the caller and the EOS output directory follow it. A non-interactive run never overwrites.
@@ -112,7 +105,7 @@ The design principle the whole package serves is that the physics lives in confi
     - The memory and disk requests are function arguments with no CLI flag. Add flags when a pass actually needs them.
 - `runOne.py` writes the cutflow next to the output as `<output>.cutflow.json`, and the run script copies both to EOS. Merging those per-job cutflows is not implemented, which is why `kamui cutflow` only works after a local pass.
 - `normalization.py`
-    - `complete` is set by comparing the measured event count against DAS, and `denominator` raises rather than returning a number when it is False. Anything normalizing must call `denominator`, not read `sumGenWeight` out of the file.
+    - Anything normalizing must call `denominator`, which returns `None` for a sample that has no recorded sum, rather than reading `sumGenWeight` out of the file and getting a `KeyError`.
     - `record` merges into the existing entry, so the DAS count recorded when a sample was added survives a later weight-sum measurement.
     - Files missing a `Runs` tree are skipped rather than counted as zero.
 

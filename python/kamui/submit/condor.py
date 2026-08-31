@@ -158,7 +158,7 @@ def submit(taskName, dryRun=False, base=None):
     d = taskDir(taskName, create=False)
     jdl = os.path.join(d, "submit.jdl")
     if dryRun:
-        print(f"  [dry-run] condor_submit {jdl}")
+        print(f"  [dryRun] condor_submit {jdl}")
         return 0
     r = runTool(["condor_submit", "submit.jdl"], cwd=d, capture_output=True, text=True)
     print(r.stdout.strip() or r.stderr.strip())
@@ -253,7 +253,7 @@ def resubmit(taskName, dryRun=False, sites=None, rows=None):
     jobListName = f"jobList.retry{n}.txt"
     if dryRun:
         # Writing nothing here keeps the retry number free, so a dry run does not push the real attempt to retry2.
-        print(f"  [dry-run] condor_submit submit.retry{n}.jdl   ({len(rows)} job(s), logs would go to {logDir})")
+        print(f"  [dryRun] condor_submit submit.retry{n}.jdl   ({len(rows)} job(s), logs would go to {logDir})")
         return n, len(rows), 0
 
     os.makedirs(os.path.join(d, logDir), exist_ok=True)

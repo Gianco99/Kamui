@@ -32,23 +32,50 @@ python/kamui/CLAUDE.md, the submit/ and helpers/ sections
 
 Next up
 -------
-The order commands are presented in follows the workflow, so a reader meets each one at the point they would actually need it. find comes first because it is the only command that ignores the catalog: everything else answers questions about samples already written down, while find asks DAS what exists.
+The order commands are presented in follows the workflow, so a reader meets each one at the point they would actually need it. Only find and cache work before a sample is registered. query, list and stage all select through the catalog, so they cannot be demonstrated until the sample exists in config/samples/. That fixes the order.
 
-1. find, query and cache
-   Review the code and the docs for the three commands used before a sample is registered. find searches DAS, query sizes up a candidate, cache matters when DAS answers go stale. stage belongs here too, as the optional step of pulling one file locally to look at it.
+1. find
+   Done 2026-08-29. Takes a raw DAS pattern and needs no catalog, so it comes first.
 2. Registration
    Done 2026-08-28. config/samples/ README and CLAUDE.md, the tutorial family, subdirectory loading.
-3. list
-   Done 2026-08-28, on the sample side. The list command's own documentation still needs reading against the code, since its output gained a column header today.
-4. Slides for all of the above.
-5. Restart the generator sums job, see below.
+3. query
+   Done 2026-08-29. Now reports "Not found in DAS" instead of zeros, and exits non-zero, which is what catches a bad dataset path pasted from find.
+4. list
+   Done 2026-08-31. Flags matched the docs, the first command in this sweep with no stale ones. Fixed a hardcoded plural that printed "1 samples", and a column-width fallback of 4 that did not match the "Sample" header. One README sentence still to correct, see below.
+5. stage and cache
+   Done 2026-08-31. Flags matched the docs on both. Fixed the [dry-run] label to [dryRun] in seven places across condor.py, crab.py, fetch.py and batch.py, and the file(s)/response(s) plurals.
+6. Collections and triggers
+   Done 2026-08-31. Removed extension, params and drop, none of which any config used and params was never wired to a producer. Moved dvDisplaced's overrides into the collection defaults, so jets is now era-specific (CHS for Run 2, PUPPI for Run 3) and the track preselection is a default. Verified by resolving all 9 (preset, era, isMC) combinations registered samples use against a rebuilt pre-edit tree: zero changed. Deleted both vetoes blocks from the trigger configs and loadTriggerVetoes, which had no callers. Condensed both CLAUDE.md files.
+7. Presets
+   Next up. The review is done and recorded below; the slide and the doc condensing are not.
+8. Selections
+   Not yet reviewed. Intended as the last slide of this section.
+9. Every markdown under config/content and config/triggers, once presets and selections are settled.
+10. Slides for all of the above.
+11. Generator sums are at 79/144. The 65 that remain are private phys03 productions with no central NanoAOD, tracked in a Git issue rather than here.
+12. One final pass over everything once the slides are done, running each command in order to confirm the repo still behaves the way the slides say it does. Functionality changes as the review goes, so this is the checkpoint that catches anything the changes broke.
+13. The README.md and CLAUDE.md sitting at the root of each big directory, done at the end once every command under them has been reviewed. That means the root of the repo, python/kamui/, config/, ntupleProduction/, ntupleSelection/, tools/ and docs/. Reviewing them earlier only means reviewing them twice, since the commands they summarize keep changing.
+14. Beta test: have someone who has not seen the repo follow the slides end to end.
+
+
+Presets, reviewed 2026-08-31, still to act on
+---------------------------------------------
+dvLepton includes dvDisplaced and overrides only skim.triggers, so the lepton channel inherits the displacement channel by name. A shared base both include would say what is actually true. Behavior is correct today.
+
+Trigger files get almost no validation. validateTriggers confirms only that the file parses and paths is non-empty. There is no unknown-key check, unlike collections and skim blocks, so a misspelled key passes check and does nothing.
 
 
 Unfinished work
 ---------------
 
-Generator sums are only partly filled
-  kamui norm --match '*' --fromNano --write was run in the background and stopped partway. Resume it with that same command; it skips nothing and rewrites entries it has already done. Progress is visible in the Generator sums line of kamui check.
+One wrong sentence in python/kamui/README.md, Picking samples
+  It says every command except list exits when nothing matched. On list an unknown --name, --tag or --family does still exit 1; only a --match that matches nothing is tolerated. Needs rewording to scope the exception to --match.
+
+Generator sums verification pass
+  Re-measuring all 79 already-measured entries and diffing against a snapshot, to catch any more entries written by the old measure() path. Roughly a third of the way through as of 2026-08-31, zero mismatches beyond the ZH one already fixed. Resume with scratchpad/verify.sh, which restarts from the top and is idempotent.
+
+Generator sums stop at 79/144
+  The 65 unfilled are stealthSusy2024 and rpv2024, all on prod/phys03, which have no central NanoAOD for norm to read. Filed as a Git issue. The fix is to read the Runs counters from our own ntuple output, which already writes them through genWeightsTable, and which are valid whenever the production covered the complete input file list.
 
 
 Known gaps, deliberately not closed
@@ -68,7 +95,7 @@ python/kamui/README.md and CLAUDE.md, everything except check
   The other twelve commands, and the module sections: foundations/, configReaders/, grid/, submit/, select/, helpers/.
 
 config/
-  README.md and CLAUDE.md for config/ itself, and for samples/, content/, triggers/, selections/, crossSections/.
+  README.md and CLAUDE.md for config/ itself, and for samples/, content/, triggers/, selections/, normalizations/.
 
 ntupleProduction/ and ntupleSelection/
   README.md and CLAUDE.md for both stages.

@@ -86,7 +86,6 @@ def buildTables(content):
             src=cms.InputTag(c["src"]),
             name=cms.string(name),
             doc=cms.string(c.get("doc", "")),
-            extension=cms.bool(c.get("extension", False)),
             skipNonExistingSrc=cms.bool(True),
             variables=cms.PSet(**{k: _var(v) for k, v in c["variables"].items()}),
         )

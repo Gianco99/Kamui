@@ -1,15 +1,14 @@
 # Sample Configs
 
-A sample family is defined by a JSON file which declares a set of datasets to process. `configReaders/catalog.py` reads every `.json` file in this directory, and in any subdirectory of it, into one big sample catalog.
-
+A sample family is defined by a JSON file which declares a set of datasets to process. 
 ## Fields
 | Field | Meaning |
 |---|---|
-| `name` | Short handle for the sample, unique across every family. It is also the per-sample output subdirectory on EOS and the CRAB output dataset tag, so it must start with a letter or digit and use only letters, digits, dot, dash and underscore. |
+| `name` | Short handle for the sample, unique across every family. It is also the per-sample output subdirectory on EOS and the CRAB output dataset tag. |
 | `dataset` | The full DAS dataset path. |
 | `dasInstance` | `prod/global` for central datasets (default), `prod/phys03` for USER-created ones. |
 | `isMC` | True for simulation (default), false for data. |
-| `era` | `Summer24`, `2018`, `2016APV`, etc.. Picks the content set the sample resolves against and the selection thresholds it is cut with. |
+| `era` | `Summer24`, `2018`, `2016APV`, etc.. Picks the content set the sample resolves against and the selection thresholds it is cut with. Required, no default! |
 | `family` | The file the sample came from. Filled in automatically. |
 | `content` | The content preset defining the branches to write, e.g. `dvSignal`. Defaults to `dvBase`. |
 | `tags` | Free-form labels, used for selection. Defaults to empty. |
@@ -50,6 +49,12 @@ Keys beginning with an underscore are comments and are stripped at every level o
 | `rpv2024.json` | 1 | Summer24 RPV stop->dd. One private point, `dvSignal`. |
 | `run2Validation.json` | 24 | Run 2 UL points for reproducing JMTucker results. `dvDisplaced`and `dvLepton`. |
 | `tutorial/zhLeptonTriggered.json` | 1 | The single sample followed end to end in the tutorial slides. `dvLepton`. |
-## Querying the Sample Catalog
 
-`./kamui list` allows the user to select samples registed here. The flags and worked examples are in Kamui/python/kamui/README.md.
+## Relevant Commands
+
+- Use `find` to get a dataset path from DAS before writing it here.
+- Use `list` to confirm a family expanded into the samples you expected, with the era, content preset and tags you meant.
+- Use `query` to ask DAS how many files, events and GB each registered sample holds. 
+- Use `stage` to copy MiniAOD files to EOS when you want to open one by hand.
+
+See Kamui/python/kamui/README.md for the flags and worked examples.

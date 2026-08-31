@@ -68,15 +68,16 @@ def _cmdList(args):
     for s in sel:
         fams.setdefault(s.get("family", "?"), []).append(s)
     ## Widths from the data, so a long preset name does not push the tags out of line
-    wName = max([len(s["name"]) for s in sel] + [4])
+    wName = max([len(s["name"]) for s in sel] + [6])
     wEra = max([len(s.get("era", "-")) for s in sel] + [3])
     wContent = max([len(s["content"]) for s in sel] + [7])
     for fam in sorted(fams):
-        print(f"\n{fam}  ({len(fams[fam])} samples)")
+        n = len(fams[fam])
+        print(f"\n{fam}  ({n} sample{'' if n == 1 else 's'})")
         print(f"  {'Sample':<{wName}}  {'Era':<{wEra}}  {'Content':<{wContent}}  Tags")
         for s in sorted(fams[fam], key=lambda x: x["name"]):
             print(f"  {s['name']:<{wName}}  {s.get('era','-'):<{wEra}}  {s['content']:<{wContent}}  {','.join(s['tags'])}")
-    print(f"\n{len(sel)} sample(s) total")
+    print(f"\n{len(sel)} sample{'' if len(sel) == 1 else 's'} total")
 
 
 def _cmdContent(args):
@@ -89,7 +90,8 @@ def _cmdContent(args):
     print(f"{args.preset}  (isMC={not args.data})")
     print(summarize(resolved))
     nvar = sum(len(c.get("variables", c.get("extVariables", {}))) for c in resolved["collections"].values())
-    print(f"\n  {len(resolved['collections'])} collections, {nvar} variables")
+    ncol = len(resolved["collections"])
+    print(f"\n  {ncol} collection{'' if ncol == 1 else 's'}, {nvar} variable{'' if nvar == 1 else 's'}")
     if resolved["skim"]:
         print(f"  skim: {resolved['skim']}")
     if args.write:
@@ -102,13 +104,25 @@ def _cmdQuery(args):
     """Ask DAS how many files, events and GB each selected sample holds. Needs cmsenv and a grid proxy."""
     sel = _pick(args)
     totF = totE = totS = 0
-    w = max([len(s["name"]) for s in sel] + [len("TOTAL")])
-    print(f"{'sample':<{w}} {'files':>7} {'events':>12} {'size/GB':>9}")
+    w = max([len(s["name"]) for s in sel] + [len("Sample")])
+    print(f"{'Sample':<{w}} {'Files':>7} {'Events':>12} {'Size/GB':>9}")
+    missing = []
     for s in sel:
         info = das.datasetSummary(s["dataset"], s["dasInstance"], refresh=args.refresh)
+        ## DAS answering with nothing means it does not know the name, which usually means a
+        ## typo in the config. Printing zeros there would read as a dataset that is merely empty.
+        if not info["found"]:
+            print(f"{s['name']:<{w}} {'-':>7} {'-':>12} {'-':>9}   Not found in DAS")
+            missing.append(s["name"])
+            continue
         print(f"{s['name']:<{w}} {info['nfiles']:>7} {info['nevents']:>12,} {info['sizeGB']:>9.1f}")
         totF += info["nfiles"]; totE += info["nevents"]; totS += info["sizeGB"]
     print(f"{'TOTAL':<{w}} {totF:>7} {totE:>12,} {totS:>9.1f}")
+    if missing:
+        shown = ", ".join(missing[:5]) + (", ..." if len(missing) > 5 else "")
+        print(f"\n{len(missing)} sample{'' if len(missing) == 1 else 's'} not found in DAS under the instance they name: {shown}")
+        return 1
+    return 0
 
 
 def _cmdFind(args):
@@ -212,7 +226,7 @@ def _cmdSelect(args):
 
 
 def _cmdNorm(args):
-    """Report a sample's generator weight sum. Only meaningful for MC, so data samples are skipped."""
+    """Record the generator weight sum every yield is divided by. MC only, since data has no generator weights."""
     sel = _pick(args)
     data = [s["name"] for s in sel if not s.get("isMC")]
     sel = [s for s in sel if s.get("isMC")]
@@ -221,68 +235,23 @@ def _cmdNorm(args):
     if not sel:
         sys.exit("No MC samples matched the selection")
 
-    ## What a sample is worth after cuts, which is never the denominator and so is never stored.
-    if args.processed:
-        if not args.inputTask:
-            sys.exit("--processed needs --inputTask, naming the task whose output to sum")
-        for s in sel:
-            inputs = selectBackend.findInputs(args.inputTask, s["name"], args.inputBase)
-            if not inputs:
-                print(f"  {s['name']:<44} No ntuples found in task '{args.inputTask}'")
-                continue
-            got = normalization.measureProcessed(inputs)
-            stored = normalization.loadSums().get(s["name"], {}).get("sumGenWeight")
-            share = f"   {100 * got['sumWeight'] / stored:.2f}% of the generator sum" if stored else ""
-            print(f"  {s['name']:<44} {got['nEvents']:>10,} events   sumw {got['sumWeight']:.6g}{share}")
-        return 0
-
-    ## The denominator comes from central NanoAOD, which is unskimmed and independent of
-    ## anything we produced. DAS itself cannot serve it: the weight sum is a property of the
-    ## event payload, so it is recorded nowhere central except inside the files.
-    if args.fromNano:
-        for s in sel:
-            nano = das.nanoSibling(s["dataset"], s["dasInstance"], refresh=args.refresh)
-            if not nano:
-                print(f"  {s['name']:<44} No central NanoAOD sibling found")
-                continue
-            try:
-                measured = normalization.measureFromNano(das.listFiles(nano, s["dasInstance"], refresh=args.refresh))
-            except (RuntimeError, das.DasError) as e:
-                print(f"  {s['name']:<44} {e}")
-                continue
-            entry = normalization.record(s["name"], measured, measured["nEvents"], write=args.write,
-                                         source=f"central NanoAOD {nano}")
-            print(f"  {s['name']:<44} {entry['nEvents']:>10,} events   sumw {entry['sumGenWeight']:.6g}")
-        if not args.write:
-            print("  Nothing written. Pass --write to store these in config/crossSections/generatorSums.json")
-        return 0
-
+    ## The sums come from the sample's central NanoAOD, which covers the whole dataset and owes
+    ## nothing to anything we produced. DAS cannot serve them: a weight sum is a property of the
+    ## event payload, so it is recorded nowhere central except inside the files themselves.
     for s in sel:
-        dasEvents = None
-        if not args.noDas:
-            try:
-                dasEvents = das.datasetSummary(s["dataset"], s["dasInstance"])["nevents"]
-            except das.DasError as e:
-                print(f"  Warning: could not ask DAS for {s['name']}: {e}")
-
-        measured = None
-        if args.inputTask:
-            inputs = selectBackend.findInputs(args.inputTask, s["name"], args.inputBase)
-            if inputs:
-                measured = normalization.measure(inputs)
-            else:
-                print(f"  {s['name']:<44} No ntuples found in task '{args.inputTask}'")
-
-        entry = normalization.record(s["name"], measured, dasEvents, write=args.write,
-                                     source=f"production task '{args.inputTask}'" if args.inputTask else "DAS")
-        shown = f"{entry.get('dasEvents', 0):>10,} in DAS" if entry.get("dasEvents") else "  DAS unknown"
-        if "sumGenWeight" in entry:
-            flag = "" if entry.get("complete") is not False else "   INCOMPLETE, do not normalize with this"
-            print(f"  {s['name']:<44} {shown}   Measured {entry['nEvents']:,}   sumw {entry['sumGenWeight']:.6g}{flag}")
-        else:
-            print(f"  {s['name']:<44} {shown}   Sum of generator weights not measured yet")
+        nano = das.nanoSibling(s["dataset"], s["dasInstance"], refresh=args.refresh)
+        if not nano:
+            print(f"  {s['name']:<44} No central NanoAOD sibling found")
+            continue
+        try:
+            measured = normalization.measureFromNano(das.listFiles(nano, s["dasInstance"], refresh=args.refresh))
+        except (RuntimeError, das.DasError) as e:
+            print(f"  {s['name']:<44} {e}")
+            continue
+        entry = normalization.record(s["name"], measured, measured["genEvents"], write=args.write)
+        print(f"  {s['name']:<44} {entry['genEvents']:>10,} events   sumw {entry['sumGenWeight']:.6g}")
     if not args.write:
-        print("  Nothing written. Pass --write to store these in config/crossSections/generatorSums.json")
+        print("  Nothing written. Pass --write to store these in config/normalizations/generatorSums.json")
     return 0
 
 
@@ -480,9 +449,9 @@ def _cmdCheck(args):
     note("Config access", "pass" if not accessProblems else "fail", "configReaders/ is the only folder containing config access scripts")
 
     ## A sample cannot be normalized without its full-dataset generator sum
-    noDas, noSumw = normalization.missingSums([s["name"] for s in cat])
-    if noDas:
-        problems.append(f"{len(noDas)} sample(s) have no DAS event count recorded; run 'kamui norm --fromNano --write' for them. First few: {noDas[:3]}")
+    noCount, noSumw = normalization.missingSums([s["name"] for s in cat])
+    if noCount:
+        problems.append(f"{len(noCount)} sample(s) have no generated event count recorded; run 'kamui norm --write' for them. First few: {noCount[:3]}")
     note("Generator sums", "pass" if not noSumw else "warn", f"Samples that know their total generator weight ({len(cat) - len(noSumw)}/{len(cat)})")
 
     sites = loadSites()
@@ -517,7 +486,7 @@ def _cmdCache(args):
     if args.prune:
         print(f"Pruned {das.pruneCache()} expired entry(s)")
     st = das.cacheStats()
-    print(f"{st['n']} cached DAS response(s), {st['bytes'] / 1e6:.1f} MB in {st['dir']}")
+    print(f"{st['n']} cached DAS response{'' if st['n'] == 1 else 's'}, {st['bytes'] / 1e6:.1f} MB in {st['dir']}")
     if st["n"] and st["newestDays"] is not None:
         print(f"  age      {st['newestDays']:.1f} to {st['oldestDays']:.1f} days")
         print(f"  expired  {st['nStale']} (older than {das.CACHE_MAX_AGE_DAYS} days, ignored on read)")
@@ -638,12 +607,7 @@ def main(argv=None):
 
     q = _addCmd(sub, "norm", help="Measure and store weights for normalization", description=_cmdNorm.__doc__)
     _addSelection(q)
-    q.add_argument("--inputTask", help="A complete production task to measure the generator weight sum over")
-    q.add_argument("--fromNano", action="store_true", help="Take the generator sums from the sample's central NanoAOD, which needs no production of our own")
-    q.add_argument("--processed", action="store_true", help="Sum the weights surviving that task's processing, for comparison; never stored")
-    q.add_argument("--write", action="store_true", help="Store the generator sums in config/crossSections/generatorSums.json")
-    q.add_argument("--inputBase", help="EOS base holding the ntuples (default: the site stageout base)")
-    q.add_argument("--noDas", action="store_true", help="Skip the DAS cross-check of the event count")
+    q.add_argument("--write", action="store_true", help="Store the sums in config/normalizations/generatorSums.json")
     q.add_argument("--refresh", action="store_true", help="Bypass the DAS cache")
     q.set_defaults(func=_cmdNorm)
 

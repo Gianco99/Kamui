@@ -35,4 +35,4 @@ Because thresholds and trigger lists differ by year, `_cmdSelect` resolves one s
 
 ## Normalization
 
-`normalization.py` sits in this stage but writes into `config/crossSections/generatorSums.json`, because the sums belong to the dataset as DAS defines it, whatever subset a job happened to read. `record` compares the measured event count with the DAS one and stores `complete`; `denominator` raises on an entry marked incomplete, since a partial sum inflates every yield built on it. Measure over a full production, never over a capped file list.
+`normalization.py` sits in this stage but writes into `config/normalizations/generatorSums.json`, because the sums belong to the dataset as generated, whatever subset a job happened to read. They are therefore never measured from our own output: `norm` asks DAS for the central NanoAOD file list and reads the `Runs` counters from those files over xrootd. An unreadable file raises, since a short sum inflates every yield built on it.

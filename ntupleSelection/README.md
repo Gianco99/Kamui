@@ -22,7 +22,7 @@ That reads every ntuple the production task `run2Val` wrote for the samples tagg
 | `--backend` | `local` (default) or `condor`. |
 | `--cutflow` | Also write one ntuple per cut beside the output, named after the cut. Local only. |
 | `--filesPerJob` | Input files per condor job. Five when not given. |
-| `--dry-run` | Build the condor job area and submit nothing. |
+| `--dryRun` | Build the condor job area and submit nothing. |
 
 Which samples are processed comes from the same five flags every sample command takes: `--name` (repeatable, exact), `--family`, `--era`, `--tag`, `--match`. A task name may use letters, digits, dot, dash and underscore, up to 96 characters, since it becomes a directory, an EOS path component and a shell word.
 
@@ -36,7 +36,7 @@ A selection is one JSON file in `config/selections/`. It lists the eras it appli
 
 The local backend runs in the calling process and is a matter of seconds for a small pass. It reads every input file for a sample into memory at once, so it suits a handful of files per sample.
 
-The condor backend writes a complete job area under `jobs/<task>/` and then submits it. The area holds `submit.jdl`, `jobList.txt` (one row of `sample,index,script`), `fileLists.json` (the input files each job reads), one `selection_<era>.json`, one `runSelect_<selection>_<era>.sh` per era, `kamuiPackage.tar.gz` with the framework in it, `task.json` recording what was submitted, and `logs/`. Each job sets up CMSSW from cvmfs, unpacks the framework, runs the selection over its share of the input files, and copies the result to EOS. `--dry-run` leaves the whole area on disk with nothing submitted, which is the way to read the exact configuration a job would use.
+The condor backend writes a complete job area under `jobs/<task>/` and then submits it. The area holds `submit.jdl`, `jobList.txt` (one row of `sample,index,script`), `fileLists.json` (the input files each job reads), one `selection_<era>.json`, one `runSelect_<selection>_<era>.sh` per era, `kamuiPackage.tar.gz` with the framework in it, `task.json` recording what was submitted, and `logs/`. Each job sets up CMSSW from cvmfs, unpacks the framework, runs the selection over its share of the input files, and copies the result to EOS. `--dryRun` leaves the whole area on disk with nothing submitted, which is the way to read the exact configuration a job would use.
 
 ## Where output lands
 
@@ -65,4 +65,4 @@ Output has the same branch structure as input, including the per-collection coun
 
 ## Generator sums
 
-`./kamui norm` lives with this stage. It sums the run-level generator counters over a complete production and stores them in `config/crossSections/generatorSums.json`, which is the denominator any yield computed from selected ntuples is normalized by. It records the DAS event count alongside the measured one and marks an entry incomplete when the two disagree, which blocks its use as a denominator.
+`./kamui norm` lives with this stage. It stores the generator sums in `config/normalizations/generatorSums.json`, which is the denominator any yield computed from selected ntuples is normalized by. The sums describe the dataset as generated, so they are read from the sample's central NanoAOD rather than from anything we produced.

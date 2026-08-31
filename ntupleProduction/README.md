@@ -28,7 +28,7 @@ voms-proxy-init --rfc --voms cms -valid 192:00
 ## Submitting
 
 ```
-./kamui submit --tag signal --task run3Signal --backend condor --dry-run
+./kamui submit --tag signal --task run3Signal --backend condor --dryRun
 ./kamui submit --tag signal --task run3Signal --backend condor
 ```
 
@@ -46,9 +46,9 @@ Pick samples with the usual five flags, `--name` (repeatable), `--family`, `--er
 | `--outputBase` | EOS base to write under, overriding the site default. |
 | `--refresh` | Bypass the DAS cache. |
 | `--yes` | Overwrite an existing job area without asking. |
-| `--dry-run` | Write the whole job area, submit nothing. |
+| `--dryRun` | Write the whole job area, submit nothing. |
 
-Both backends write the job area to disk first and submit second, so a `--dry-run` leaves you the exact files that would have run.
+Both backends write the job area to disk first and submit second, so a `--dryRun` leaves you the exact files that would have run.
 
 Reusing a task name asks before it overwrites, and answering no writes to `<task>_2`. A task area holding a CRAB work area or a recorded condor cluster is never overwritten, because its jobs may still be running.
 
@@ -100,7 +100,7 @@ It reads the job area, works out which backend produced it, and asks that backen
 ## Resubmitting
 
 ```
-./kamui resubmit --task run3Signal --dry-run
+./kamui resubmit --task run3Signal --dryRun
 ./kamui resubmit --task run3Signal
 ```
 
@@ -115,7 +115,7 @@ missing  2 job(s):
 
 The retry reuses the task area untouched, so the same run scripts, the same resolved content and the same EOS destination apply and the retried files land beside the ones that already succeeded. What is new is `jobList.retryN.txt`, `submit.retryN.jdl` and `logs/retryN/`, so the first attempt's logs survive for as long as you want to read them. `N` counts up from 1 over whatever the task has used before. The retry is appended to `task.json` under `retries`, and `status` prints one line per retry.
 
-A `--dry-run` reports what would go and writes nothing, leaving the retry number free for the real attempt.
+A `--dryRun` reports what would go and writes nothing, leaving the retry number free for the real attempt.
 
 Jobs still on the queue have not failed, and rerunning one would write the same output filename twice, so `resubmit` stops when it finds any of the task's jobs still queued or running. `--yes` overrides that.
 

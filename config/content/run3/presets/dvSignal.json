@@ -1,5 +1,5 @@
 {
-  "_doc": "Adds generator information to dvBase. The convention for MC families.",
+  "_doc": "Adds generator information to dvBase.",
   "include": [
     "dvBase",
     "gen"

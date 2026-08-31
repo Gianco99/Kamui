@@ -8,7 +8,7 @@ Everything the framework reads is here. A subdirectory per subject, each with it
 | `content/` | Which quantities to write out: collections describing one kind of object, presets combining them into a production. Split into `run2/` and `run3/`. See `content/README.md`. |
 | `triggers/` | Which HLT paths define a channel. See `triggers/README.md`. |
 | `selections/` | The ordered event-level cuts `./kamui select` applies to production ntuples. See `selections/README.md`. |
-| `crossSections/` | Cross sections and the per-sample generator sums a yield is normalized by. See `crossSections/README.md`. |
+| `normalizations/` | Cross sections and the per-sample generator sums a yield is normalized by. See `normalizations/README.md`. |
 | `sites.json` | Storage paths, redirectors, CRAB site, CMSSW release. |
 | `lumi.json` | Integrated luminosity per era and per channel. |
 
@@ -33,7 +33,7 @@ The CMSSW version is pinned on purpose. Bumping it here is a one-line change and
 
 ## lumi.json
 
-Integrated luminosity in inverse picobarns, and the record of where each number came from. It is the `lumi` term of the yield formula written out in `crossSections/README.md`.
+Integrated luminosity in inverse picobarns, and the record of where each number came from. It is the `lumi` term of the yield formula written out in `normalizations/README.md`.
 
 `eras` is keyed by CMS MC campaign name and covers `2016APV`, `2016`, `2017`, `2018`, `Summer22`, `Summer22EE`, `Summer23`, `Summer23BPix` and `Summer24`. Each entry carries a `lumi` and a `source` naming the golden JSON and normtag the value was integrated over, so a number can be re-derived when either changes.
 

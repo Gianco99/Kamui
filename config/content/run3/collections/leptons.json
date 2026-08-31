@@ -1,5 +1,5 @@
 {
-  "_doc": "Muons and electrons, with impact parameters for the displaced-lepton channel.",
+  "_doc": "Leptons for Run 3.",
   "collections": {
     "Muon": {
       "type": "patMuon",

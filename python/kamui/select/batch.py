@@ -115,7 +115,7 @@ def submit(taskName, dryRun=False):
     """Run condor_submit on a selection job area."""
     d = taskDir(taskName, create=False)
     if dryRun:
-        print("  [dry-run] condor_submit %s" % os.path.join(d, "submit.jdl"))
+        print("  [dryRun] condor_submit %s" % os.path.join(d, "submit.jdl"))
         return 0
     r = runTool(["condor_submit", "submit.jdl"], cwd=d, capture_output=True, text=True)
     print(r.stdout.strip() or r.stderr.strip())

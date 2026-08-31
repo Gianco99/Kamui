@@ -12,15 +12,6 @@
     "HLT_IsoMu24_v*",
     "HLT_Mu50_v*"
   ],
-  "vetoes": [
-    {
-      "_doc": "Orthogonality to EXO-19-013, the published high-HT DV search.",
-      "paths": [
-        "HLT_PFHT1050_v*"
-      ],
-      "offline": "HT of jets with pT > 40 GeV must exceed 1200 GeV (from the AN)"
-    }
-  ],
   "_pathsByEra": {
     "_doc": "Which paths belong to which era's menu. Bookkeeping only.",
     "2016": [
