@@ -43,47 +43,43 @@ A `global` collection is different: it has no `src`, no `cut` and no `maxLen`, a
 
 ## Presets
 
-A preset is what you name when you submit.
+A preset is defines the collections you want to save in your output ntuples.
 
 | Field | Meaning |
 |---|---|
-| `include` | Other configs to build on, collections or presets |
+| `include` | Other collection or prest configs to build on |
 | `collections` | Optional. Overrides anything the includes brought in |
-| `skim` | Optional. `triggers` names a file in `config/triggers/`, and only events firing it are kept. `mode` and `process` override that file |
+| `skim` | Optional. `triggers` names a file in `config/triggers/`, and only events firing it are kept. |
 
 Most presets are only an include list.
 
 ## What Is Here Now
 
-Collections, in both era sets:
+Collections. Every one exists in both era sets, and `jets` and `leptons` differ between them.
 
 | Name | Holds |
 |---|---|
-| `core` | Primary vertices, beamspot, PF and PUPPI MET, rho, and the trigger bits |
-| `jets` | AK4 jets, CHS for Run 2 and PUPPI for Run 3, plus uncorrected calo jets for the displaced-dijet trigger emulation |
-| `leptons` | Muons and electrons, with impact parameters and track reference points |
+| `core` | PVs, beamspot, PF and PUPPI MET, rho, and the trigger bits |
+| `jets` | AK4 jets, CHS for Run 2 and PUPPI for Run 3, plus uncorrected calo jets |
+| `leptons` | Muons and electrons, with impact parameters and track reference points. Electron IDs are Fall17-94X-V2 for Run 2 and RunIIIWinter22-V1 for Run 3 |
 | `vertices` | IVF secondary vertices from MiniAOD |
-| `tracks` | Tracks and lost tracks, preselected to pT > 1 GeV with at least 2 pixel and 6 strip layers. Much the largest table |
+| `tracks` | Tracks and lost tracks, preselected to pT > 1 GeV with at least 2 pixel and 6 strip layers |
 | `gen` | Generator particles, generator MET, weights and pileup. All `mcOnly` |
 
 Presets:
 
 | Name | Era sets | What it is |
 |---|---|---|
-| `dvBase` | run2, run3 | `core`, `jets`, `leptons`, `vertices`. Use for data |
+| `dvBase` | run2, run3 | `core`, `jets`, `leptons`, `vertices`.  |
 | `dvSignal` | run2, run3 | `dvBase` plus `gen`. The convention for MC families |
-| `dvFull` | run2, run3 | `dvSignal` plus `tracks`. Needed for offline vertexing, and much larger |
+| `dvFull` | run2, run3 | `dvSignal` plus `tracks`.r |
 | `dvDisplaced` | run2 | `dvFull` skimmed to the displacement-triggered channel |
-| `dvLepton` | run2 | `dvDisplaced` skimmed to the lepton-triggered channel |
+| `dvLepton` | run2 | `dvFull` skimmed to the lepton-triggered channel |
 
 ## Relevant Commands
 
-- Use `content` to see what a preset resolves to. `--era` defaults to Summer24, so a Run 2 preset needs `--era 2018`.
-- Use `content <name> --data` to check the same preset resolves for data.
-- Use `content <name> --write out.json` to emit the resolved form a job receives.
+- Use `content` to see what a preset or collection resolves to.
 - Use `stage` to copy MiniAOD files to EOS when you want to open one by hand.
 - Run `check` after editing anything here.
-
-A collection name works anywhere a preset name does.
 
 See Kamui/python/kamui/README.md for the flags and worked examples.

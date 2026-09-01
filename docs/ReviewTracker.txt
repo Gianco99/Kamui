@@ -47,21 +47,27 @@ The order commands are presented in follows the workflow, so a reader meets each
 6. Collections and triggers
    Done 2026-08-31. Removed extension, params and drop, none of which any config used and params was never wired to a producer. Moved dvDisplaced's overrides into the collection defaults, so jets is now era-specific (CHS for Run 2, PUPPI for Run 3) and the track preselection is a default. Verified by resolving all 9 (preset, era, isMC) combinations registered samples use against a rebuilt pre-edit tree: zero changed. Deleted both vetoes blocks from the trigger configs and loadTriggerVetoes, which had no callers. Condensed both CLAUDE.md files.
 7. Presets
-   Next up. The review is done and recorded below; the slide and the doc condensing are not.
-8. Selections
-   Not yet reviewed. Intended as the last slide of this section.
-9. Every markdown under config/content and config/triggers, once presets and selections are settled.
-10. Slides for all of the above.
-11. Generator sums are at 79/144. The 65 that remain are private phys03 productions with no central NanoAOD, tracked in a Git issue rather than here.
-12. One final pass over everything once the slides are done, running each command in order to confirm the repo still behaves the way the slides say it does. Functionality changes as the review goes, so this is the checkpoint that catches anything the changes broke.
-13. The README.md and CLAUDE.md sitting at the root of each big directory, done at the end once every command under them has been reviewed. That means the root of the repo, python/kamui/, config/, ntupleProduction/, ntupleSelection/, tools/ and docs/. Reviewing them earlier only means reviewing them twice, since the commands they summarize keep changing.
-14. Beta test: have someone who has not seen the repo follow the slides end to end.
+   Done 2026-09-01. dvLepton now includes dvFull directly instead of descending from dvDisplaced, verified a no-op twice. Slide made.
+8. The content command
+   Done 2026-09-01. Flags matched the docs. Formatted the raw dict the skim line was printing, added column headers to the table, fixed the collections/variables plurals. Slide made.
+
+   That closes the Defining Our Ntuples section: collections, triggers, presets, content.
+
+9. Submitting jobs
+   Next up, and nothing here is reviewed. Commands submit, status and resubmit; config/sites.json; ntupleProduction/ README.md and CLAUDE.md, which keep their pair because cmssw/ holds real code. This section has to run before the selection section can be demonstrated, since there is currently no ntuple on disk that the present configs can read.
+
+10. Applying selections
+   The configs are reviewed as of 2026-09-01, the slides are not. Covers config/selections/, select and cutflow together, demonstrated against the ntuples the submission section produces. Held back from the ntuple section deliberately: a cutflow shown abstractly is a schema walkthrough, shown against real output it is the result.
+
+11. Every markdown under config/content and config/triggers, once the above are settled.
+12. Generator sums are at 79/144. The 65 that remain are private phys03 productions with no central NanoAOD, tracked in a Git issue rather than here.
+13. One final pass over everything once the slides are done, running each command in order to confirm the repo still behaves the way the slides say it does. Functionality changes as the review goes, so this is the checkpoint that catches anything the changes broke.
+14. The README.md and CLAUDE.md sitting at the root of each big directory, done at the end once every command under them has been reviewed. That means the root of the repo, python/kamui/, config/, ntupleProduction/, tools/ and docs/. ntupleSelection/ no longer has a pair; its docs were folded into python/kamui/ on 2026-09-01, since the directory holds no code. Reviewing them earlier only means reviewing them twice, since the commands they summarize keep changing.
+15. Beta test: have someone who has not seen the repo follow the slides end to end.
 
 
 Presets, reviewed 2026-08-31, still to act on
 ---------------------------------------------
-dvLepton includes dvDisplaced and overrides only skim.triggers, so the lepton channel inherits the displacement channel by name. A shared base both include would say what is actually true. Behavior is correct today.
-
 Trigger files get almost no validation. validateTriggers confirms only that the file parses and paths is non-empty. There is no unknown-key check, unlike collections and skim blocks, so a misspelled key passes check and does nothing.
 
 
@@ -97,8 +103,8 @@ python/kamui/README.md and CLAUDE.md, everything except check
 config/
   README.md and CLAUDE.md for config/ itself, and for samples/, content/, triggers/, selections/, normalizations/.
 
-ntupleProduction/ and ntupleSelection/
-  README.md and CLAUDE.md for both stages.
+ntupleProduction/
+  README.md and CLAUDE.md. It keeps its pair because cmssw/ holds real code.
 
 tools/ and docs/
   README.md and CLAUDE.md.

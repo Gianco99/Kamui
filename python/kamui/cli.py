@@ -92,8 +92,11 @@ def _cmdContent(args):
     nvar = sum(len(c.get("variables", c.get("extVariables", {}))) for c in resolved["collections"].values())
     ncol = len(resolved["collections"])
     print(f"\n  {ncol} collection{'' if ncol == 1 else 's'}, {nvar} variable{'' if nvar == 1 else 's'}")
-    if resolved["skim"]:
-        print(f"  skim: {resolved['skim']}")
+    skim = resolved["skim"]
+    if skim:
+        npath = len(skim.get("hltPaths", []))
+        print(f"  skim: {skim['triggers']} ({npath} path{'' if npath == 1 else 's'}, "
+              f"mode {skim.get('mode', 'any')}, process {skim.get('process', 'HLT')})")
     if args.write:
         with open(args.write, "w") as f:
             json.dump(resolved, f, indent=2)
@@ -211,8 +214,8 @@ def _cmdSelect(args):
             outDir = os.path.join(paths.SELECTION_DIR, "out", args.task, s["name"])
             flow = applySelection(fileLists[s["name"]], resolvedSelections[s["era"]],
                                   os.path.join(outDir, f"{s['name']}_selected.root"))
-            flows[s["name"]] = flow
-            print(f"  {s['name']:<44} {flow[0]['kept']:>8,} -> {flow[-1]['kept']:>8,}  ({100 * flow[-1]['cumulative']:.1f}%)")
+            flows[s["name"]] = selectBackend.withGenerated(flow, normalization.generatedEvents(s["name"]))
+            print(f"  {s['name']:<44} {flow[0]['kept']:>8,} -> {flow[-1]['kept']:>8,}  ({100 * flow[-1]['kept'] / flow[0]['kept'] if flow[0]['kept'] else 0:.1f}%)")
         selectBackend.writeCutflow(paths.SELECTION_DIR, args.task, args.selection, flows)
         print(f"  cutflow written under {os.path.join(paths.SELECTION_DIR, 'out', args.task)}")
         return

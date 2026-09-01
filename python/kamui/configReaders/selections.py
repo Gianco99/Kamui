@@ -23,7 +23,7 @@ CUT_FIELDS = {"name", "type", "triggers", "quantity", "min", "max", "conditions"
 CONDITION_FIELDS = {"quantity", "min", "max"}
 
 ## Every key one per-object requirement may carry
-REQUIREMENT_FIELDS = {"variable", "min", "max", "absMin", "absMax"}
+REQUIREMENT_FIELDS = {"variable", "min", "max", "absMin", "absMax", "anyOf"}
 
 ## Every key one pair requirement may carry. A pair requirement is about two objects at once,
 ## which no per-object requirement can express: |eta_i - eta_j| < 1.6 is the case that needs it.
@@ -168,6 +168,36 @@ def _resolveCut(name, cut, era, i):
     return out
 
 
+def _resolveRequirement(selName, cutName, req, era):
+    """One per-object requirement, or an 'anyOf' of requirement groups ORed per object."""
+    bad = sorted(set(req) - REQUIREMENT_FIELDS)
+    if bad:
+        raise ValueError(f"selection '{selName}': cut '{cutName}' has a requirement with unknown key(s) {bad}; valid keys are {sorted(REQUIREMENT_FIELDS)}")
+
+    if "anyOf" in req:
+        ## Regions of one collection: an object satisfies any one group. This is what lets a
+        ## bound depend on where the object is without duplicating the whole leg.
+        if len(req) != 1:
+            raise ValueError(f"selection '{selName}': cut '{cutName}' has a requirement mixing 'anyOf' with {sorted(set(req) - {'anyOf'})}")
+        groups = req["anyOf"]
+        if not isinstance(groups, list) or len(groups) < 2:
+            raise ValueError(f"selection '{selName}': cut '{cutName}' has a requirement 'anyOf' that is not a list of at least two groups")
+        for g in groups:
+            if not isinstance(g, list) or not g:
+                raise ValueError(f"selection '{selName}': cut '{cutName}' has an 'anyOf' group that is not a non-empty list")
+        return {"anyOf": [[_resolveRequirement(selName, cutName, r, era) for r in g] for g in groups]}
+
+    if "variable" not in req:
+        raise ValueError(f"selection '{selName}': cut '{cutName}' has a requirement with no 'variable'")
+    resolved = {"variable": req["variable"]}
+    for bound in ("min", "max", "absMin", "absMax"):
+        if bound in req:
+            resolved[bound] = _resolveThreshold(selName, cutName, bound, req[bound], era)
+    if len(resolved) == 1:
+        raise ValueError(f"selection '{selName}': cut '{cutName}' requirement on '{req['variable']}' has no bound")
+    return resolved
+
+
 def _resolveLeg(selName, cutName, leg, era):
     """One leg of an object cut: how many objects of a collection must satisfy every requirement."""
     bad = sorted(set(leg) - LEG_FIELDS)
@@ -178,20 +208,7 @@ def _resolveLeg(selName, cutName, leg, era):
     if not leg.get("requirements"):
         raise ValueError(f"selection '{selName}': cut '{cutName}' leg on '{leg['collection']}' has no requirements")
 
-    reqs = []
-    for req in leg["requirements"]:
-        bad = sorted(set(req) - REQUIREMENT_FIELDS)
-        if bad:
-            raise ValueError(f"selection '{selName}': cut '{cutName}' has a requirement with unknown key(s) {bad}; valid keys are {sorted(REQUIREMENT_FIELDS)}")
-        if "variable" not in req:
-            raise ValueError(f"selection '{selName}': cut '{cutName}' has a requirement with no 'variable'")
-        resolved = {"variable": req["variable"]}
-        for bound in ("min", "max", "absMin", "absMax"):
-            if bound in req:
-                resolved[bound] = _resolveThreshold(selName, cutName, bound, req[bound], era)
-        if len(resolved) == 1:
-            raise ValueError(f"selection '{selName}': cut '{cutName}' requirement on '{req['variable']}' has no bound")
-        reqs.append(resolved)
+    reqs = [_resolveRequirement(selName, cutName, req, era) for req in leg["requirements"]]
 
     ## A pT ladder says how many objects there must be, so it supplies the count when none is given.
     ladder = leg.get("orderedMinPt")

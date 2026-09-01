@@ -16,7 +16,7 @@ The design principle the whole package serves is that the physics lives in confi
 - `paths.py` is the only module allowed to know the repository layout. Anything else that hardcodes a directory name is a bug, and moving a directory should mean editing this file alone.
     - It derives the repository root from its own file location, which is why the package can be moved without configuration. That also means it breaks silently if the file is relocated without updating the `dirname` chain.
 - `config.py` merges layer by layer, and a list replaces the list below.
-    - For example: `dvLepton` is built on `dvDisplaced` and swaps its 11 displacement HLT paths for 8 lepton ones.
+    - For example: `dvLepton` and `dvDisplaced` are both `dvFull` plus a skim, differing only in which trigger config they name.
     - The cost falls on two keys where adding is the natural intent: `miniaod.keep`, restated in full by `dvBase`, `dvSignal` and `dvFull`, and `tags`, restated by all three grids in `run2Validation`. If that becomes annoying, add an opt-in append marker to `deepMerge`.
 
 
@@ -86,7 +86,7 @@ The design principle the whole package serves is that the physics lives in confi
     - `_write` groups a collection's fields into one `ak.zip` record so uproot emits one counter per collection. Writing each jagged branch separately makes uproot invent `nElectron_pt`, `nElectron_eta` and so on, and the schema then drifts with every selection pass.
     - `_primaryVertex` takes the first vertex passing `PV_isGood`, not index 0. The ntuples keep every reconstructed vertex and a low-ndof fit sits at index 0 often enough to move dz by a centimetre.
     - `_trackIP` recomputes dz and dxy from the stored track reference point, including the beam tilt, because the ntuple stores the ingredients rather than a finished impact parameter.
-    - A trigger pattern matching no branch contributes nothing and is not an error. The note records how many of the requested paths were present, which is where a wrong era or a missing skim shows up.
+    - A trigger pattern matching no branch contributes nothing and is not an error. `triggerMask` starts all-false and ORs in what it found, so a cut whose paths are *all* absent silently removes the whole sample. The `0/N paths present` note is the only sign, and it is where a wrong era or a missing skim shows up.
     - Cut kinds carrying `invert` are how an orthogonality veto is written: state the other channel's selection, then invert it, so the two channels cannot drift apart.
 - `quantities.py`
     - `QUANTITIES` is the entire vocabulary a selection config may name. Adding a quantity is an entry here; nothing else changes.
@@ -103,6 +103,11 @@ The design principle the whole package serves is that the physics lives in confi
     - `packageKamui` tars the package into the job area, so a worker imports kamui with no checkout and no CMSSW integration. `__pycache__` is filtered out, since a stale `.pyc` from a different Python would ship with it.
     - One resolved selection JSON is written per era and named in `jobList.txt` through the run script, the same mechanism `submit/condor.py` uses for `(preset, isMC)`.
     - The memory and disk requests are function arguments with no CLI flag. Add flags when a pass actually needs them.
+- A submitted task is frozen. `batch.prepare` dumps the resolved selection to `selection_<era>.json` and ships it, so a worker never reads `config/` at all. Editing a selection config after `prepare` changes nothing for jobs already queued; rebuilding the job area is the only way to pick an edit up.
+- `--outputBase` reaches only the condor backend. The local backend always writes under `ntupleSelection/out/<task>/`.
+- Re-running with an existing `--task` overwrites the job area silently. `batch.taskDir` is a plain `makedirs`, without the `resolveTaskDir` guard that protects a production area from clobbering a running task.
+- `checkTaskName` runs only on the condor path, inside `batch.taskDir`. The local path joins `--task` into `out/` directly.
+- `findInputs` hardcodes `<base>/ntuples/<inputTask>` on both the local and the xrootd branch, so chaining a pass onto an earlier pass's output means that output living under a directory named `ntuples`.
 - `runOne.py` writes the cutflow next to the output as `<output>.cutflow.json`, and the run script copies both to EOS. Merging those per-job cutflows is not implemented, which is why `kamui cutflow` only works after a local pass.
 - `normalization.py`
     - Anything normalizing must call `denominator`, which returns `None` for a sample that has no recorded sum, rather than reading `sumGenWeight` out of the file and getting a `KeyError`.

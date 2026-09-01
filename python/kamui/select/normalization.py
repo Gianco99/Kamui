@@ -94,6 +94,11 @@ def record(sampleName, measured=None, genEvents=None, write=True):
     return entry
 
 
+def generatedEvents(sampleName):
+    """The generated event count of the whole dataset, or None when it was never recorded."""
+    return loadSums()["samples"].get(sampleName, {}).get("genEvents")
+
+
 def missingSums(sampleNames):
     """Samples with no generated event count recorded, and samples still lacking a weight sum."""
     data = loadSums()["samples"]

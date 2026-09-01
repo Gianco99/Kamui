@@ -28,5 +28,4 @@ A selection config's cut filters at selection time. Ex: `config/selections/run2D
 ```json
 {"name": "trigger", "type": "trigger", "triggers": "run2Displaced"}
 ```
-## Relevant Commands
-See Kamui/python/kamui/README.md for the flags and worked examples.
+

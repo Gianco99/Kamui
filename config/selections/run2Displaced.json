@@ -1,5 +1,5 @@
 {
-  "_doc": "Displacement-triggered channel for Run 2, matching JMTucker's apply_presel == 6 with leptonht_veto on. Cuts apply in the order listed, which is also the cutflow order, and that order follows AnalysisCuts.cc so the two cutflows can be compared line by line.",
+  "_doc": "Displacement-triggered channel for Run 2, matching JMTucker. Cuts apply in the order listed, which is also the cutflow order.",
   "eras": [
     "2016APV",
     "2016",
@@ -7,12 +7,6 @@
     "2018"
   ],
   "cuts": [
-    {
-      "name": "trigger",
-      "type": "trigger",
-      "triggers": "run2Displaced",
-      "doc": "Fired at least one b-jet or displaced-dijet path"
-    },
     {
       "name": "htVeto",
       "type": "veto",
@@ -51,13 +45,13 @@
           "min": 4
         }
       ],
-      "doc": "Drop events that fired a high-HT trigger and pass the matching offline requirement, for orthogonality with EXO-19-013. Which trigger existed and where the HT threshold sits both depend on the year"
+      "doc": "Drop events that fired a high-HT trigger and pass the matching offline requirement, for orthogonality with EXO-19-013."
     },
     {
       "name": "leptonVeto",
       "type": "object",
       "invert": true,
-      "doc": "Orthogonality with the lepton-triggered channel: drop the event when a single-lepton path fired and an offline lepton sits on its plateau. The legs are the ones run2Lepton.json selects on, inverted, so the two channels cannot both claim an event. JMTucker skips Mu50, Ele115 and Ele50_PFJet165 in this veto, which is why they are absent here too.",
+      "doc": "Orthogonality with the lepton-triggered channel: the run2Lepton legs, inverted.",
       "anyOf": [
         {
           "collection": "Muon",
@@ -126,7 +120,7 @@
               "HLT_Ele32_WPTight_Gsf_v*"
             ]
           },
-          "doc": "Electron leg, barrel: the impact parameter requirement differs either side of |scEta| = 1.48",
+          "doc": "Electron leg. The impact parameter requirement differs either side of |eta| = 1.48",
           "requirements": [
             {
               "variable": "pt",
@@ -146,66 +140,36 @@
               "min": 4
             },
             {
-              "variable": "eta",
-              "absMax": 1.48
-            },
-            {
-              "variable": "dxyBeamspot",
-              "absMax": 0.05
-            },
-            {
-              "variable": "dzPV",
-              "absMax": 0.1
-            }
-          ]
-        },
-        {
-          "collection": "Electron",
-          "min": 1,
-          "triggers": {
-            "2016APV": [
-              "HLT_Ele27_WPTight_Gsf_v*"
-            ],
-            "2016": [
-              "HLT_Ele27_WPTight_Gsf_v*"
-            ],
-            "2017": [
-              "HLT_Ele35_WPTight_Gsf_v*"
-            ],
-            "2018": [
-              "HLT_Ele32_WPTight_Gsf_v*"
-            ]
-          },
-          "doc": "Electron leg, endcap: the impact parameter requirement differs either side of |scEta| = 1.48",
-          "requirements": [
-            {
-              "variable": "pt",
-              "min": {
-                "2016APV": 30,
-                "2016": 30,
-                "2017": 38,
-                "2018": 35
-              }
-            },
-            {
-              "variable": "eta",
-              "absMax": 2.4
-            },
-            {
-              "variable": "cutBased",
-              "min": 4
-            },
-            {
-              "variable": "eta",
-              "absMin": 1.48
-            },
-            {
-              "variable": "dxyBeamspot",
-              "absMax": 0.1
-            },
-            {
-              "variable": "dzPV",
-              "absMax": 0.2
+              "anyOf": [
+                [
+                  {
+                    "variable": "eta",
+                    "absMax": 1.48
+                  },
+                  {
+                    "variable": "dxyBeamspot",
+                    "absMax": 0.05
+                  },
+                  {
+                    "variable": "dzPV",
+                    "absMax": 0.1
+                  }
+                ],
+                [
+                  {
+                    "variable": "eta",
+                    "absMin": 1.48
+                  },
+                  {
+                    "variable": "dxyBeamspot",
+                    "absMax": 0.1
+                  },
+                  {
+                    "variable": "dzPV",
+                    "absMax": 0.2
+                  }
+                ]
+              ]
             }
           ]
         }
@@ -214,7 +178,7 @@
     {
       "name": "displacedTriggerPresel",
       "type": "anyOf",
-      "doc": "At least one displacement trigger fired and the offline requirements standing in for its online selection are met. One alternative per path, each gated to the eras the path ran in. JMTucker leaves require_trig_obj_match off, so no HLT object matching enters and these are pure offline emulations.",
+      "doc": "One alternative per path: the path fired and the offline requirements standing in for its online selection are met.",
       "anyOf": [
         {
           "name": "quadJet45TripleBTag",
@@ -501,7 +465,7 @@
             "2016APV",
             "2016"
           ],
-          "doc": "2016 displaced-dijet path, low HT leg. Calo quantities only, and no HLT track matching: JMTucker leaves require_trig_obj_match off",
+          "doc": "2016 displaced-dijet path, low HT leg. Calo quantities only.",
           "cuts": [
             {
               "name": "fired",
@@ -1138,7 +1102,7 @@
           "Flag_ecalBadCalibFilter"
         ]
       },
-      "doc": "Standard MET filters, all required. 2016 has no ecalBadCalibFilter, so its list is one shorter"
+      "doc": "Standard MET filters, all required."
     }
   ]
 }

@@ -60,6 +60,29 @@ def writeCutflow(selectionDir, task, selectionName, flows):
     os.replace(tmp, os.path.join(out, "cutflow.json"))
 
 
+def withGenerated(flow, genEvents):
+    """
+    Prepend the generated-event row and rebase every efficiency on it.
+
+    The row above the ntuple is what the trigger skim did, so the first efficiency in the
+    table becomes the skim efficiency instead of a cut that removed nothing.
+    """
+    if not genEvents:
+        return flow
+    out = [{"cut": "generated", "type": "", "doc": "Generated events in the whole dataset",
+            "detail": "recorded by kamui norm, not measured here",
+            "kept": int(genEvents), "removed": 0, "efficiency": 1.0, "cumulative": 1.0}]
+    prev = int(genEvents)
+    for row in flow:
+        r = dict(row)
+        r["removed"] = max(prev - r["kept"], 0)
+        r["efficiency"] = (r["kept"] / prev) if prev else 0.0
+        r["cumulative"] = (r["kept"] / int(genEvents)) if genEvents else 0.0
+        out.append(r)
+        prev = r["kept"]
+    return out
+
+
 def printCutflow(selectionDir, task):
     """Print the cutflow table for a select task."""
     path = os.path.join(selectionDir, "out", task, "cutflow.json")

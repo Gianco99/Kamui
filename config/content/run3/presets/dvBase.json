@@ -1,5 +1,5 @@
 {
-  "_doc": "Event, jets, leptons, vertices. No tracks, no gen.",
+  "_doc": "Event, jets, leptons, vertices.",
   "include": [
     "core",
     "jets",

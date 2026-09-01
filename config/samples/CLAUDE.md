@@ -7,7 +7,7 @@
 - Any axis substitution whose key happens to be a sample field
 - `overrides`. 
 
-Merging replaces lists and scalars. Ex: A grid that names `tags` throws away the `tags` in `defaults`, which is why every grid in `run2Validation.json` restates its family tags.
+Ex: A grid that names `tags` throws away the `tags` in `defaults`, which is why every grid in `run2Validation.json` restates its family tags.
 
 ## JSON Caveats
 

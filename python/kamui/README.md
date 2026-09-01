@@ -48,24 +48,28 @@ Shows the samples in your config files, grouped by family. Four columns: the sam
 ```
 ### content
 
-Shows what a content preset would write into your ntuples, without running anything. One row per collection: its name, what kind of object it is, which MiniAOD collection it comes from, how many variables are kept, and any cut or cap. Naming no preset lists the presets each era set defines.
+Shows what a content preset would write into your ntuples, without running anything. 
+
+One row per collection: 
+
+- Its name
+- What kind of object it is
+- Which MiniAOD collection it comes from
+- How many variables are kept
+- Any cut or cap.
 
 | Flag | Meaning |
 | --- | --- |
-| `preset` | Positional, optional. The preset or collection to resolve |
+| `preset` | Optional. The preset or collection to resolve |
 | `--data` | Resolve as data, which drops the `mcOnly` collections |
 | `--era` | Era whose content set to resolve against (default `Summer24`) |
-| `--write PATH` | Write the resolved JSON there, exactly as a job receives it |
-
-An era reaches only its own content set, so a Run 2 preset needs `--era` to be a Run 2 year.
-
+| `--write PATH` | Write the resolved JSON to this path |
 ```
 ./kamui content                                    The presets run2 and run3 define
-./kamui content dvSignal                           What a preset resolves to, for MC
-./kamui content dvFull                             Everything
+./kamui content dvSignal                           What a preset resolves to
 ./kamui content jets                               A single collection on its own
 ./kamui content dvSignal --data                    The generator collections disappear
-./kamui content dvLepton --era 2018                A Run 2 preset, note the trigger skim at the end
+./kamui content dvLepton --era 2018                A Run 2 preset
 ./kamui content dvFull --write resolved.json       Write out exactly what a job would be handed
 ```
 
@@ -175,6 +179,8 @@ Applies an event-level selection to ntuples a `submit` task produced, and writes
 
 The selection is resolved once per era of the samples you picked, because thresholds, trigger lists and MET filter lists all depend on the year. A sample whose era the selection config does not list is an error.
 
+Output carries the same branches as input, counters included, so a selection can be applied to an earlier pass's output and a tight selection can be built as a loose common pass followed by a per-channel one.
+
 Locally, the output and the cutflow land under `ntupleSelection/out/<task>/`. On condor, the job area is `ntupleSelection/jobs/<task>/` and each job copies its own ntuple and its own cutflow JSON to `<outputBase>/selected/<task>/<sample>/`.
 
 ```
@@ -204,6 +210,8 @@ Use `./kamui check` to see how many catalogued samples have a sum recorded.
 ### cutflow
 
 Prints the cutflow a local `select` task recorded: per cut, the events kept, the events removed, the step efficiency and the cumulative efficiency, with what each cut is and how it was applied. A task spanning several samples also gets a combined table.
+
+The `applied as` line is what distinguishes a cut that removed events from a cut that removed everything because the branch it wanted was absent. It reports how many of a trigger cut's paths were present, which flags were missing, the bounds a quantity cut used, and what each `anyOf` alternative kept.
 
 | Flag | Meaning |
 | --- | --- |
@@ -360,7 +368,7 @@ Everything behind the `select`, `cutflow` and `norm` commands. Inputs are the nt
 
 `io.py` - Finds the input ntuples for a sample inside a production task, over xrootd or on a local disk, and writes and prints the cutflow.
 
-`batch.py` - Builds the condor job area for a selection pass under `ntupleSelection/jobs/<task>/`, packages the kamui source so a worker can import it, and submits.
+`batch.py` - Builds the condor job area for a selection pass under `ntupleSelection/jobs/<task>/`, packages the kamui source so a worker can import it, and submits. The area holds `submit.jdl`, `jobList.txt`, `fileLists.json`, one `selection_<era>.json` and one `runSelect_<selection>_<era>.sh` per era, `kamuiPackage.tar.gz`, `task.json` and `logs/`. `--dryRun` leaves all of it on disk unsubmitted, which is how to read the exact configuration a job would use.
 
 `runOne.py` - What a worker runs: `python3 -m kamui.select.runOne <selectionJson> <outputFile> <input> [input ...]`. It applies the already-resolved selection to one group of files and writes the cutflow beside the output.
 

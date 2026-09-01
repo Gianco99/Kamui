@@ -48,4 +48,6 @@ Run 2 entries are taken from JMTucker `AnalysisConstants.h`.
 
 ## Relevant Commands
 
-Use `norm` to register entries into `generatorSums.json`. See Kamui/python/kamui/README.md for the flags and worked examples.
+Use `norm` to register entries into `generatorSums.json`. 
+
+See Kamui/python/kamui/README.md for the flags and worked examples.

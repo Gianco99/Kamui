@@ -168,25 +168,44 @@ def _derived(coll, variable, events, era):
     return None
 
 
+def _oneRequirement(req, coll, events, branches, era, ones):
+    """Per-object mask for a single requirement, or for an anyOf group of requirement lists."""
+    if "anyOf" in req:
+        ## Regions of one collection, ORed per object: an electron satisfies the barrel group
+        ## or the endcap group. Without this a region-dependent bound needs a duplicate leg.
+        out = None
+        for group in req["anyOf"]:
+            sub = ones
+            for r in group:
+                sub = sub & _oneRequirement(r, coll, events, branches, era, ones)
+            out = sub if out is None else (out | sub)
+        return ones if out is None else out
+
+    name = f"{coll}_{req['variable']}"
+    value = _derived(coll, req["variable"], events, era)
+    if value is None:
+        if name not in branches:
+            raise ValueError(f"selection needs branch '{name}', which the ntuple does not have")
+        value = events[name]
+    keep = ones
+    if "min" in req:
+        keep = keep & (value >= req["min"])
+    if "max" in req:
+        keep = keep & (value <= req["max"])
+    if "absMin" in req:
+        keep = keep & (abs(value) >= req["absMin"])
+    if "absMax" in req:
+        keep = keep & (abs(value) <= req["absMax"])
+    return keep
+
+
 def _objectMask(leg, events, branches, era):
     """Per-object mask: which objects of a collection satisfy every requirement of this leg."""
     coll = leg["collection"]
-    keep = ak.ones_like(events[f"{coll}_pt"], dtype=bool)
+    ones = ak.ones_like(events[f"{coll}_pt"], dtype=bool)
+    keep = ones
     for req in leg["requirements"]:
-        name = f"{coll}_{req['variable']}"
-        value = _derived(coll, req["variable"], events, era)
-        if value is None:
-            if name not in branches:
-                raise ValueError(f"selection needs branch '{name}', which the ntuple does not have")
-            value = events[name]
-        if "min" in req:
-            keep = keep & (value >= req["min"])
-        if "max" in req:
-            keep = keep & (value <= req["max"])
-        if "absMin" in req:
-            keep = keep & (abs(value) >= req["absMin"])
-        if "absMax" in req:
-            keep = keep & (abs(value) <= req["absMax"])
+        keep = keep & _oneRequirement(req, coll, events, branches, era, ones)
     return keep
 
 
@@ -241,6 +260,10 @@ def _pairText(pair):
 
 
 def _reqText(req):
+    if "anyOf" in req:
+        return "(" + " or ".join(
+            "(" + " and ".join(_reqText(r) for r in group) + ")" for group in req["anyOf"]
+        ) + ")"
     v = req["variable"]
     parts = []
     if "min" in req:
@@ -285,7 +308,7 @@ def applySelection(inputPaths, selection, outputPath, writeSteps=False, treeName
     events, branches = _readAll(inputPaths, treeName)
     total = len(events)
 
-    flow = [{"cut": "input", "type": "", "doc": "Events read from the production ntuples", "detail": f"{len(inputPaths)} file(s)",
+    flow = [{"cut": "input", "type": "", "doc": "Events in the production ntuples, after the trigger skim they were written with", "detail": f"{len(inputPaths)} file(s)",
              "kept": total, "removed": 0, "efficiency": 1.0, "cumulative": 1.0}]
     keep = np.ones(total, dtype=bool)
 

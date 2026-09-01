@@ -1,6 +1,6 @@
 # config
 
-`README.md` covers the layout, `sites.json` and `lumi.json`. `samples/`, `content/`, `triggers/` and `normalizations/` each have their own pair of docs; `selections/` has a README only.
+`README.md` covers the layout, `sites.json` and `lumi.json`. `samples/`, `content/`, `triggers/`, `selections/` and `normalizations/` each have their own pair of docs.
 
 ## Nothing Outside configReaders/ May Open These Files
 `./kamui check` enforces it by scanning every `.py` outside `python/kamui/configReaders/` for `paths.CONFIG_DIR`, `paths.SAMPLES_DIR`, `paths.CONTENT_DIR`, `paths.TRIGGERS_DIR` and `paths.SITES_FILE`. This is why `loadSites` lives in `configReaders/sites.py`.
@@ -10,8 +10,13 @@ The scan list has not grown with the directory. `SELECTIONS_DIR`, `XSEC_DIR` and
 ## sites.json Is Expanded
 String values pass through environment-variable expansion when loaded, which is how `$USER` works. Expansion happens on the submitting machine at config-load time, not on the worker node: `$USER` there would be the batch account and the output would go somewhere wrong. An unset variable raises rather than silently producing a path containing a literal `$`.
 
-## Comment Keys Are Stripped At Every Depth
-`loadSites` runs `stripComments`, so a `_doc` nested inside the `cmssw` block is dropped like any other.
+## The Loader Is Common To Every Config Here
+Everything in this directory goes through `foundations/config.py`, so these hold for samples, content, triggers and selections alike.
+
+- Keys beginning with `_` are stripped at every depth, so a `_doc` nested inside a block is dropped like any other.
+- `loadWithIncludes` flattens `include` depth-first and deep-merges. A circular include raises.
+- Only dicts merge. Lists and scalars replace wholesale, so a child that names a list throws away the parent's entirely. Each subfolder's CLAUDE.md notes where that bites.
+- A name resolves against the search directory, then one level of subdirectories beneath it in sorted order.
 
 ## The Release Version
 `cmssw.version` and `cmssw.scramArch` are read by the condor backend and written into every generated job script. Changing them changes what runs on the grid.
