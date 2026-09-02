@@ -94,7 +94,7 @@ def printCutflow(selectionDir, task):
     print(f"task {record['task']}  selection {record['selection']}\n")
     for sample, flow in sorted(record["samples"].items()):
         print(sample)
-        print(f"  {'cut':<16} {'type':<9} {'events':>11} {'removed':>10} {'step eff':>10} {'cumulative':>12}")
+        print(f"  {'Cut':<16} {'Type':<9} {'Events':>11} {'Removed':>10} {'Step Eff':>10} {'Cumulative':>12}")
         for row in flow:
             print(f"  {row['cut']:<16} {row.get('type',''):<9} {row['kept']:>11,} {row.get('removed',0):>10,} "
                   f"{100 * row['efficiency']:>9.2f}% {100 * row['cumulative']:>11.2f}%")
@@ -109,7 +109,7 @@ def printCutflow(selectionDir, task):
     if len(record["samples"]) > 1:
         names = [r["cut"] for r in next(iter(record["samples"].values()))]
         print("all samples")
-        print(f"  {'cut':<16} {'events':>12} {'cumulative':>12}")
+        print(f"  {'Cut':<16} {'Events':>12} {'Cumulative':>12}")
         first = None
         for i, cut in enumerate(names):
             total = sum(flow[i]["kept"] for flow in record["samples"].values() if i < len(flow))

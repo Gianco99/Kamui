@@ -1,8 +1,7 @@
 # Personal working notes - reference only, not part of the repo
-docs/SampleProdPlan.txt
+docs/
 
 # Saved edmDumpEventContent output - reference only, regenerable
-ntupleProduction/branchDumps/*.txt
 
 # Generated job areas, DAS cache, python bytecode
 ntupleProduction/jobs/

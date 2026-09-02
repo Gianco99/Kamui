@@ -1,6 +1,6 @@
 # tools
 
-One-off scripts that read what the framework produced. Nothing here is imported by `kamui`, and nothing here is needed to submit or run a job.
+Hand tools that read what the framework produced, or what it is about to consume. Nothing here is imported by `kamui`, and nothing here runs as part of a job.
 
 ## triggerYields.py
 
@@ -33,3 +33,18 @@ sample                                     channel            files     total   
 Under `--perPath`, a path that has no branch in the chain prints `not in menu`, which is the normal state for a path belonging to another era's menu. A sample whose catalog entry has a `notes` field prints it as a `JMTucker reference:` line under the sample.
 
 Lines outside the table report why a sample produced no number: it is no longer in the catalog, its content preset declares no trigger skim, its output directory on EOS is empty, or some of its files could not be opened or have no `Events` tree.
+
+## inspectMiniAOD.py
+
+Reports the b-tag discriminators, embedded lepton IDs, userFloats and userInts a MiniAOD file carries, each from the first event that has the collection. Run it before writing a content preset against a new campaign: a wrong electron ID name throws at job runtime and a wrong b-tag name quietly returns -1000, and both move between campaigns.
+
+Needs `cmsenv` for FWLite. No grid proxy is needed for files already on our EOS.
+
+```
+python3 tools/inspectMiniAOD.py root://cmseos.fnal.gov//store/.../file.root
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `--jets` | Jet collection to read. `slimmedJetsPuppi` by default, so a Run 2 file needs `--jets slimmedJets` |
+| `--branches` | Also run `edmDumpEventContent` |

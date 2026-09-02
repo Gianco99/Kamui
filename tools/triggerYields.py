@@ -20,7 +20,7 @@ import sys
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "python"))
 from kamui.foundations import paths                                        # noqa: E402
-from kamui.configReaders.catalog import loadCatalog, select                  # noqa: E402
+from kamui.configReaders.catalog import loadCatalog  # noqa: E402
 from kamui.foundations.config import loadWithIncludes                      # noqa: E402
 from kamui.configReaders.content import resolveContent                       # noqa: E402
 from kamui.configReaders.sites import loadSites                      # noqa: E402

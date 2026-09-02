@@ -1,0 +1,22 @@
+# configReaders/
+
+- Nothing outside this folder may open a config file.
+    - `./kamui check` enforces it by scanning for `paths.*_DIR` and `paths.SITES_FILE` outside `configReaders/`.
+    - This is why `loadSites` lives here, and why `_cmdCheck` calls `validateTriggers()` to reach the trigger directory.
+    - `select/normalization.py` is the one place that writes a config file, `config/normalizations/generatorSums.json`. It is measured data rather than hand-written physics, which is why it does not go through a reader.
+- `catalog.py` reads the sample configs and answers which samples a command means.
+    - The `Sample` class is a dict subclass giving attribute access, `sample.name`.
+    - `select` backs the five sample flags on every command that takes them, and they do not behave alike. `--family`, `--era` and `--tag` resolve case-insensitively against what exists and raise on a value matching nothing, naming every value that does exist; two spellings differing only in case are ambiguous and also raise. `--name` is exact and case-sensitive. `--match` is a plain glob with no check at all, so a pattern matching nothing leaves the selection empty and the command exits with "No samples matched the selection".
+- `content.py` resolves a content preset into what a job receives.
+    - `KIND_TO_PLUGIN` is the point of the module: a physics-facing `type` maps onto the CMSSW plugin that builds that table, so nobody writing a config has to know a plugin name. A new kind of collection is an entry here, plus any of the sets below it whose behavior it shares.
+- `selections.py` resolves a selection config into something the engine can run without further lookups.
+    - It resolves for exactly one era. Thresholds, trigger lists and flag lists may each be written as a plain value or as an object keyed by era, and `_resolveThreshold` collapses them. Passing `era=None` is legal only for a config that uses none of that, and everything else raises rather than guessing a year.
+    - Trigger names are expanded into path lists here via `loadTriggerPaths`, so the resolved selection is self-contained and a worker never reads `config/triggers/`. That is what lets `batch.py` ship a single JSON to the grid.
+    - The `*_FIELDS` sets exist to reject a misspelled key. A typo in a cut would otherwise be silently ignored and the cut would quietly do less.
+    - `CUT_TYPES` and the engine's `_cutMask` must be kept in step; a type accepted here and unknown there fails only when the selection runs.
+    - It validates every `quantity` against `select.quantities.QUANTITIES`, which is why this module imports from `select/`. The direction is deliberate: the vocabulary belongs to the code that evaluates it, and `quantities.py` imports nothing from kamui, so there is no cycle.
+    - An `anyOf` alternative that does not apply to the era is dropped at resolve time. Leaving it in would have it fail later on trigger paths that never existed that year.
+    - `orderedMinPt` is checked to be descending, because it is matched against pT-sorted objects and an ascending ladder would pass everything.
+- `sites.py` reads `sites.json`, expanding environment variables as it goes.
+    - Expansion happens at config-load time on the submitting machine, deliberately. On a worker node `$USER` is the batch account, and output would go somewhere wrong.
+    - An unset variable raises, since a path with a literal dollar sign in it fails much later and less clearly.

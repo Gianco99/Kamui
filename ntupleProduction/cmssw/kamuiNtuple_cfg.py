@@ -1,22 +1,4 @@
-"""
-cmsRun configuration: MiniAOD in, one ntuple out.
-
-All content decisions come from a resolved content JSON (see
-config/content/). This file only wires things together, so it
-should almost never need editing.
-
-Local run:
-    cmsRun kamuiNtuple_cfg.py \
-        content=/path/to/dvSignal.resolved.json \
-        inputFiles=root://cmseos.fnal.gov//store/.../file.root \
-        outputFile=test.root maxEvents=1000
-
-On a worker node the resolved JSON travels with the job, so `content` is just
-a filename in the scratch directory.
-
-Output tree: `Events`, one entry per event, readable with uproot/RDataFrame - no CMSSW needed
-downstream. run / luminosityBlock / event are written automatically.
-"""
+"""cmsRun configuration: MiniAOD in, ntuple out. Content comes from a resolved content JSON."""
 
 import os
 import sys
@@ -25,20 +7,17 @@ import FWCore.ParameterSet.Config as cms
 from FWCore.ParameterSet.VarParsing import VarParsing
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.getcwd())   # on a worker node kamuiTables.py sits next to the pset
+sys.path.insert(0, os.getcwd())
 from kamuiTables import buildSkim, buildTables, loadContent  # noqa: E402
 
+SINGLETON = VarParsing.multiplicity.singleton
+
 opts = VarParsing("analysis")
-opts.register("content",     "",        VarParsing.multiplicity.singleton, VarParsing.varType.string,
-              "path to a resolved content JSON")
-opts.register("isMC",        True,      VarParsing.multiplicity.singleton, VarParsing.varType.bool,
-              "MC (True) or data (False)")
-opts.register("globalTag",   "",        VarParsing.multiplicity.singleton, VarParsing.varType.string,
-              "conditions global tag; empty means take it from the input file")
-opts.register("nThreads",    1,         VarParsing.multiplicity.singleton, VarParsing.varType.int,
-              "number of cmsRun threads")
-opts.register("reportEvery", 1000,      VarParsing.multiplicity.singleton, VarParsing.varType.int,
-              "MessageLogger reporting interval")
+opts.register("content", "", SINGLETON, VarParsing.varType.string, "Path to a resolved content JSON")
+opts.register("isMC", True, SINGLETON, VarParsing.varType.bool, "MC (True) or data (False)")
+opts.register("globalTag", "", SINGLETON, VarParsing.varType.string, "Conditions global tag; empty takes it from the input file")
+opts.register("nThreads", 1, SINGLETON, VarParsing.varType.int, "Number of cmsRun threads")
+opts.register("reportEvery", 1000, SINGLETON, VarParsing.varType.int, "MessageLogger reporting interval")
 opts.setDefault("outputFile", "kamuiNtuple.root")
 opts.setDefault("maxEvents", -1)
 opts.parseArguments()
@@ -64,27 +43,20 @@ process.options = cms.untracked.PSet(
     wantSummary=cms.untracked.bool(False),
 )
 
-# Conditions: only loaded when a tag is given. The tables built here read
-# quantities already stored in MiniAOD, so nothing needs the EventSetup yet.
-# A tag becomes necessary once JECs or a re-vertexing step are added.
 if opts.globalTag:
     process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
     from Configuration.AlCa.GlobalTag import GlobalTag
     process.GlobalTag = GlobalTag(process.GlobalTag, opts.globalTag, "")
 
-# ---- content -> table producers -------------------------------------------------
 modules, order = buildTables(content)
 for name, mod in modules.items():
     setattr(process, name, mod)
-## The generator-weight producer accumulates the run-level sums that normalization divides by,
-## so it has to see every event. Keeping it behind the skim would make the denominator count
-## only the events that survived, which silently inflates every yield from a skimmed sample.
+
+## The generator-weight producer must see every event, so it is kept out of the skimmed path.
 normNames = [n for n in order if "genweight" in n.lower()]
 tableNames = [n for n in order if n not in normNames]
 process.kamuiTables = cms.Task(*[getattr(process, n) for n in tableNames])
 
-
-# ---- optional HLT skim ----------------------------------------------------------
 skimFilter, skimName = buildSkim(content.get("skim", {}))
 if skimFilter is not None:
     setattr(process, skimName, skimFilter)
@@ -92,17 +64,15 @@ if skimFilter is not None:
     selectEvents = cms.untracked.PSet(SelectEvents=cms.vstring("dvPath"))
 else:
     process.dvPath = cms.Path(process.kamuiTables)
-    selectEvents = cms.untracked.PSet()   # keep every event
+    selectEvents = cms.untracked.PSet()
 
-## Unfiltered and scheduled, not in a Task: a Task runs its modules only when something
-## consumes their products, which would again mean only the events that survived the skim.
+## Scheduled
 if normNames:
     normSeq = getattr(process, normNames[0])
     for n in normNames[1:]:
         normSeq = normSeq + getattr(process, n)
     process.normPath = cms.Path(normSeq)
 
-# ---- output ---------------------------------------------------------------------
 trig = content.get("triggerBits", {})
 outputCommands = [
     "drop *",
@@ -111,11 +81,7 @@ outputCommands = [
     "keep nanoaodUniqueString_nanoMetadata_*_*",
 ]
 if trig.get("keepAll", True):
-    # The output module turns edm::TriggerResults into one bool branch per path.
-    # Several processes are kept because the HLT decisions and the MET filter decisions
-    # live in different ones, and a process absent from a given file simply matches nothing.
-    processes = trig.get("processes") or [trig.get("process", "HLT")]
-    for proc in processes:
+    for proc in trig.get("processes") or [trig.get("process", "HLT")]:
         outputCommands.append("keep edmTriggerResults_*_*_%s" % proc)
 
 process.out = cms.OutputModule(

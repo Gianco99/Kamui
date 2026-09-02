@@ -156,7 +156,7 @@ def _derived(coll, variable, events, era):
     Per-object quantities that are computed rather than stored.
 
     The ntuples keep raw jet energy fractions instead of a precomputed identification flag,
-    so the working point is applied here. docs/JetID.txt carries the table.
+    so the working point is applied here. select/README.md carries the table.
     """
     if coll == "Jet" and variable == "tightLepVeto":
         from .quantities import tightLepVeto

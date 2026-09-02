@@ -274,7 +274,7 @@ def _cmdStatus(args):
 
     # Print the few lines that matter; the record embeds every resolved preset and runs to tens of kB.
     prov = info.get("provenance", {})
-    print(f"Task     {info.get('task')}  ({info.get('backend')}, output={info.get('output')})")
+    print(f"Task     {info.get('task')}  ({info.get('backend')})")
     print(f"Samples  {len(info.get('samples', []))}, content {', '.join(info.get('content') or sorted({c for c in [d.get('content') for d in info.get('sampleDetails', [])] if c}))}")
     if info.get("nJobs") is not None:
         print(f"Jobs     {info['nJobs']}")
@@ -309,7 +309,7 @@ def _cmdResubmit(args):
     with open(rec) as f:
         info = json.load(f)
 
-    print(f"Task     {info.get('task')}  ({info.get('backend')}, output={info.get('output')})")
+    print(f"Task     {info.get('task')}  ({info.get('backend')})")
     print(f"Output   {info.get('outLFNDirBase') or info.get('outDirBase')}")
 
     if info.get("backend") == "crab":
@@ -335,7 +335,7 @@ def _cmdResubmit(args):
     if queued:
         print(f"  {queued} job(s) from this task are still queued or running.")
         if not args.forceResubmit:
-            sys.exit("  refusing to resubmit while they run. Wait, or pass --yes to submit anyway.")
+            sys.exit("  refusing to resubmit while they run. Wait, or pass --forceResubmit to submit anyway.")
 
     n, nJobs, code = condorBackend.resubmit(args.task, dryRun=args.dryRun)
     if code == 0 and not args.dryRun:
@@ -354,7 +354,7 @@ def _queuedJobs(info):
         if retry.get("condorCluster"):
             cmd.insert(-2, str(retry["condorCluster"]))
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        r = runTool(cmd, capture_output=True, text=True, timeout=120)
     except (OSError, subprocess.SubprocessError):
         return 0
     return len([line for line in r.stdout.split() if line.strip()]) if r.returncode == 0 else 0
@@ -459,7 +459,7 @@ def _cmdCheck(args):
 
     sites = loadSites()
     missingKeys = [k for k in ("eosRedirector", "sourceRedirector", "stageoutBase", "crabStageoutBase", "crabStorageSite") if k not in sites]
-    missingCfg = [f for f in ("kamuiNtuple_cfg.py", "kamuiTables.py", "inspectMiniAOD.py") if not os.path.exists(os.path.join(paths.CMSSW_DIR, f))]
+    missingCfg = [f for f in ("kamuiNtuple_cfg.py", "kamuiTables.py") if not os.path.exists(os.path.join(paths.CMSSW_DIR, f))]
     for k in missingKeys:
         problems.append(f"sites.json is missing '{k}'")
     for f in missingCfg:

@@ -1,5 +1,21 @@
-Jet ID reference
-================
+# select/
+
+Everything behind the `select`, `cutflow` and `norm` commands. Inputs are the ntuples a production task wrote; outputs are ntuples with the same branches, plus a cutflow.
+
+`engine.py` - Applies a resolved selection. It reads the input ntuples with uproot, builds one mask per cut in the order the config lists them, writes the surviving events, and returns the cutflow. It knows six kinds of cut: `trigger`, `object`, `flags`, `quantity`, `veto` and `anyOf`. Any cut can carry `invert`, which keeps exactly the events it would otherwise have thrown away. It also computes the per-track impact parameters and the jet identification, which the ntuples store as raw ingredients rather than finished quantities.
+
+`quantities.py` - The event-level quantities a selection config may name, each with the branches it needs and a one-line description. `HT40`, `caloHT30`, `nJet40`, `leadMuonPt` and `MET` are among them, and the TightLepVeto jet identification the jet-based ones apply lives here too.
+
+`io.py` - Finds the input ntuples for a sample inside a production task, over xrootd or on a local disk, and writes and prints the cutflow.
+
+`batch.py` - Builds the condor job area for a selection pass under `ntupleSelection/jobs/<task>/`, packages the kamui source so a worker can import it, and submits. The area holds `submit.jdl`, `jobList.txt`, `fileLists.json`, one `selection_<era>.json` and one `runSelect_<selection>_<era>.sh` per era, `kamuiPackage.tar.gz`, `task.json` and `logs/`. `--dryRun` leaves all of it on disk unsubmitted, which is how to read the exact configuration a job would use.
+
+`runOne.py` - What a worker runs: `python3 -m kamui.select.runOne <selectionJson> <outputFile> <input> [input ...]`. It applies the already-resolved selection to one group of files and writes the cutflow beside the output.
+
+`normalization.py` - The generator sums a sample must be normalized by. It sums the run-level counters over a sample's central NanoAOD, read remotely over xrootd, and raises rather than returning a short sum when a file cannot be read.
+
+## Jet ID Working Points
+
 Kept because jets.json deliberately stores raw energy fractions rather than a precomputed ID flag, so the working points are applied downstream and this is the table to apply.
 
 Run 3 TightLepVeto PF JetID (RUN3CHSruns2022FGruns2023CD), from PFJetIDSelectionFunctor.h:

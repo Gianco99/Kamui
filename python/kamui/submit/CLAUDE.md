@@ -1,0 +1,22 @@
+# submit/
+
+- `prepare` writes the job area, `submit` only shells out. `--dryRun` runs the first and skips the second, so the files it leaves are the ones a real submission would use.
+- Re-using a task name prompts before overwriting, because the old area is the only local record of a submission that may still be running. Declining writes to `<task>_n`, and `prepare` returns the name it actually used, so the caller and the EOS output directory follow it. A non-interactive run never overwrites.
+- `--filesPerJob` is `default=None` so an explicitly passed value can be told from an absent one, letting the flag beat a sample's `unitsPerJob` while the sample value still beats the built-in.
+- `task.json` is what makes a production reproducible.
+    - It embeds the resolved content, so it stays readable when the preset changes.
+    - A dirty tree means the commit alone does not describe the task, so check that flag first when ntuples disagree with expectations.
+    - `publishRecord` copies it to the EOS output directory on real submission, never on `--dryRun`. Job areas are gitignored scratch, so the EOS copy is the only one that lives as long as the ntuples.
+    - A failed publish warns and returns False.
+    - Anything added to a submission path that changes what a job does belongs in it.
+- The content preset is flattened into the job area and shipped with the job.
+- `crab.py`
+    - `requestName` is capped at 100 characters by CRAB, so `_requestName` truncates. `_checkRequestNames` rejects a submission whose samples would collide after truncation, before the job area is touched.
+    - `submit` returns `(ok, bad)` and keeps going, so one bad sample cannot strand the rest of a production.
+- `condor.py`
+    - `resubmit` decides what failed by looking at EOS, not at condor: a job whose output is present is done however it exited. It refuses while any of this task's jobs are still queued, since retrying a running job writes the same output twice.
+    - A sample whose file list came back empty gets no jobs. It is named in a warning and recorded in `droppedSamples`, since a silently shorter production looks like a successful one.
+    - Each job builds a CMSSW area with `scramv1 project` before running, so there is fixed startup cost per job. Jobs over very few files spend most of their wall time on it.
+    - A task can mix content presets and data with MC, so a run script is written per `(preset, isMC)` combination and each row of `jobList.txt` names the script it needs. The JDL's executable is `$(script)`.
+    - `+DesiredOS = "EL9"` is the LPC worker OS selector. If jobs sit idle indefinitely, `+REQUIRED_OS = "rhel9"` is the alternative.
+    - Output is copied back with `xrdcp` from inside the job because EOS is not a condor-visible filesystem.

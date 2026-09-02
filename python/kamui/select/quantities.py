@@ -61,7 +61,7 @@ def tightLepVeto(events, era):
         return tightLepVeto2017p8(events)
     raise ValueError(
         f"no TightLepVeto jet identification is defined for era '{era}'. "
-        "The Run 2 working points are here; the Run 3 table is in docs/JetID.txt and still needs writing down."
+        "The Run 2 working points are here; the Run 3 table is in select/README.md and still needs writing down."
     )
 
 
