@@ -80,9 +80,8 @@ outputCommands = [
     "keep nanoaodMergeableCounterTable_*Table_*_*",
     "keep nanoaodUniqueString_nanoMetadata_*_*",
 ]
-if trig.get("keepAll", True):
-    for proc in trig.get("processes") or [trig.get("process", "HLT")]:
-        outputCommands.append("keep edmTriggerResults_*_*_%s" % proc)
+for proc in trig.get("processes") or [trig.get("process", "HLT")]:
+    outputCommands.append("keep edmTriggerResults_*_*_%s" % proc)
 
 process.out = cms.OutputModule(
     "NanoAODOutputModule",

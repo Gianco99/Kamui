@@ -212,7 +212,6 @@
       "HLT",
       "PAT",
       "RECO"
-    ],
-    "keepAll": true
+    ]
   }
 }

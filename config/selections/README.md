@@ -1,19 +1,32 @@
-# Selection Configs
+# Selection Documentation
 
-A selection config is an ordered list of event-level cuts that `./kamui select` applies to production ntuples, writing out an ntuple with the same branches plus a cutflow. Cuts apply in the order they are listed, and that order is the cutflow order.
+A selection JSON is an ordered list of event-level cuts that `./kamui select` applies to production ntuples, writing out an ntuple with the same branches plus a cutflow. Cuts apply in the order they are listed, and that order is also the cutflow order.
 
 | File | Channel |
 |---|---|
 | `run2Lepton.json` | Run 2 lepton-triggered channel: single-electron or single-muon path, MET filters, one lepton on the plateau of the path that fired |
 | `run2Displaced.json` | Run 2 displacement-triggered channel: b-jet or displaced-dijet path, high-HT veto, lepton-channel veto, per-path offline emulation, MET filters |
-
-The era comes from each selected sample's catalog entry, and one copy of the selection is resolved per era present in the sample list.
 ## File Structure
 
-Two top-level keys: 
+| Key | Meaning |
+|---|---|
+| **`cuts`** (required, default: None) | The ordered cut list |
+| `eras` (optional, default: None) | The eras this config is meant for |
+| `include` (optional, default: None) | Another selection config to build on. Naming `cuts` replaces the inherited list |
 
-- `eras`, a list of the eras this config is meant for.
--  `cuts`, the ordered cut list. 
+Any threshold, trigger list or flag list may be written as a single value or as an object keyed by era. Only the era being run has to appear.
+## Cuts
+
+Every cut carries these, whatever its type:
+
+| Key | Meaning |
+|---|---|
+| **`name`** (required, default: None) | Names the cut, and its row in the cutflow |
+| **`type`** (required, default: None) | One of the six below |
+| `doc` (optional, default: `""`) | Free text, echoed into the cutflow |
+| `invert` (optional, default: `false`) | Keeps exactly the events the cut would otherwise drop |
+| `eras` (optional, default: None) | Read only on an `anyOf` alternative. Elsewhere it validates and does nothing |
+
 ## Cut Types
 
 | `type` | Keeps an event when | Fields |
@@ -25,27 +38,38 @@ Two top-level keys:
 | `object` | At least one leg is satisfied | `anyOf` list of legs, or inline `collection`, `min`, `requirements` |
 | `anyOf` | Every cut of at least one alternative passes | `anyOf` list of alternatives |
 
-- `triggers` is either the name of a config in `config/triggers/`or an explicit list of path patterns. A pattern ending in `_v*` has that suffix stripped and is matched against the ntuple's branch names.
+Some details regarding these cut types:
 
-- `flags` is a list of branch names, all of which must be true.
+- `triggers` is the name of a config in `config/triggers/`, an explicit list of path patterns, or an object keyed by era holding either. 
+  - A pattern ending in `_v*` has that suffix stripped and is matched against the ntuple's branch names.
 
-- A `quantity` or `veto` cut names one of the quantities below and bounds it with `min` and `max`. Several conditions in one cut are ANDed.
-  -  A `veto` pairs that with a trigger list and drops only the events that fired one of the paths and meet every condition, which is how orthogonality to another channel is implemented.
+- A `quantity` or `veto` names one of the quantities below. A `veto` is how orthogonality to another channel is implemented.
 
-- An `anyOf` cut holds alternatives, each an object with `name`, `doc`, an optional `eras` list, and `cuts`. 
-  - The cuts inside one alternative are ANDed, the alternatives are ORed, and an alternative whose `eras` does not include the era being run is dropped before anything is evaluated.
+- An `anyOf` alternative needs only `cuts`; `name` defaults to `alternative <n>`, and `doc` and `eras` are optional.
 
 ## Quantities
+
+These are derived quantities used for selections that do not come pre-packaged in the ntuples.
+
+**Event level**:
 
 | Name | Meaning |
 |---|---|
 | `HT30`, `HT40` | Scalar pT sum over jets above 30 or 40 GeV with `abs(eta) < 2.5` passing the era's TightLepVeto ID |
 | `nJet20`, `nJet40` | Count of those jets above 20 or 40 GeV |
-| `caloHT30` | Scalar sum of raw calo-jet pT above 30 GeV with `abs(eta) < 2.5`, the quantity the displaced-dijet triggers cut on |
+| `caloHT30` | Scalar sum of raw calo-jet pT above 30 GeV with `abs(eta) < 2.5` |
 | `nCaloJet` | Size of the calo-jet collection |
 | `nJet`, `nMuon`, `nElectron`, `nSV` | Collection sizes |
 | `leadJetPt`, `leadMuonPt`, `leadElectronPt` | pT of the leading object, 0 for an empty collection |
-| `MET` | `MET_pt` |
+| `MET` | `MET` transverse momentum |
+
+**Object level**:
+
+| Name | Meaning |
+|---|---|
+| `tightLepVeto` | TightLepVeto PF jet ID for the era, applied to the `Jet` collection from the stored energy fractions |
+| `dxyBeamspot` | Track dxy with respect to the beamspot taken at the object's own z, following the beam tilt |
+| `dzPV` | Track dz with respect to the PV, the first vertex passing `PV_isGood` |
 
 ## Legs
 
@@ -53,36 +77,20 @@ A leg of an `object` cut asks how many objects of one collection satisfy every r
 
 | Key | Meaning |
 |---|---|
-| `collection` | Branch prefix, for example `Jet`, `Muon`, `CaloJet` |
-| `min` | How many objects must satisfy the leg. A plain integer. Defaults to the length of `orderedMinPt`, or 1 |
-| `requirements` | Per-object requirements, all ANDed |
-| `orderedMinPt` | pT ladder in descending order: the k-th hardest surviving object must clear the k-th threshold |
-| `pairRequirements` | Requirements on two surviving objects at once |
-| `triggers` | Gates the leg on its own trigger |
-| `doc` | Free text |
+| **`collection`** (required, default: None) | Branch prefix, for example `Jet`, `Muon`, `CaloJet` |
+| **`requirements`** (required, default: None) | Per-object requirements, all ANDed |
+| `min` (optional, default: the length of `orderedMinPt`, or 1) | How many objects must satisfy the leg. A plain integer |
+| `orderedMinPt` (optional, default: None) | pT ladder in descending order: the k-th hardest surviving object must clear the k-th threshold |
+| `pairRequirements` (optional, default: None) | Requirements on two surviving objects at once |
+| `triggers` (optional, default: None) | Gates the leg on its own trigger |
+| `doc` (optional, default: `""`) | Free text |
 
-- A requirement names a `variable` and bounds it with `min`, `max`, `absMin` or `absMax`, the last two on the absolute value. It reads the branch `<collection>_<variable>`. Bounds are inclusive.
-  - Ex: `{"variable": "pt", "min": 20}` on a `Jet` leg reads `Jet_pt`. 
-- Listing the same variable twice stacks the bounds: the common object definition, then the path's own harder threshold.
-- A requirement may instead be `{"anyOf": [[...], [...]]}`, requirement groups ORed per object. 
-  - Ex: the electron impact-parameter cut either side of |eta| = 1.48.
-- `pairRequirements` bound `absDiffMin` and `absDiffMax` on the separation between two objects that already passed, and hold when some pair works. 
-  - Ex: `{"variable": "eta", "absDiffMax": 1.6}` is the dijet `MaxDeta1p6` leg, and needs `min` of at least 2.
-- `triggers` gates the leg, so a muon leg counts only in events where a muon path fired.
-- Legs within one `object` cut are ORed.
+- A requirement names a `variable` and bounds it with `min`, `max`, `absMin` or `absMax`.
+  -  It reads the branch `<collection>_<variable>`, and bounds are inclusive.
+- Listing the same variable twice stacks the bounds: first the common object definition, then the path's own harder threshold.
+- A requirement may instead be `{"anyOf": [[...], [...]]}`, requirement groups ORed per object.
+- `pairRequirements` bound `absDiffMin` and `absDiffMax` on the separation between two objects that already passed, and hold when some pair works.
 
-## Derived Per-Object Variables
-
-Three variables are computed from other branches.
-
-| Variable | Meaning |
-|---|---|
-| `tightLepVeto` | TightLepVeto PF jet ID for the era, applied to the `Jet` collection from the stored energy fractions. |
-| `dxyBeamspot` | Track dxy with respect to the beamspot taken at the object's own z, following the beam tilt |
-| `dzPV` | Track dz with respect to the PV, the first vertex passing `PV_isGood` |
-## invert
-
-`invert: true` on any cut keeps exactly the events that cut would otherwise have thrown away. Ex: how the displacement channel states its orthogonality to the lepton channel.
 ## Relevant Commands
 
 - Use `select` to apply one of these to a production task's ntuples.

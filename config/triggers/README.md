@@ -1,4 +1,4 @@
-# Trigger Configs
+# Trigger Documentation
 
 One JSON file per trigger channel. A channel is the set of HLT paths that define one way of selecting events.
 
@@ -11,21 +11,20 @@ One JSON file per trigger channel. A channel is the set of HLT paths that define
 
 | Key | Meaning |
 |---|---|
-| `paths` | The HLT path patterns. Required. A trailing `_v*` matches any version of the path |
-| `process` | The process name the trigger bits were written under. Defaults to `HLT` |
-| `mode` | `any` for an OR over `paths`, `all` for an AND. Defaults to `any` |
-| `_pathsByEra` | Optional. Which paths belong to which era's menu. Underscore keys are stripped at load, so this is documentation only |
-## Referenced From Two Places
-A content preset's `skim` block filters at production time. Ex: `config/content/run2/presets/dvLepton.json` says
+| **`paths`** (required, default: None) | The HLT path patterns. A trailing `_v*` matches any version of the path |
+| `include` (optional, default: None) | Another trigger config to build on. Naming `paths` replaces the inherited list |
+| `mode` (optional, default: `any`) | `any` for an OR over `paths`, `all` for an AND |
+| `process` (optional, default: `HLT`) | The process name the trigger bits were written under |
+
+ Nothing validates the key set of a trigger config, so double-check spelling!
+## Where These Are Used
+
+A content preset's `skim` block names a trigger JSON, and only events firing it reach the ntuple.  
+Ex: `config/content/run2/presets/dvLepton.json` says
 
 ```json
 "skim": {"triggers": "run2Lepton"}
 ```
 
-
-A selection config's cut filters at selection time. Ex: `config/selections/run2Displaced.json` says
-
-```json
-{"name": "trigger", "type": "trigger", "triggers": "run2Displaced"}
-```
+Selection configs carry their trigger patterns inline rather than naming a config here.
 

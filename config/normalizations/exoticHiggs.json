@@ -1,5 +1,5 @@
 {
-  "_doc": "Higgs production cross sections at mS=125 assuming BR(H -> long-lived pair) = 1.",
+  "_doc": "Higgs production cross sections at MH=125 assuming BR(H -> long-lived pair) = 1.",
   "_units": "pb",
   "_note": "JMTucker multiplies xsec by filterEff at load time. Kamui keeps them separate.",
   "processes": {

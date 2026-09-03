@@ -30,7 +30,7 @@ sample                                     channel            files     total   
 
 `channel` is the trigger config the sample's content preset skims on. `total` is the entries in the chained `Events` trees, `pass` the entries where at least one of the channel's paths is true, and `eff` their ratio in percent. Trigger branches are matched by stripping the version wildcard: `HLT_IsoMu24_v*` in the config is the branch `HLT_IsoMu24`.
 
-Under `--perPath`, a path that has no branch in the chain prints `not in menu`, which is the normal state for a path belonging to another era's menu. A sample whose catalog entry has a `notes` field prints it as a `JMTucker reference:` line under the sample.
+Under `--perPath`, a path that has no branch in the chain prints `not in menu`, which is the normal state for a path belonging to another era's menu.
 
 Lines outside the table report why a sample produced no number: it is no longer in the catalog, its content preset declares no trigger skim, its output directory on EOS is empty, or some of its files could not be opened or have no `Events` tree.
 

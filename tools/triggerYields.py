@@ -104,7 +104,7 @@ def main():
         if not args.triggers:
             sys.exit("--files needs --triggers <name>")
         trig = loadWithIncludes(args.triggers, paths.TRIGGERS_DIR)
-        jobs.append(("(files)", args.triggers, trig["paths"], args.files, None))
+        jobs.append(("(files)", args.triggers, trig["paths"], args.files))
     else:
         if not args.task:
             sys.exit("give --task or --files")
@@ -128,14 +128,13 @@ def main():
                 print(f"  {name}: content preset '{s['content']}' declares no trigger skim, skipping")
                 continue
             files = listEos(sites, f"{info.get('outLFNDirBase') or info['outDirBase']}/{name}")
-            jobs.append((name, skim.get("triggers", "?"), skim["hltPaths"],
-                         files, s.get("notes", "")))
+            jobs.append((name, skim.get("triggers", "?"), skim["hltPaths"], files))
 
     hdr = f"{'sample':<42} {'channel':<16} {'files':>5} {'total':>9} {'pass':>9} {'eff':>8}"
     print(hdr)
     print("-" * len(hdr))
 
-    for name, chan, plist, files, notes in jobs:
+    for name, chan, plist, files in jobs:
         if not files:
             print(f"{name:<42} {chan:<16} {'0':>5}   no output files found")
             continue
@@ -143,8 +142,6 @@ def main():
         eff = 100.0 * nPass / total if total else 0.0
         line = f"{name:<42} {chan:<16} {len(files):>5} {total:>9,} {nPass:>9,} {eff:>7.3f}%"
         print(line)
-        if notes:
-            print(f"{'':<42} JMTucker reference: {notes}")
         if args.perPath:
             for b, n in sorted(perPath.items()):
                 mark = "not in menu" if n is None else f"{n:,}"

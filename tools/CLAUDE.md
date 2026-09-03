@@ -5,7 +5,6 @@
 - `mode` and `vetoes` are ignored. `yieldsFor` always joins paths with `||`, so a config saying `mode: "all"` would be silently ORed. The docstring promises a four-tuple ending in `nPassAfterVeto` and the function returns three values.
 - `listEos` lists `<outLFNDirBase or outDirBase>/<sample>/` and takes every `.root`, the flat layout condor writes. A CRAB task records `outLFNDirBase` but nests its output below that level, so nothing is found. Use `--files` there.
 - The regex on `--task` is a path-traversal guard, since the name is joined onto `JOBS_DIR`.
-- No sample sets `notes`, so the `JMTucker reference:` line does not print today.
 
 ## inspectMiniAOD.py
 

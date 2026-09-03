@@ -5,7 +5,6 @@
     - This is why `loadSites` lives here, and why `_cmdCheck` calls `validateTriggers()` to reach the trigger directory.
     - `select/normalization.py` is the one place that writes a config file, `config/normalizations/generatorSums.json`. It is measured data rather than hand-written physics, which is why it does not go through a reader.
 - `catalog.py` reads the sample configs and answers which samples a command means.
-    - The `Sample` class is a dict subclass giving attribute access, `sample.name`.
     - `select` backs the five sample flags on every command that takes them, and they do not behave alike. `--family`, `--era` and `--tag` resolve case-insensitively against what exists and raise on a value matching nothing, naming every value that does exist; two spellings differing only in case are ambiguous and also raise. `--name` is exact and case-sensitive. `--match` is a plain glob with no check at all, so a pattern matching nothing leaves the selection empty and the command exits with "No samples matched the selection".
 - `content.py` resolves a content preset into what a job receives.
     - `KIND_TO_PLUGIN` is the point of the module: a physics-facing `type` maps onto the CMSSW plugin that builds that table, so nobody writing a config has to know a plugin name. A new kind of collection is an entry here, plus any of the sets below it whose behavior it shares.

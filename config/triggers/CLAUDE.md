@@ -1,7 +1,4 @@
-# config/triggers
-## Caveats
-
-- Path order is JMTucker's, from `MFVNeutralino/python/TriggerFilter_cfi.py`. Do not sort.
-- One list serves all four eras. A path absent from a year's menu never fires, so era-specific paths sit together in one list and `_pathsByEra` is the only record of which belongs where.
-- `mode` and `process` are read by the production skim only. A selection cut takes `paths` alone, so `mode: "all"` would mean AND in production and OR in selection with nothing raising.
-- A config cannot inherit `paths` and add one; naming `paths` replaces the inherited list.
+# Trigger Caveats
+- Path order inspired by JMTucker's, from `MFVNeutralino/python/TriggerFilter_cfi.py`.
+- `_pathsByEra` is the only record of which path belongs to which year's menu.
+- `mode` and `process` reach the production skim only. A selection cut takes `paths` alone, so `mode: "all"` would mean AND in production, but OR in selection.

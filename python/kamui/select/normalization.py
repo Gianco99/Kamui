@@ -12,15 +12,9 @@ silently shrink the denominator and inflate every yield computed from it.
 ## Standard Python imports
 import json
 import os
-import tempfile
-
-## Third-party
-import awkward as ak
-import uproot
 
 ## Kamui modules
 from ..foundations import paths
-from .engine import _localCopy
 
 
 def sumsFile():

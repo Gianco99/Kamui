@@ -7,6 +7,7 @@ The file format is documented in config/samples/README.md and the CLAUDE.md besi
 
 ## Standard Python imports
 import itertools
+import fnmatch
 import os
 import re
 
@@ -20,16 +21,10 @@ from ..foundations.config import deepMerge, loadJson
 NAME_OK = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 ## Every field a sample may carry. Documented in config/samples/README.md
-SAMPLE_FIELDS = {"name", "dataset", "dasInstance", "isMC", "era", "family", "content", "tags", "unitsPerJob", "lumiMask", "notes"}
+SAMPLE_FIELDS = {"name", "dataset", "dasInstance", "isMC", "era", "family", "content", "tags", "unitsPerJob", "lumiMask"}
 
 class Sample(dict):
-    """A dictionary with attribute access, just so sample.name reads better in f-strings."""
-
-    def __getattr__(self, k):
-        try:
-            return self[k]
-        except KeyError:
-            raise AttributeError(k) from None
+    """A sample entry. Subclasses dict so it prints by name in logs."""
 
     def __repr__(self):
         return f"<Sample {self.get('name')}>"
@@ -69,8 +64,6 @@ def _expandGrid(grid, defaults):
         for k, v in subs.items():
             if k in SAMPLE_FIELDS:
                 s[k] = v
-        s.setdefault("notes", "")
-        s["_axes"] = subs
         samples.append(s)
 
     stale = sorted(skip - generated)
@@ -107,7 +100,7 @@ def _loadFamily(path):
         if s["name"] in seen:
             raise ValueError(f"{path}: duplicate sample name '{s['name']}'")
         seen.add(s["name"])
-        bad = set(s) - SAMPLE_FIELDS - {"_axes"}
+        bad = set(s) - SAMPLE_FIELDS
         if bad:
             raise ValueError(f"{path}: sample '{s['name']}' has unknown field(s): {sorted(bad)}")
         if "dataset" not in s:
@@ -162,7 +155,6 @@ def _resolve(value, allowed, what):
 
 def select(catalog, names=None, family=None, era=None, tag=None, pattern=None):
     """Filter a catalog. All given criteria must match."""
-    import fnmatch
 
     out = catalog
     if names:
