@@ -1,13 +1,14 @@
-# Kamui
+# Kamui CLI Documentation
 
 Kamui is the CLI for the whole analysis framework. Every stage of the analysis is meant to be driven through it, so there is one place to look for all of our analysis needs. It relies on a set of configuration files so we are never editing or hard-coding things into our scripts.
 
-Two stages are implemented: sample processing, which turns CMS datasets into analysis ntuples on EOS, and event selection, which applies a selection config to those ntuples and writes ntuples with the same branches.
+Two stages are implemented:
+
+- Sample processing, which turns CMS datasets into analysis ntuples on EOS
+- Event selection, which applies a selection config to those ntuples and writes ntuples with the same branches.
 
 ```
 ./kamui <command> [flags]
-./kamui --noBanner <command>     # --noBanner goes before the command
-KAMUI_NO_BANNER=1                 # or set this once and never see it again
 ```
 
 `./kamui <command> --help` prints the flags for one command.
@@ -15,17 +16,24 @@ KAMUI_NO_BANNER=1                 # or set this once and never see it again
 
 ## Picking samples
 
-Six commands take the same five flags. `--name` may be repeated.
-
+Before going into the documentation for each command, note that six commands accept the same five flags:
 | Flag | What it matches |
 | --- | --- |
-| `--name` | Exact sample name, repeatable |
-| `--family` | The sample config file, e.g. `exoticHiggs4d2024` |
-| `--era` | Data-taking period: `2016`, `2016APV`, `2017`, `2018`, `Summer24` |
-| `--tag` | A tag from the sample config, e.g. `validation`, `signal`, `leptonTriggered` |
-| `--match` | Wildcard on the sample name; quote it or the shell eats it first |
+| `--name NAME` (optional, default: None) | Exact sample name, repeatable |
+| `--family NAME` (optional, default: None) | The `family` key of a file in `config/samples/` |
+| `--era NAME` (optional, default: None) | Data-taking period |
+| `--tag NAME` (optional, default: None) | A tag from the sample config |
+| `--match PATTERN` (optional, default: None) | Wildcard on the sample name |
 
-The commands that take them are `list`, `query`, `stage`, `submit`, `select` and `norm`. Every one of them exits when nothing matched, except that `list` tolerates a `--match` that matches nothing. An unknown `--name`, `--tag` or `--family` is always an error.
+
+
+The commands that take them are `list`, `query`, `stage`, `submit`, `select` and `norm`.
+
+Two things to keep in mind:
+
+- An unknown `--name`, `--tag` or `--family` is always an error, on every command.
+
+- An empty selection exits on all but `list`, which reports nothing found and carries on.
 
 ## Commands
 
@@ -33,7 +41,7 @@ The commands that take them are `list`, `query`, `stage`, `submit`, `select` and
 
 #### check
 
-Validates the configs and the framework locally.
+Validates the configs and the framework locally. It can be divided into config and architecture checks.
 
 **Config Checks:**
 
@@ -53,7 +61,7 @@ Validates the configs and the framework locally.
 | Layering | `foundations/` does not import from the rest of the framework (avoid circular imports) |
 | Config access | `configReaders/` is the only folder containing config access scripts |
 
-Each line is marked with a status. 
+Each line is marked with a status.
 
 - A cross is a failure
 - A warning is something incomplete
@@ -67,13 +75,13 @@ Run it after editing any config, and before submitting anything. It exits non-ze
 
 #### find
 
-Searches DAS for datasets matching a wildcard, whether or not we have them in our configs.
+Searches DAS for datasets matching a wildcard, regardless of whether we have them in our configs.
 
 | Flag | Meaning |
 | --- | --- |
-| `pattern` | Positional, required. Put it in quotes! |
-| `--instance` | `prod/global` for official datasets (default), `prod/phys03` for USER ones |
-| `--refresh` | Bypass the DAS cache |
+| **`pattern`** (required, default: None) | Positional |
+| `--instance INSTANCE` (optional, default: ) | `prod/global` for central datasets, `prod/phys03` for USER-created datasets |
+| `--refresh` (optional, default: None) | Bypass the DAS cache |
 
 ```
 ./kamui find '/*HAHM*/*/MINIAODSIM'                       Everything from one model, any campaign
@@ -83,12 +91,15 @@ Searches DAS for datasets matching a wildcard, whether or not we have them in ou
 
 #### norm
 
-Records the generator weight sum for normalization, in `config/normalizations/generatorSums.json`. The sums are read from the sample's central NanoAOD.
+Records the generator weight sum for normalization in `config/normalizations/generatorSums.json`. The sums are read from the sample's central NanoAOD.
+
+See `config/normalizations/README.md` for the files this writes into.
+
 | Flag | Meaning |
 | --- | --- |
-| The five sample flags | |
-| `--write` | Write results to the JSON |
-| `--refresh` | Bypass the DAS cache |
+| The five sample flags | See above |
+| `--write` (optional, default: None) | Write results to the JSON |
+| `--refresh` (optional, default: None) | Bypass the DAS cache |
 
 ```
 ./kamui norm --family tutorial            Report the sums, write nothing
@@ -96,19 +107,25 @@ Records the generator weight sum for normalization, in `config/normalizations/ge
 ./kamui norm --tag validation --write     A whole tag at once
 ```
 
-A sample whose dataset has no central NanoAOD is skipped. 
+A sample whose dataset has no central NanoAOD is skipped. This functionality should be updated at some point!
 
-Use `./kamui check` to see how many catalogued samples have a sum recorded.
+Use `./kamui check` to see how many cataloged samples have a sum recorded.
 
 ### Working with Registered Samples
 
 #### list
 
-Shows the samples in your config files, grouped by family. Four columns: the sample name, its era, the content preset it uses, and its tags.
+Shows the samples in your config files, grouped by family. Four columns:
+
+- The sample name
+- The era
+- The content preset it uses
+- The tags it uses
 
 | Flag | Meaning |
 | --- | --- |
-| `--datasets` | Print the bare DAS paths instead of the table |
+| The five sample flags | See above |
+| `--datasets` (optional, default: None) | Print the bare DAS paths instead of the table |
 
 ```
 ./kamui list                                       Everything
@@ -127,8 +144,8 @@ Asks DAS how many files, events and gigabytes each selected sample holds, and to
 
 | Flag | Meaning |
 | --- | --- |
-| The five sample flags | |
-| `--refresh` | Ignore the cache and ask DAS again |
+| The five sample flags | See above |
+| `--refresh` (optional, default: None) | Ignore the cache and ask DAS again |
 
 ```
 ./kamui query --tag validation                     The 24 Run 2 samples
@@ -142,38 +159,26 @@ Copies raw MiniAOD from the grid to our EOS area, for local tests. It copies the
 
 | Flag | Meaning |
 | --- | --- |
-| The five sample flags | |
-| `--maxFiles N` | Cap on files copied |
-| `--dryRun` | Print what would be copied, copy nothing |
-| `--refresh` | Bypass the DAS cache |
+| The five sample flags | See above |
+| `--maxFiles N` (optional, default: None) | Cap on files copied |
+| `--dryRun` (optional, default: None) | Print what would be copied, copy nothing |
+| `--refresh` (optional, default: None) | Bypass the DAS cache |
 
 ```
 ./kamui stage --name ggH-2S-4D_mS55_ctau10mm_2024             One whole sample
-./kamui stage --name ggH-2S-4D_mS55_ctau10mm_2024 --dryRun   Print what would be copied
+./kamui stage --name ggH-2S-4D_mS55_ctau10mm_2024 --dryRun    Print what would be copied
 ./kamui stage --tag rpv --maxFiles 1                          One file each
-```
-
-#### cache
-
-Describes the DAS cache, or thins it out. DAS is slow, so every answer is kept on disk and reused. Prints how many responses are held, how much space they take, how old they are, and how many have passed the 30 day age limit.
-| Flag | Meaning |
-| --- | --- |
-| `--prune` | Delete expired entries |
-| `--clear` | Delete every cached response |
-
-```
-./kamui cache                                      What is cached right now
-./kamui cache --prune                              Drop the expired entries
-./kamui cache --clear                              Throw the whole thing away
 ```
 
 ### Defining Our Ntuples
 
 #### content
 
-Shows what a content preset would write into your ntuples, without running anything. 
+Shows what a content preset would write into your ntuples, without running anything.
 
-One row per collection: 
+See `config/content/README.md` for how a collection or preset is written, and `config/triggers/README.md` for the channel a `skim` names.
+
+One row per collection:
 
 - Its name
 - What kind of object it is
@@ -183,10 +188,10 @@ One row per collection:
 
 | Flag | Meaning |
 | --- | --- |
-| `preset` | Optional. The preset or collection to resolve |
-| `--data` | Resolve as data, which drops the `mcOnly` collections |
-| `--era` | Era whose content set to resolve against (default `Summer24`) |
-| `--write PATH` | Write the resolved JSON to this path |
+| `preset` (optional, default: None) | Positional. The preset or collection to resolve. Omit it to list them |
+| `--data` (optional, default: None) | Resolve as data, which drops the `mcOnly` collections |
+| `--era NAME` (optional, default: `Summer24`) | Era whose content set to resolve against |
+| `--write PATH` (optional, default: None) | Write the resolved JSON to this path |
 ```
 ./kamui content                                    The presets run2 and run3 define
 ./kamui content dvSignal                           What a preset resolves to
@@ -199,23 +204,26 @@ One row per collection:
 ### Producing the Ntuples
 
 See `ntupleProduction/README.md` for more details on job submission. This section just describes how to run the submission via the CLI.
+
 #### submit
 
 Produces the ntuples. It takes the samples you selected, works out what each job should write, builds a job area on disk, and sends it to condor or to CRAB.
 
+See `config/content/README.md` for what a preset decides to save.
+
 | Flag | Meaning |
 | --- | --- |
-| The five sample flags | |
-| `--task NAME` | Required. Names the directory under `ntupleProduction/jobs/` and the EOS output subdirectory |
-| `--backend` | `condor` (default) or `crab` |
-| `--content` | Override the content preset the selected samples uses |
-| `--filesPerJob N` | Input files per job |
-| `--maxFiles N` | Use at most this many input files per sample |
-| `--memoryMB N` | Memory request per job (default 2500) |
-| `--dryRun` | Write the job area, submit nothing |
-| `--refresh` | Bypass the DAS cache |
-| `--overwrite` | Overwrite an existing job area without asking |
-| `--outputBase` | Write output under this EOS path instead of the site default |
+| The five sample flags | See above |
+| **`--task NAME`** (required, default: None) | Names the directory under `ntupleProduction/jobs/` and the EOS output subdirectory |
+| `--backend BACKEND` (optional, default: `condor`) | `condor` or `crab` |
+| `--content NAME` (optional, default: None) | Override the content preset the selected samples use |
+| `--filesPerJob N` (optional, default: the sample's `unitsPerJob`, else 5) | Input files per job |
+| `--maxFiles N` (optional, default: None) | Use at most this many input files per sample |
+| `--memoryMB N` (optional, default: 2500) | Memory request per job |
+| `--dryRun` (optional, default: None) | Write the job area, submit nothing |
+| `--refresh` (optional, default: None) | Bypass the DAS cache |
+| `--overwrite` (optional, default: None) | Overwrite an existing job area without asking |
+| `--outputBase PATH` (optional, default: the site stageout base) | Write output under this EOS path |
 ```
 ./kamui submit --tag validation --task run2Val --dryRun                               Build the job area, submit nothing
 ./kamui submit --tag validation --task run2Val --backend crab                         The 24 Run 2 samples at LPC, through CRAB
@@ -231,7 +239,7 @@ Reports how a submitted production task is doing. It reads the job area, sees wh
 
 | Flag | Meaning |
 | --- | --- |
-| `--task NAME` | Required. A task under `ntupleProduction/jobs/` |
+| **`--task NAME`** (required, default: None) | A task under `ntupleProduction/jobs/` |
 
 ```
 ./kamui status --task run2Val
@@ -243,9 +251,9 @@ Resubmits only the jobs of a task whose outputs never reached EOS. On CRAB it as
 
 | Flag | Meaning |
 | --- | --- |
-| `--task NAME` | Required. The task to retry |
-| `--dryRun` | Report what would be resubmitted, submit nothing |
-| `--forceResubmit` | Resubmit even while jobs from this task are still queued |
+| **`--task NAME`** (required, default: None) | The task to retry |
+| `--dryRun` (optional, default: None) | Report what would be resubmitted, submit nothing |
+| `--forceResubmit` (optional, default: None) | Resubmit even while jobs from this task are still queued |
 ```
 ./kamui resubmit --task run2Val --dryRun           What is missing
 ./kamui resubmit --task run2Val                    Retry it
@@ -256,17 +264,20 @@ Resubmits only the jobs of a task whose outputs never reached EOS. On CRAB it as
 #### select
 
 Applies an event-level selection to ntuples a `submit` task produced, and writes ntuples with the same branches.
+
+See `config/selections/README.md` for how a cut is written.
+
 | Flag | Meaning |
 | --- | --- |
-| The five sample flags | |
-| `--selection NAME` | Required. A config in `config/selections/`, e.g. `run2Lepton` |
-| `--task NAME` | Required. Names this selection pass |
-| `--inputTask NAME` | Required. The ntuple production task to read from |
-| `--inputBase` | EOS base holding the input ntuples (default: the site stageout base) |
-| `--outputBase` | Where to write the selected ntuples |
-| `--backend` | `local` (default) or `condor` |
-| `--filesPerJob N` | Input files per job on condor (default 5) |
-| `--dryRun` | Write the job area, submit nothing |
+| The five sample flags | See above |
+| **`--selection NAME`** (required, default: None) | A config in `config/selections/` |
+| **`--task NAME`** (required, default: None) | Names this selection pass |
+| **`--inputTask NAME`** (required, default: None) | The ntuple production task to read from |
+| `--inputBase PATH` (optional, default: the site stageout base) | EOS base holding the input ntuples |
+| `--outputBase PATH` (optional, default: the site stageout base) | Where to write the selected ntuples |
+| `--backend BACKEND` (optional, default: `local`) | `local` or `condor` |
+| `--filesPerJob N` (optional, default: 5) | Input files per job on condor |
+| `--dryRun` (optional, default: None) | Write the job area, submit nothing |
 
 Output carries the same branches as input, so a selection can be applied to an earlier pass's output.
 ```
@@ -278,17 +289,36 @@ Output carries the same branches as input, so a selection can be applied to an e
 
 Prints the cutflow a local `select` task recorded. Per cut, it quotes:
 
--  The events kept
+- The events kept
 - The events removed
 - The step efficiency
-- The cumulative efficiency.
+- The cumulative efficiency
+
+The first row is `generated`, the events in the whole dataset as `norm` recorded them. A sample with no recorded sum has no such row and the table starts at the ntuple.
 
 | Flag | Meaning |
 | --- | --- |
-| `--task NAME` | Required. The select task |
+| **`--task NAME`** (required, default: None) | The select task |
 
 ```
 ./kamui cutflow --task lepPass
+```
+
+### DAS Cache
+
+#### cache
+
+Describes the DAS cache, or thins it out. DAS is slow, so every answer `find`, `query`, `norm` and `submit` get back is kept on disk and reused. Prints how many responses are held, how much space they take, how old they are, and how many have passed the 30 day age limit.
+
+| Flag | Meaning |
+| --- | --- |
+| `--prune` (optional, default: None) | Delete expired entries |
+| `--clear` (optional, default: None) | Delete every cached response |
+
+```
+./kamui cache                                      What is cached right now
+./kamui cache --prune                              Drop the expired entries
+./kamui cache --clear                              Throw the whole thing away
 ```
 
 ## The Code Behind It

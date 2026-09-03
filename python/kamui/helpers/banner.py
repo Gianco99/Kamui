@@ -31,7 +31,7 @@ RED, RESET = "\033[31m", "\033[0m"
 def printBanner(enabled=True, stream=None):
     """Draw the Sharingan. Does nothing whenever it would be unwelcome."""
     stream = stream or sys.stderr
-    if not enabled or os.environ.get("KAMUI_NO_BANNER"):
+    if not enabled:
         return
     if not hasattr(stream, "isatty") or not stream.isatty():
         return                              # piped or redirected: keep the output clean

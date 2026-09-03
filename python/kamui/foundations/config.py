@@ -45,9 +45,6 @@ def _resolvePath(nameOrPath, searchDir):
             cand = nameOrPath if os.path.isabs(nameOrPath) else os.path.join(d, nameOrPath)
             if os.path.exists(cand):
                 return cand
-        if os.path.exists(nameOrPath):
-            return nameOrPath
-    ## Each directory in order, then one level of subdirectories beneath it
     for base in dirs:
         if not os.path.isdir(base):
             continue

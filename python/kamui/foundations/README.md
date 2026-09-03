@@ -6,5 +6,6 @@ The bottom layer everything else is built on.
 
 `config.py` - Reads the JSON config files.
 - Any key starting with an underscore is treated as a comment and dropped, since JSON has no comment syntax.
-- Config files inherit from each other like C++ classes. Overriding a block replaces only the parts you name, so the settings originally defined survive.
-- Lists are the exception. There is no way to say "the base list plus mine", so restate anything you want to keep.
+- Config files inherit from each other like C++ classes, through an `include` list naming what to build on.
+  - Overriding a block replaces only the parts you name, so the settings originally defined survive.
+  - Lists are the exception. There is no way to say "the base list plus mine", so restate anything you want to keep.

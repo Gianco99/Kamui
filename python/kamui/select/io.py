@@ -10,6 +10,7 @@ import os
 import subprocess
 
 ## Kamui modules
+from ..foundations import paths
 from ..configReaders.sites import loadSites
 
 
@@ -49,9 +50,9 @@ def findInputs(inputTask, sampleName, inputBase=None):
                   if line.strip().endswith(".root") and _namesSample(os.path.dirname(line.strip()), sampleName))
 
 
-def writeCutflow(selectionDir, task, selectionName, flows):
+def writeCutflow(task, selectionName, flows):
     """Record the per-cut counts for every sample in a task."""
-    out = os.path.join(selectionDir, "out", task)
+    out = os.path.join(paths.SELECTION_OUT_DIR, task)
     os.makedirs(out, exist_ok=True)
     record = {"task": task, "selection": selectionName, "samples": flows}
     tmp = os.path.join(out, "cutflow.json.tmp")
@@ -83,9 +84,9 @@ def withGenerated(flow, genEvents):
     return out
 
 
-def printCutflow(selectionDir, task):
+def printCutflow(task):
     """Print the cutflow table for a select task."""
-    path = os.path.join(selectionDir, "out", task, "cutflow.json")
+    path = os.path.join(paths.SELECTION_OUT_DIR, task, "cutflow.json")
     if not os.path.isfile(path):
         raise FileNotFoundError(f"no cutflow at {path}")
     with open(path) as f:

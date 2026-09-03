@@ -34,11 +34,11 @@ def _addSelection(p):
     Gives a sample-related command defined in main() the five sample selection flags.
     Sample convention documented in Kamui/config/samples/README.md
     """
-    p.add_argument("--name", action="append", help="Exact sample name")
-    p.add_argument("--family", help="Family file name, e.g. exoticHiggs4d2024")
-    p.add_argument("--era", help="Data-taking period, e.g. Summer24, Summer23, 2018, ...")
-    p.add_argument("--tag", help="Tag from the sample config, e.g. signal / stealthSusy")
-    p.add_argument("--match", help="Wildcard on the sample name, e.g. 'ggH*ctau10mm*'")
+    p.add_argument("--name", metavar="NAME", action="append", help="Exact sample name")
+    p.add_argument("--family", metavar="NAME", help="Family file name, e.g. exoticHiggs4d2024")
+    p.add_argument("--era", metavar="NAME", help="Data-taking period, e.g. Summer24, Summer23, 2018, ...")
+    p.add_argument("--tag", metavar="NAME", help="Tag from the sample config, e.g. signal / stealthSusy")
+    p.add_argument("--match", metavar="PATTERN", help="Wildcard on the sample name, e.g. 'ggH*ctau10mm*'")
 
 def _pick(args, required=True):
     """
@@ -211,13 +211,13 @@ def _cmdSelect(args):
         for s in sel:
             if s["name"] not in fileLists:
                 continue
-            outDir = os.path.join(paths.SELECTION_DIR, "out", args.task, s["name"])
+            outDir = os.path.join(paths.SELECTION_OUT_DIR, args.task, s["name"])
             flow = applySelection(fileLists[s["name"]], resolvedSelections[s["era"]],
                                   os.path.join(outDir, f"{s['name']}_selected.root"))
             flows[s["name"]] = selectBackend.withGenerated(flow, normalization.generatedEvents(s["name"]))
             print(f"  {s['name']:<44} {flow[0]['kept']:>8,} -> {flow[-1]['kept']:>8,}  ({100 * flow[-1]['kept'] / flow[0]['kept'] if flow[0]['kept'] else 0:.1f}%)")
-        selectBackend.writeCutflow(paths.SELECTION_DIR, args.task, args.selection, flows)
-        print(f"  cutflow written under {os.path.join(paths.SELECTION_DIR, 'out', args.task)}")
+        selectBackend.writeCutflow(args.task, args.selection, flows)
+        print(f"  cutflow written under {os.path.join(paths.SELECTION_OUT_DIR, args.task)}")
         return
 
     samples = [s for s in sel if s["name"] in fileLists]
@@ -260,7 +260,7 @@ def _cmdNorm(args):
 
 def _cmdCutflow(args):
     """Print the cutflow table recorded by a select task."""
-    selectBackend.printCutflow(paths.SELECTION_DIR, args.task)
+    selectBackend.printCutflow(args.task)
 
 
 def _cmdStatus(args):
@@ -534,7 +534,6 @@ def _addCmd(sub, name, help, description):
 def main(argv=None):
     p = argparse.ArgumentParser(prog="kamui", description=__doc__, formatter_class=_Formatter, add_help=False)
     p.add_argument("-h", "--help", action="help", help=argparse.SUPPRESS)
-    p.add_argument("--noBanner", action="store_true", help="Skip the startup banner")
     _titles(p)
     sub = p.add_subparsers(dest="cmd", metavar="", parser_class=_CommandParser)
 
@@ -546,8 +545,8 @@ def main(argv=None):
     q = _addCmd(sub, "content", help="Show presets declaring what we save in ntuples", description=_cmdContent.__doc__)
     q.add_argument("preset", nargs="?", help="Preset name; omit argument to list all of them")
     q.add_argument("--data", action="store_true", help="Resolve as data (drops mcOnly collections)")
-    q.add_argument("--era", help="Era configuration we use (default: Summer24)")
-    q.add_argument("--write", help="Write the resolved JSON here")
+    q.add_argument("--era", metavar="NAME", help="Era configuration we use (default: Summer24)")
+    q.add_argument("--write", metavar="PATH", help="Write the resolved JSON here")
     q.set_defaults(func=_cmdContent)
 
     q = _addCmd(sub, "query", help="Query DAS for how many files, events and GB each selected sample holds", description=_cmdQuery.__doc__)
@@ -557,55 +556,55 @@ def main(argv=None):
 
     q = _addCmd(sub, "find", help="Unrestricted DAS dataset search", description=_cmdFind.__doc__)
     q.add_argument("pattern", help="DAS wildcard, e.g. '/*HAHM*/*/MINIAODSIM'")
-    q.add_argument("--instance", default="prod/global", help="prod/global for official datasets, prod/phys03 for USER ones")
+    q.add_argument("--instance", metavar="INSTANCE", default="prod/global", help="prod/global for official datasets, prod/phys03 for USER ones (default: prod/global)")
     q.add_argument("--refresh", action="store_true", help="Bypass the DAS cache")
     q.set_defaults(func=_cmdFind)
 
     q = _addCmd(sub, "stage", help="Copy raw MiniAOD to EOS", description=_cmdStage.__doc__)
     _addSelection(q)
-    q.add_argument("--maxFiles", type=int, help="Hard cap on files copied")
+    q.add_argument("--maxFiles", metavar="N", type=int, help="Hard cap on files copied")
     q.add_argument("--dryRun", action="store_true", help="Print what would be copied, but copy nothing")
     q.add_argument("--refresh", action="store_true", help="Bypass the DAS cache")
     q.set_defaults(func=_cmdStage)
 
     q = _addCmd(sub, "submit", help="Produce ntuples by submitting to condor or CRAB", description=_cmdSubmit.__doc__)
     _addSelection(q)
-    q.add_argument("--task", required=True, help="Task name; also the EOS output subdirectory")
-    q.add_argument("--backend", choices=["condor", "crab"], default="condor", help="Where the jobs run (default: condor)")
-    q.add_argument("--content", help="Override the per-sample content preset")
-    q.add_argument("--filesPerJob", type=int, help="Input files per job, overriding any per-sample unitsPerJob (default: 5)")
-    q.add_argument("--maxFiles", type=int, help="Use at most this many input files per sample")
-    q.add_argument("--memoryMB", type=int, default=2500, help="Memory request per job in MB (default: 2500)")
+    q.add_argument("--task", metavar="NAME", required=True, help="Task name; also the EOS output subdirectory")
+    q.add_argument("--backend", metavar="BACKEND", choices=["condor", "crab"], default="condor", help="Where the jobs run (default: condor)")
+    q.add_argument("--content", metavar="NAME", help="Override the per-sample content preset")
+    q.add_argument("--filesPerJob", metavar="N", type=int, help="Input files per job, overriding any per-sample unitsPerJob (default: 5)")
+    q.add_argument("--maxFiles", metavar="N", type=int, help="Use at most this many input files per sample")
+    q.add_argument("--memoryMB", metavar="N", type=int, default=2500, help="Memory request per job in MB (default: 2500)")
     q.add_argument("--dryRun", action="store_true", help="Write the job area, submit nothing")
     q.add_argument("--refresh", action="store_true", help="Bypass the DAS cache")
     q.add_argument("--overwrite", action="store_true", help="Overwrite an existing job area without asking")
-    q.add_argument("--outputBase", help="Write output under this EOS path instead of the site default")
+    q.add_argument("--outputBase", metavar="PATH", help="Write output under this EOS path instead of the site default")
     q.set_defaults(func=_cmdSubmit)
 
     q = _addCmd(sub, "resubmit", help="Rerun failed jobs", description=_cmdResubmit.__doc__)
-    q.add_argument("--task", required=True, help="The task to retry")
+    q.add_argument("--task", metavar="NAME", required=True, help="The task to retry")
     q.add_argument("--dryRun", action="store_true", help="Report what would be resubmitted, submit nothing")
     q.add_argument("--forceResubmit", action="store_true", help="Resubmit even while jobs from this task are still queued")
     q.set_defaults(func=_cmdResubmit)
 
     q = _addCmd(sub, "status", help="Status of a submitted task", description=_cmdStatus.__doc__)
-    q.add_argument("--task", required=True, help="Task name under ntupleProduction/jobs/")
+    q.add_argument("--task", metavar="NAME", required=True, help="Task name under ntupleProduction/jobs/")
     q.set_defaults(func=_cmdStatus)
 
     q = _addCmd(sub, "select", help="Apply an event selection to ntuples", description=_cmdSelect.__doc__)
     _addSelection(q)
-    q.add_argument("--selection", required=True, help="Selection config name, e.g. run2Lepton")
-    q.add_argument("--task", required=True, help="Name for this selection pass")
-    q.add_argument("--inputTask", required=True, help="The ntuple production task to read from")
-    q.add_argument("--inputBase", help="EOS base holding the input ntuples (default: the site stageout base)")
-    q.add_argument("--outputBase", help="Where to write the selected ntuples")
-    q.add_argument("--backend", choices=["local", "condor"], default="local", help="Where the selection runs (default: local)")
-    q.add_argument("--filesPerJob", type=int, help="Input files per job on condor (default: 5)")
+    q.add_argument("--selection", metavar="NAME", required=True, help="Selection config name, e.g. run2Lepton")
+    q.add_argument("--task", metavar="NAME", required=True, help="Name for this selection pass")
+    q.add_argument("--inputTask", metavar="NAME", required=True, help="The ntuple production task to read from")
+    q.add_argument("--inputBase", metavar="PATH", help="EOS base holding the input ntuples (default: the site stageout base)")
+    q.add_argument("--outputBase", metavar="PATH", help="Where to write the selected ntuples")
+    q.add_argument("--backend", metavar="BACKEND", choices=["local", "condor"], default="local", help="Where the selection runs (default: local)")
+    q.add_argument("--filesPerJob", metavar="N", type=int, help="Input files per job on condor (default: 5)")
     q.add_argument("--dryRun", action="store_true", help="Write the job area, submit nothing")
     q.set_defaults(func=_cmdSelect)
 
     q = _addCmd(sub, "cutflow", help="Print the cutflow for a given task", description=_cmdCutflow.__doc__)
-    q.add_argument("--task", required=True, help="Select task name")
+    q.add_argument("--task", metavar="NAME", required=True, help="Select task name")
     q.set_defaults(func=_cmdCutflow)
 
     q = _addCmd(sub, "norm", help="Measure and store weights for normalization", description=_cmdNorm.__doc__)
@@ -624,7 +623,7 @@ def main(argv=None):
 
     ## The banner is an orientation aid, so it appears with the help and stays out of the way otherwise.
     given = list(argv if argv is not None else sys.argv[1:])
-    printBanner(enabled=(not given or "-h" in given or "--help" in given) and "--noBanner" not in given)
+    printBanner(enabled=not given or "-h" in given or "--help" in given)
     args = p.parse_args(argv)
     ## No command at all is a request to see what the commands are.
     if not args.cmd:
