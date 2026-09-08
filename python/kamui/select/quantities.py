@@ -8,10 +8,6 @@ Event-level quantities a selection config may name.
 import awkward as ak
 
 
-## Branches the jet identification needs
-JET_ID_BRANCHES = ["Jet_pt", "Jet_eta", "Jet_neHEF", "Jet_neEmEF", "Jet_chHEF",
-                   "Jet_chEmEF", "Jet_muEF", "Jet_nConstituents", "Jet_chMultiplicity"]
-
 
 ## Eras whose TightLepVeto definition is the 2016 one rather than the 2017/18 one
 ERAS_2016 = {"2016", "2016APV"}
@@ -61,7 +57,7 @@ def tightLepVeto(events, era):
         return tightLepVeto2017p8(events)
     raise ValueError(
         f"no TightLepVeto jet identification is defined for era '{era}'. "
-        "The Run 2 working points are here; the Run 3 table is in select/README.md and still needs writing down."
+        "Only the Run 2 working points are implemented."
     )
 
 
@@ -73,7 +69,7 @@ def selectedJets(events, minPt, era, maxEta=2.5, applyId=True):
     return keep
 
 
-## Every quantity a selection config may reference, and the branches it needs
+## Every quantity a selection config may reference
 def htFromJets(events, minJetPt, era, maxEta=2.5, applyId=True):
     """Scalar sum of pT over identified jets above a threshold."""
     return ak.sum(events["Jet_pt"][selectedJets(events, minJetPt, era, maxEta, applyId)], axis=1)
@@ -107,20 +103,20 @@ def count(events, collection):
 
 
 QUANTITIES = {
-    "HT40":            {"fn": lambda e, era: htFromJets(e, 40.0, era), "branches": JET_ID_BRANCHES, "doc": "Scalar sum of pT over jets above 40 GeV with |eta| < 2.5 passing TightLepVeto"},
-    "HT30":            {"fn": lambda e, era: htFromJets(e, 30.0, era), "branches": JET_ID_BRANCHES, "doc": "Scalar sum of pT over jets above 30 GeV with |eta| < 2.5 passing TightLepVeto"},
-    "nJet20":          {"fn": lambda e, era: countJets(e, 20.0, era),  "branches": JET_ID_BRANCHES, "doc": "Jets above 20 GeV with |eta| < 2.5 passing TightLepVeto"},
-    "nJet40":          {"fn": lambda e, era: countJets(e, 40.0, era),  "branches": JET_ID_BRANCHES, "doc": "Jets above 40 GeV with |eta| < 2.5 passing TightLepVeto"},
-    "caloHT30":        {"fn": lambda e, era: caloJetHt(e, 30.0), "branches": ["CaloJet_pt", "CaloJet_eta"], "doc": "Scalar sum of raw pT over calo jets above 30 GeV with |eta| < 2.5, the quantity the displaced-dijet triggers cut on"},
-    "nCaloJet":        {"fn": lambda e, era: count(e, "CaloJet"), "branches": ["nCaloJet"], "doc": "Number of calo jets, the whole collection with no requirement"},
-    "leadMuonPt":      {"fn": lambda e, era: leadingPt(e, "Muon"),     "branches": ["Muon_pt"],     "doc": "pT of the leading muon"},
-    "leadElectronPt":  {"fn": lambda e, era: leadingPt(e, "Electron"), "branches": ["Electron_pt"], "doc": "pT of the leading electron"},
-    "leadJetPt":       {"fn": lambda e, era: leadingPt(e, "Jet"),      "branches": ["Jet_pt"],      "doc": "pT of the leading jet"},
-    "nJet":            {"fn": lambda e, era: count(e, "Jet"),      "branches": ["nJet"],      "doc": "Number of jets"},
-    "nMuon":           {"fn": lambda e, era: count(e, "Muon"),     "branches": ["nMuon"],     "doc": "Number of muons"},
-    "nElectron":       {"fn": lambda e, era: count(e, "Electron"), "branches": ["nElectron"], "doc": "Number of electrons"},
-    "nSV":             {"fn": lambda e, era: count(e, "SV"),       "branches": ["nSV"],       "doc": "Number of secondary vertices"},
-    "MET":             {"fn": lambda e, era: e["MET_pt"],          "branches": ["MET_pt"],    "doc": "Missing transverse energy"},
+    "HT40":            {"fn": lambda e, era: htFromJets(e, 40.0, era),  "doc": "Scalar sum of pT over jets above 40 GeV with |eta| < 2.5 passing TightLepVeto"},
+    "HT30":            {"fn": lambda e, era: htFromJets(e, 30.0, era),  "doc": "Scalar sum of pT over jets above 30 GeV with |eta| < 2.5 passing TightLepVeto"},
+    "nJet20":          {"fn": lambda e, era: countJets(e, 20.0, era),  "doc": "Jets above 20 GeV with |eta| < 2.5 passing TightLepVeto"},
+    "nJet40":          {"fn": lambda e, era: countJets(e, 40.0, era),  "doc": "Jets above 40 GeV with |eta| < 2.5 passing TightLepVeto"},
+    "caloHT30":        {"fn": lambda e, era: caloJetHt(e, 30.0),  "doc": "Scalar sum of raw pT over calo jets above 30 GeV with |eta| < 2.5, the quantity the displaced-dijet triggers cut on"},
+    "nCaloJet":        {"fn": lambda e, era: count(e, "CaloJet"),  "doc": "Number of calo jets, the whole collection with no requirement"},
+    "leadMuonPt":      {"fn": lambda e, era: leadingPt(e, "Muon"),      "doc": "pT of the leading muon"},
+    "leadElectronPt":  {"fn": lambda e, era: leadingPt(e, "Electron"),  "doc": "pT of the leading electron"},
+    "leadJetPt":       {"fn": lambda e, era: leadingPt(e, "Jet"),       "doc": "pT of the leading jet"},
+    "nJet":            {"fn": lambda e, era: count(e, "Jet"),       "doc": "Number of jets"},
+    "nMuon":           {"fn": lambda e, era: count(e, "Muon"),      "doc": "Number of muons"},
+    "nElectron":       {"fn": lambda e, era: count(e, "Electron"),  "doc": "Number of electrons"},
+    "nSV":             {"fn": lambda e, era: count(e, "SV"),        "doc": "Number of secondary vertices"},
+    "MET":             {"fn": lambda e, era: e["MET_pt"],     "doc": "Missing transverse energy"},
 }
 
 
@@ -131,8 +127,3 @@ def evaluate(name, events, era):
     return QUANTITIES[name]["fn"](events, era)
 
 
-def branchesFor(name):
-    """Branches a named quantity needs to be read from the ntuple."""
-    if name not in QUANTITIES:
-        raise ValueError(f"unknown quantity '{name}'. Known quantities: {', '.join(sorted(QUANTITIES))}")
-    return list(QUANTITIES[name]["branches"])

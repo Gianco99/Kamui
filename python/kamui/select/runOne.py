@@ -26,7 +26,7 @@ def main(argv=None):
 
     flow = applySelection(inputs, selection, outputPath)
 
-    ## The cutflow travels back with the output so the driver can merge it
+    ## The cutflow travels back with the output. Nothing merges these yet.
     with open(outputPath + ".cutflow.json", "w") as f:
         json.dump(flow, f, indent=2)
 

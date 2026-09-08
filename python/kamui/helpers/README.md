@@ -1,4 +1,4 @@
-# helpers/
+# Helpers
 
 Small things that are not part of the analysis.
 

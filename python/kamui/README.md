@@ -80,7 +80,7 @@ Searches DAS for datasets matching a wildcard, regardless of whether we have the
 | Flag | Meaning |
 | --- | --- |
 | **`pattern`** (required, default: None) | Positional |
-| `--instance INSTANCE` (optional, default: ) | `prod/global` for central datasets, `prod/phys03` for USER-created datasets |
+| `--instance INSTANCE` (optional, default: `prod/global`) | `prod/global` for central datasets, `prod/phys03` for USER-created datasets |
 | `--refresh` (optional, default: None) | Bypass the DAS cache |
 
 ```

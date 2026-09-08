@@ -14,6 +14,7 @@ import subprocess
 
 ## Kamui modules
 from ..configReaders.sites import loadSites
+from ..configReaders.content import eraGroup
 from .common import chunk, contentStem, outputBase, publishRecord, resolveTaskDir, runTool, taskDir, writeResolvedContent, writeTaskRecord
 from ..foundations import paths
 
@@ -72,9 +73,9 @@ queue sample,index,script from {jobListName}
 '''
 
 
-def _scriptName(presetName, isMC, era):
-    """One run script per content preset, data/MC flavour and era, since each combination gets its own resolved content."""
-    return f"runJob_{contentStem(presetName)}_{'mc' if isMC else 'data'}_{era}.sh"
+def _scriptName(presetName, isMC, group):
+    """One run script per content preset, data/MC flavour and era set, since each combination resolves to its own content."""
+    return f"runJob_{contentStem(presetName)}_{'mc' if isMC else 'data'}_{group}.sh"
 
 
 # fileLists maps a sample name to the list of LFNs it should run over, resolved by the caller from DAS or EOS.
@@ -100,7 +101,7 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
         if not lfns:
             dropped.append(s["name"])
             continue
-        key = (s["content"], bool(s["isMC"]), s["era"])
+        key = (s["content"], bool(s["isMC"]), eraGroup(s["era"]))
         if key not in contentCache:
             contentCache[key] = writeResolvedContent(d, s["content"], bool(s["isMC"]), s["era"])
         perJob = int(filesPerJob or s.get("unitsPerJob") or DEFAULT_FILES_PER_JOB)
@@ -119,7 +120,7 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
         f.write("\n".join(jobRows) + "\n")
 
     # A task may mix content presets and MC with data, so each combination gets its own run script and the job rows name the one they need.
-    for (preset, isMC, era), contentJson in contentCache.items():
+    for (preset, isMC, group), contentJson in contentCache.items():
         script = RUN_SCRIPT.format(
             scramArch=scramArch,
             cmsswVersion=cmsswVersion,
@@ -129,7 +130,7 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
             eosRedirector=sites["eosRedirector"].rstrip("/"),
             outDir="/".join([base, "ntuples", taskName, "$SAMPLE"]),
         )
-        p = os.path.join(d, _scriptName(preset, isMC, era))
+        p = os.path.join(d, _scriptName(preset, isMC, group))
         with open(p, "w") as f:
             f.write(script)
         os.chmod(p, os.stat(p).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
@@ -183,10 +184,9 @@ def submit(taskName, dryRun=False, base=None):
     return r.returncode
 
 
-# What a finished job leaves on EOS. The run script names outputs <sample>_<tag>_<index>.root, so a job
-# that died anywhere before the copy leaves nothing, and a job that ran twice leaves the same name twice.
-def _expectedOutputs(sampleName, index):
-    return [f"{sampleName}_ntuple_{index}.root"]
+# What a finished job leaves on EOS. A job that died anywhere before the copy leaves nothing.
+def _expectedOutput(sampleName, index):
+    return f"{sampleName}_ntuple_{index}.root"
 
 
 def _eosListing(redirector, directory):
@@ -196,7 +196,11 @@ def _eosListing(redirector, directory):
     except (OSError, subprocess.SubprocessError) as e:
         raise RuntimeError(f"could not list {directory}: {e}")
     if r.returncode != 0:
-        return set()
+        ## A directory that is not there yet means no outputs. Anything else means we cannot tell what
+        ## is on EOS, and reporting that as "nothing present" would resubmit jobs that already finished.
+        if "no such file or directory" in r.stderr.lower():
+            return set()
+        raise RuntimeError(f"could not list {directory}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}")
     return {os.path.basename(line) for line in r.stdout.split() if line.strip()}
 
 
@@ -219,11 +223,10 @@ def missingJobs(taskName, sites=None):
         sampleName, index = row.split(",")[0], row.split(",")[1]
         if sampleName not in listings:
             listings[sampleName] = _eosListing(redirector, f"{outDirBase}/{sampleName}")
-        wanted = _expectedOutputs(sampleName, index)
-        nExpected += len(wanted)
-        here = [w for w in wanted if w in listings[sampleName]]
-        nPresent += len(here)
-        if len(here) != len(wanted):
+        nExpected += 1
+        if _expectedOutput(sampleName, index) in listings[sampleName]:
+            nPresent += 1
+        else:
             missing.append(row)
     return missing, nPresent, nExpected
 

@@ -1,10 +1,7 @@
-# ntupleProduction
-## Caveats
+# NtupleProduction
 
-- The CMSSW release is pinned in `config/sites.json`. Do not bump it! This may have unintended effects.
-- Condor OS selection uses `+DesiredOS = "EL9"`. If jobs sit idle forever, try `+REQUIRED_OS = "rhel9"`.
-- Each job runs `scramv1 project` from cvmfs, about 30 seconds of startup. Ship a tarball if job counts get large.
-- Producers that are singletons by construction reject a `singleton` parameter, which is what `singletonImplicit` tells `kamuiTables.py` to omit.
+- Nothing in `cmssw/` may import from `python/kamui`. Only those two files, the resolved content JSON and `fileLists.json` reach a worker, so an import from the package breaks every job at once.
+- The gen-weight table is picked out by substring: `normNames` matches `"genweight"` against a module name built from the collection key. Renaming `genWeight` in `config/content/*/collections/gen.json` silently moves the weights inside the skim path, where a skimmed job would undercount them.
+- The tables run as a `cms.Task`, so a producer whose product no `outputCommands` keep pattern matches never runs at all.
+- The CMSSW release in `config/sites.json` is what condor builds. Do not bump it without checking. CRAB ignores it and ships the release you submit from.
 - The schedd is recorded at submit time. LPC spreads a submission across schedds and `condor_q` asks the default one, so a task submitted elsewhere reads as finished. A `task.json` with no `schedd` key falls back to the default.
-- `crab submit` returning zero means nothing: the cvmfs wrapper exits zero when CMSSW is missing, so `crab.submit` also requires that the project directory appeared.
-- Retries are not published to EOS, so the `task.json` sitting next to the ntuples always describes the first attempt.

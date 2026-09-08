@@ -33,7 +33,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("file", help="MiniAOD file (local path or xrootd URL)")
     ap.add_argument("--branches", action="store_true", help="Also run edmDumpEventContent")
-    ap.add_argument("--jets", default="slimmedJetsPuppi", help="Jet collection to read (default: slimmedJetsPuppi)")
+    ap.add_argument("--jets", metavar="NAME", default="slimmedJetsPuppi", help="Jet collection to read (default: slimmedJetsPuppi)")
     args = ap.parse_args()
 
     if args.branches:

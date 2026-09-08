@@ -1,5 +1,5 @@
 """
-CRAB3 backend, the default. One CRAB task per sample.
+CRAB3 backend. One CRAB task per sample.
 """
 
 # Import Block
@@ -9,6 +9,7 @@ import os
 import subprocess
 
 ## Kamui modules
+from ..configReaders.content import eraGroup
 from ..configReaders.sites import loadSites
 from .common import checkTaskName, outputBase, publishRecord, resolveTaskDir, taskDir, writeResolvedContent, writeTaskRecord
 from ..foundations import paths
@@ -78,7 +79,7 @@ def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, a
     effective = {s["name"]: int(unitsPerJob or s.get("unitsPerJob") or DEFAULT_FILES_PER_JOB) for s in samples}
     written = []
     for s in samples:
-        key = (s["content"], bool(s["isMC"]), s["era"])
+        key = (s["content"], bool(s["isMC"]), eraGroup(s["era"]))
         if key not in contentCache:
             contentCache[key] = writeResolvedContent(d, s["content"], bool(s["isMC"]), s["era"])
         contentJson = contentCache[key]
@@ -110,13 +111,15 @@ def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, a
             f.write(text)
         written.append(path)
 
+    ## CRAB ships the release the submission is made from, so sites.json is not what these jobs will run.
     writeTaskRecord(d, {
-        "task": taskName, "backend": "crab", "nSamples": len(samples),
+        "task": taskName, "backend": "crab",
         "samples": [s["name"] for s in samples],
         "content": sorted({s["content"] for s in samples}),
         "unitsPerJob": effective, "maxMemoryMB": maxMemoryMB,
+        "cmssw": {"version": os.environ.get("CMSSW_VERSION"), "scramArch": os.environ.get("SCRAM_ARCH")},
         "outLFNDirBase": "/".join([base, "ntuples", taskName]),
-    }, samples=samples, sites=sites, resolvedContent=contentCache.values())
+    }, samples=samples, resolvedContent=contentCache.values())
     return written, taskName, base
 
 

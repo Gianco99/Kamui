@@ -1,4 +1,4 @@
-# foundations/
+# Foundations
 
 The bottom layer everything else is built on.
 

@@ -1,4 +1,4 @@
-# helpers/
+# Helpers
 
 - `banner.py` writes to stderr, so it stays out of piped output.
 - Non-UTF-8 environments turn up on LPC, so the braille art is wrapped for `UnicodeEncodeError` rather than assuming a terminal can encode it.

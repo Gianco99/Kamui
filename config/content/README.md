@@ -67,7 +67,7 @@ A preset must end up with at least one collection, whether from `include` or its
 
 | Field | Meaning |
 |---|---|
-| **`triggers`** (required, default: None) | Names a file in `config/triggers/` |
+| `triggers` (optional, default: None) | Names a file in `config/triggers/`. Leaving it out means no skim, so every event is written |
 | `mode` (optional, default: the trigger file's, then `any`) | `any` for an OR over the paths, `all` for an AND |
 | `process` (optional, default: the trigger file's, then `HLT`) | The process the trigger bits were written under |
 

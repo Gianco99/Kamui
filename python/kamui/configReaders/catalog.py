@@ -23,13 +23,6 @@ NAME_OK = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 ## Every field a sample may carry. Documented in config/samples/README.md
 SAMPLE_FIELDS = {"name", "dataset", "dasInstance", "isMC", "era", "family", "content", "tags", "unitsPerJob", "lumiMask"}
 
-class Sample(dict):
-    """A sample entry. Subclasses dict so it prints by name in logs."""
-
-    def __repr__(self):
-        return f"<Sample {self.get('name')}>"
-
-
 def _axisPoints(axisName, entries):
     """Normalize one axis into a list of substitution dicts."""
     out = []
@@ -69,7 +62,7 @@ def _expandGrid(grid, defaults):
     stale = sorted(skip - generated)
     if stale:
         raise ValueError(f"grid '{grid.get('name')}' skips sample(s) it never generates: {stale}")
-    return samples, generated
+    return samples
 
 
 def _loadFamily(path):
@@ -79,11 +72,8 @@ def _loadFamily(path):
     defaults.setdefault("family", cfg.get("family", os.path.basename(path)[:-5]))
 
     out = []
-    generated = set()
     for grid in cfg.get("grids", []):
-        expanded, names = _expandGrid(grid, defaults)
-        generated |= names
-        out.extend(expanded)
+        out.extend(_expandGrid(grid, defaults))
     for s in cfg.get("samples", []):
         merged = deepMerge(defaults, s)
         out.append(merged)
@@ -112,7 +102,7 @@ def _loadFamily(path):
         s.setdefault("isMC", True)
         s.setdefault("content", "dvBase")
         s.setdefault("tags", [])
-        final.append(Sample(s))
+        final.append(s)
 
     stale = sorted(set(overrides) - seen - preOverrideNames)
     if stale:
@@ -121,7 +111,7 @@ def _loadFamily(path):
 
 
 def loadCatalog(samplesDir=None):
-    """Load every family file into one list of Sample."""
+    """Load every family file into one list of samples."""
     samplesDir = samplesDir or paths.SAMPLES_DIR
     ## Walked rather than listed, so families can be grouped into subdirectories as the
     ## catalog grows. A sample means the same thing wherever its file sits.

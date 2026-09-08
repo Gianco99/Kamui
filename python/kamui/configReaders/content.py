@@ -10,7 +10,7 @@ import os
 
 ## Kamui modules
 from ..foundations import paths
-from ..foundations.config import loadWithIncludes
+from ..foundations.config import loadJson, loadWithIncludes
 
 # CMSSW plugin language
 KIND_TO_PLUGIN = {
@@ -311,7 +311,7 @@ def validateEraCopies(contentDir=None):
         if not (os.path.exists(a) and os.path.exists(b)):
             problems.append(f"collection '{name}' exists in only one era set")
             continue
-        same = open(a).read() == open(b).read()
+        same = loadJson(a) == loadJson(b)
         if name in ERA_SPECIFIC_COLLECTIONS and same:
             problems.append(f"collection '{name}' is meant to differ by era but both copies are identical")
         if name not in ERA_SPECIFIC_COLLECTIONS and not same:

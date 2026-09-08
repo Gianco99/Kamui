@@ -17,7 +17,7 @@ import sys
 
 ## Kamui modules
 from ..foundations import paths
-from ..configReaders.content import resolveContent
+from ..configReaders.content import eraGroup, resolveContent
 
 
 ## Characters a task name may use
@@ -123,12 +123,14 @@ def contentStem(presetName):
     return stem[:-5] if stem.endswith(".json") else stem
 
 
-def writeResolvedContent(d, presetName, isMC, era="Summer24"):
+def writeResolvedContent(d, presetName, isMC, era):
     """Flatten a content preset into the job area and return its path."""
     resolved = resolveContent(presetName, isMC=isMC, era=era)
     suffix = "mc" if isMC else "data"
     stem = contentStem(presetName)
-    out = os.path.join(d, f"{stem}.{suffix}.json")
+    ## A preset resolves against its era's content set, so one name is two different bodies across the
+    ## two sets and the file has to say which it is.
+    out = os.path.join(d, f"{stem}.{suffix}.{eraGroup(era)}.json")
     if os.path.exists(out) and _contentBody(json.load(open(out))) != _contentBody(resolved):
         raise ValueError(f"two different content presets both resolve to '{stem}'; rename one or use their plain names")
     with open(out, "w") as f:

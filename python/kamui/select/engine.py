@@ -156,7 +156,7 @@ def _derived(coll, variable, events, era):
     Per-object quantities that are computed rather than stored.
 
     The ntuples keep raw jet energy fractions instead of a precomputed identification flag,
-    so the working point is applied here. select/README.md carries the table.
+    so the working point is applied here. The per-era functions in quantities.py carry it.
     """
     if coll == "Jet" and variable == "tightLepVeto":
         from .quantities import tightLepVeto
@@ -299,12 +299,8 @@ def _bounds(cut):
     return " and ".join(parts)
 
 
-def applySelection(inputPaths, selection, outputPath, writeSteps=False, treeName="Events"):
-    """
-    Apply every cut in order, write the surviving events, and return the cutflow.
-
-    writeSteps also writes one ntuple per cut, named after the cut, beside the output.
-    """
+def applySelection(inputPaths, selection, outputPath, treeName="Events"):
+    """Apply every cut in order, write the surviving events, and return the cutflow."""
     events, branches = _readAll(inputPaths, treeName)
     total = len(events)
 
@@ -327,9 +323,6 @@ def applySelection(inputPaths, selection, outputPath, writeSteps=False, treeName
             "efficiency": (after / before) if before else 0.0,
             "cumulative": (after / total) if total else 0.0,
         })
-        if writeSteps:
-            stepPath = os.path.join(os.path.dirname(outputPath), f"{cut['name']}.root")
-            _write(events[keep], stepPath, treeName)
 
     _write(events[keep], outputPath, treeName)
     return flow
@@ -348,7 +341,7 @@ def _localCopy(path, scratch):
     dest = os.path.join(scratch, os.path.basename(path))
     r = subprocess.run(["xrdcp", "-f", "-s", path, dest], capture_output=True, text=True)
     if r.returncode != 0:
-        raise RuntimeError(f"could not copy {path}: {r.stderr.strip().splitlines()[-1:] or r.returncode}")
+        raise RuntimeError(f"could not copy {path}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}")
     return dest, True
 
 
@@ -389,7 +382,7 @@ def _write(events, path, treeName):
     under repeated selection passes.
     """
     fields = list(events.fields)
-    counters = {f[1:] for f in fields if f.startswith("n") and f[1:2].isupper() and f[1:] + "_" not in ("",)}
+    counters = {f[1:] for f in fields if f.startswith("n") and f[1:2].isupper()}
     collections = sorted(c for c in counters if any(f.startswith(c + "_") for f in fields))
 
     grouped = {}

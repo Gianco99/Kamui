@@ -40,18 +40,17 @@ def stage(sample, sites=None, maxFiles=None, dryRun=False, refresh=False):
         print("  no files found in DAS")
         return 0, 0
 
-    if maxFiles is not None and maxFiles < 1:
-        raise ValueError(f"--maxFiles must be at least 1, got {maxFiles}")
-    cap = maxFiles
     total = len(lfns)
-    if cap is not None and total > cap:
-        lfns = lfns[:cap]
+    lfns = lfns[:maxFiles]
     print(f"  {total} file{'' if total == 1 else 's'} in DAS, copying {len(lfns)}")
 
     if dryRun:
         print(f"  [dryRun] xrdfs {eosRed} mkdir -p {dest}")
     else:
-        subprocess.run(["xrdfs", eosRed, "mkdir", "-p", dest], capture_output=True, text=True)
+        r = subprocess.run(["xrdfs", eosRed, "mkdir", "-p", dest], capture_output=True, text=True)
+        if r.returncode != 0:
+            print(f"  could not create {dest}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}")
+            return 0, len(lfns)
 
     # A dry run lists EOS too, so what it prints is what a real run would copy.
     already = set(os.path.basename(f) for f in _listStaged(sites, sample["name"]))
@@ -69,7 +68,7 @@ def stage(sample, sites=None, maxFiles=None, dryRun=False, refresh=False):
             continue
         r = subprocess.run(["xrdcp", "-f", src, dst], capture_output=True, text=True)
         if r.returncode != 0:
-            print(f"  FAILED {fn}: {r.stderr.strip().splitlines()[-1:]}")
+            print(f"  FAILED {fn}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}")
             bad += 1
         else:
             print(f"  copied {fn}")

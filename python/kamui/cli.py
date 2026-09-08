@@ -142,17 +142,14 @@ def _cmdStage(args):
     if args.maxFiles is not None and args.maxFiles < 1:
         sys.exit(f"--maxFiles must be at least 1, got {args.maxFiles}")
     sel = _pick(args)
-    problems = []
+    inPlace = failed = 0
     for s in sel:
         print(f"\n=== {s['name']}\n  {s['dataset']}")
-        try:
-            fetch.stage(s, sites, maxFiles=args.maxFiles, dryRun=args.dryRun, refresh=args.refresh)
-        except ValueError as e:
-            print(f"  skipped: {e}")
-            problems.append(s["name"])
-    if problems:
-        print(f"\n{len(problems)} sample(s) skipped: {', '.join(problems)}")
-        return 1 if len(problems) == len(sel) else 0
+        ok, bad = fetch.stage(s, sites, maxFiles=args.maxFiles, dryRun=args.dryRun, refresh=args.refresh)
+        inPlace += ok
+        failed += bad
+    print(f"\n{inPlace} file(s) in place, {failed} failed")
+    return 1 if failed else 0
 
 
 def _cmdSubmit(args):
@@ -183,13 +180,14 @@ def _cmdSubmit(args):
         d, nJobs, task, base = condorBackend.prepare(sel, args.task, fileLists, filesPerJob=args.filesPerJob, memoryMB=args.memoryMB, assumeYes=args.overwrite, base=args.outputBase)
         print(f"  wrote {nJobs} job(s) under {d}")
         print(f"  output goes to {base}/ntuples/{task}")
+        if not nJobs:
+            sys.exit("  no jobs to submit; every selected sample came back with no input files")
         condorBackend.submit(task, dryRun=args.dryRun, base=base)
 
 
 def _cmdSelect(args):
     """Apply an event-level selection to ntuples and write ntuples with the same branches."""
     sel = _pick(args)
-    outBase = args.outputBase or loadSites()["stageoutBase"].rstrip("/")
     print(f"Task '{args.task}' : {len(sel)} sample(s), selection={args.selection}")
 
     fileLists = {}
@@ -337,7 +335,7 @@ def _cmdResubmit(args):
         if not args.forceResubmit:
             sys.exit("  refusing to resubmit while they run. Wait, or pass --forceResubmit to submit anyway.")
 
-    n, nJobs, code = condorBackend.resubmit(args.task, dryRun=args.dryRun)
+    n, nJobs, code = condorBackend.resubmit(args.task, dryRun=args.dryRun, rows=missing)
     if code == 0 and not args.dryRun:
         print(f"  retry {n} submitted: {nJobs} job(s), logs in logs/retry{n}, output to the same directory")
     elif code != 0:
@@ -458,7 +456,7 @@ def _cmdCheck(args):
     note("Generator sums", "pass" if not noSumw else "warn", f"Samples that know their total generator weight ({len(cat) - len(noSumw)}/{len(cat)})")
 
     sites = loadSites()
-    missingKeys = [k for k in ("eosRedirector", "sourceRedirector", "stageoutBase", "crabStageoutBase", "crabStorageSite") if k not in sites]
+    missingKeys = [k for k in ("eosRedirector", "sourceRedirector", "stageoutBase", "miniaodDir", "crabStageoutBase", "crabStorageSite") if k not in sites]
     missingCfg = [f for f in ("kamuiNtuple_cfg.py", "kamuiTables.py") if not os.path.exists(os.path.join(paths.CMSSW_DIR, f))]
     for k in missingKeys:
         problems.append(f"sites.json is missing '{k}'")
@@ -635,8 +633,8 @@ def main(argv=None):
         return 2
     try:
         return args.func(args)
-    except (KeyError, FileNotFoundError, PermissionError, ValueError, das.DasError) as e:
-        # Config and DAS problems are user errors - say what is wrong and stop.
+    except (KeyError, FileNotFoundError, PermissionError, ValueError, RuntimeError, das.DasError) as e:
+        # Config, storage and DAS problems are user errors - say what is wrong and stop.
         # Anything else still raises.
         sys.exit(f"Error: {e}")
 

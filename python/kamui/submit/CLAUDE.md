@@ -1,22 +1,11 @@
-# submit/
+# Submit
 
-- `prepare` writes the job area, `submit` only shells out. `--dryRun` runs the first and skips the second, so the files it leaves are the ones a real submission would use.
-- Re-using a task name prompts before overwriting, because the old area is the only local record of a submission that may still be running. Declining writes to `<task>_n`, and `prepare` returns the name it actually used, so the caller and the EOS output directory follow it. A non-interactive run never overwrites.
-- `--filesPerJob` is `default=None` so an explicitly passed value can be told from an absent one, letting the flag beat a sample's `unitsPerJob` while the sample value still beats the built-in.
-- `task.json` is what makes a production reproducible.
-    - It embeds the resolved content, so it stays readable when the preset changes.
-    - A dirty tree means the commit alone does not describe the task, so check that flag first when ntuples disagree with expectations.
-    - `publishRecord` copies it to the EOS output directory on real submission, never on `--dryRun`. Job areas are gitignored scratch, so the EOS copy is the only one that lives as long as the ntuples.
-    - A failed publish warns and returns False.
-    - Anything added to a submission path that changes what a job does belongs in it.
-- The content preset is flattened into the job area and shipped with the job.
+- Re-using a task name prompts, and declining writes to `<task>_n`, which the EOS output directory then follows. A task that recorded a condor cluster or holds a CRAB work area refuses outright whatever the answer, and `--overwrite` skips the prompt in a script as readily as at a terminal.
+- A content preset resolves against its era set, so `dvBase` for a Run 2 era and for a Run 3 one are different bodies. The resolved JSON, the run script and the `jobList.txt` rows are all keyed on `(preset, isMC, eraGroup)`.
+- `task.json` embeds the resolved content, and `publishRecord` copies it to EOS on real submission only. A retry updates the local copy alone, and job areas are gitignored scratch, so the EOS copy is the only one that lasts as long as the ntuples.
 - `crab.py`
-    - `requestName` is capped at 100 characters by CRAB, so `_requestName` truncates. `_checkRequestNames` rejects a submission whose samples would collide after truncation, before the job area is touched.
-    - `submit` returns `(ok, bad)` and keeps going, so one bad sample cannot strand the rest of a production.
+    - CRAB caps `requestName` at 100 characters, so `_requestName` truncates and `_checkRequestNames` rejects samples that would collide after truncation.
+    - CRAB ships the release it is submitted from, so `task.json` records the environment's `CMSSW_VERSION`. `--maxFiles` and `--refresh` do nothing here.
 - `condor.py`
-    - `resubmit` decides what failed by looking at EOS, not at condor: a job whose output is present is done however it exited. It refuses while any of this task's jobs are still queued, since retrying a running job writes the same output twice.
-    - A sample whose file list came back empty gets no jobs. It is named in a warning and recorded in `droppedSamples`, since a silently shorter production looks like a successful one.
-    - Each job builds a CMSSW area with `scramv1 project` before running, so there is fixed startup cost per job. Jobs over very few files spend most of their wall time on it.
-    - A task can mix content presets and data with MC, so a run script is written per `(preset, isMC)` combination and each row of `jobList.txt` names the script it needs. The JDL's executable is `$(script)`.
-    - `+DesiredOS = "EL9"` is the LPC worker OS selector. If jobs sit idle indefinitely, `+REQUIRED_OS = "rhel9"` is the alternative.
-    - Output is copied back with `xrdcp` from inside the job because EOS is not a condor-visible filesystem.
+    - `resubmit` reads EOS to decide what failed, matching by filename, so a job whose output is present is done however it exited. The queued-job guard lives in `_cmdResubmit`, and `--forceResubmit` skips it.
+    - The retry JDL is built by string replacement against the `JDL` template, so reformatting its alignment breaks `resubmit`.

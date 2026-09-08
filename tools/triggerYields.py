@@ -40,7 +40,7 @@ def listEos(sites, lfnDir):
 
 
 def yieldsFor(files, paths_):
-    """Return (nTotal, nPass, {path: nFires}, nPassAfterVeto)."""
+    """Return (nTotal, nPass, {path: nFires})."""
     import ROOT
 
     # TChain.Add silently accepts a path that does not exist, which would otherwise
@@ -88,10 +88,10 @@ def yieldsFor(files, paths_):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--task", help="Task name under ntupleProduction/jobs/")
-    ap.add_argument("--files", nargs="+", help="Explicit ntuple files, in place of a task")
-    ap.add_argument("--triggers", help="Trigger config name; required with --files")
-    ap.add_argument("--sample", action="append", help="Restrict to these samples")
+    ap.add_argument("--task", metavar="NAME", help="Task name under ntupleProduction/jobs/")
+    ap.add_argument("--files", nargs="+", metavar="FILE", help="Explicit ntuple files, in place of a task")
+    ap.add_argument("--triggers", metavar="NAME", help="Trigger config name; required with --files")
+    ap.add_argument("--sample", action="append", metavar="NAME", help="Restrict to these samples")
     ap.add_argument("--perPath", action="store_true", help="Print the per-path breakdown")
     args = ap.parse_args()
 

@@ -1,4 +1,4 @@
-# foundations/
+# Foundations
 
 - Nothing here may import from anywhere else in kamui.
 - `paths.py` is the only module allowed to know the repository layout.

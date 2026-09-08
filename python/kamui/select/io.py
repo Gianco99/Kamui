@@ -42,10 +42,14 @@ def findInputs(inputTask, sampleName, inputBase=None):
     remote = "/".join([base, "ntuples", inputTask])
     try:
         r = subprocess.run(["xrdfs", redirector, "ls", "-R", remote], capture_output=True, text=True, timeout=300)
-    except (OSError, subprocess.SubprocessError):
-        return []
+    except (OSError, subprocess.SubprocessError) as e:
+        raise RuntimeError(f"could not list {remote}: {e}")
     if r.returncode != 0:
-        return []
+        ## A task directory that is not there has no ntuples. Anything else, an expired proxy most often,
+        ## would otherwise read as an empty production and send you looking at the wrong stage.
+        if "no such file or directory" in r.stderr.lower():
+            return []
+        raise RuntimeError(f"could not list {remote}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}")
     return sorted(f"{redirector}/{line.strip()}" for line in r.stdout.splitlines()
                   if line.strip().endswith(".root") and _namesSample(os.path.dirname(line.strip()), sampleName))
 
@@ -106,13 +110,19 @@ def printCutflow(task):
                 print(f"      applied as: {row['detail']}")
         print()
 
-    ## Totals across samples, since a task usually spans several
+    ## Totals across samples, since a task usually spans several. Summing is only meaningful when every
+    ## sample ran the same cuts: a sample with no recorded generator count has no `generated` row, and
+    ## adding row 0 of one flow to row 0 of another would then add different cuts together.
     if len(record["samples"]) > 1:
-        names = [r["cut"] for r in next(iter(record["samples"].values()))]
+        flows = list(record["samples"].values())
+        names = [r["cut"] for r in flows[0]]
+        if any([r["cut"] for r in f] != names for f in flows):
+            print("all samples: not totalled, the samples did not all run the same cuts")
+            return
         print("all samples")
         print(f"  {'Cut':<16} {'Events':>12} {'Cumulative':>12}")
         first = None
         for i, cut in enumerate(names):
-            total = sum(flow[i]["kept"] for flow in record["samples"].values() if i < len(flow))
+            total = sum(f[i]["kept"] for f in flows)
             first = total if first is None else first
             print(f"  {cut:<16} {total:>12,} {100 * total / first if first else 0:>11.2f}%")
