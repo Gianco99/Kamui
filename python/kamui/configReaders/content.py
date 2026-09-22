@@ -31,6 +31,7 @@ KIND_TO_PLUGIN = {
     "global":           "GlobalVariablesTableProducer",
     "pileup":           "NPUTablesProducer",
     "genWeight":        "GenWeightsTableProducer",
+    "seedTrack":        "SimpleTrackFlatTableProducer",
 }
 
 # Kinds whose producer takes no `src`/`cut`/`variables`
@@ -102,7 +103,7 @@ def resolveContent(name, contentDir=None, isMC=True, era="Summer24"):
             continue
         if c.get("dataOnly") and isMC:
             continue
-        collections[cname] = _translate(cname, c)
+        collections[cname] = _translate(cname, c, era, isMC)
 
     return {
         "name":        name,
@@ -154,12 +155,12 @@ def _resolveSkim(skim):
 
 
 ## Every key a collection may carry
-COLLECTION_FIELDS = {"type", "src", "doc", "cut", "maxLen", "variables", "singleton", "mcOnly", "dataOnly"}
+COLLECTION_FIELDS = {"type", "src", "doc", "cut", "maxLen", "variables", "singleton", "mcOnly", "dataOnly", "seeding"}
 VARIABLE_FIELDS = {"expr", "type", "doc", "precision"}
 EXTVAR_FIELDS = {"src", "type", "doc"}
 
 
-def _translate(cname, c):
+def _translate(cname, c, era, isMC):
     unknown = sorted(set(c) - COLLECTION_FIELDS)
     if unknown:
         raise ValueError(f"collection '{cname}' has unknown key(s) {unknown}; valid keys are {sorted(COLLECTION_FIELDS)}")
@@ -192,6 +193,10 @@ def _translate(cname, c):
     out["src"] = c["src"]
 
     out["variables"] = _checkVars(cname, c.get("variables", {}))
+    if kind == "seedTrack":
+        out["seeding"] = _resolveSeeding(cname, c.get("seeding"), era, isMC)
+    elif "seeding" in c:
+        raise ValueError(f"collection '{cname}': 'seeding' has no meaning on a '{kind}' collection")
     if kind in ALWAYS_SINGLETON_KINDS:
         for k in ("cut", "maxLen"):
             if k in c:
@@ -210,6 +215,34 @@ def _translate(cname, c):
             if "maxLen" in c:
                 out["maxLen"] = _checkMaxLen(cname, c["maxLen"])
     return out
+
+
+## Every key a seeding block may carry. The dxy uncertainty scale is MC only and keyed by era.
+SEEDING_REQUIRED = {"beamSpot", "primaryVertices", "goodPv", "minPt", "minAbsDxyBs", "maxDxyErr", "minNSigmaDxyBs", "minRescaledNSigmaDxyBs", "minNSigmaDxyPv", "minHits", "minPixelHits", "minPixelLayers", "minStripLayers", "maxFirstPixelLayer"}
+SEEDING_FIELDS = SEEDING_REQUIRED | {"dxyErrScale"}
+
+
+def _resolveSeeding(cname, seeding, era, isMC):
+    if not isinstance(seeding, dict):
+        raise ValueError(f"collection '{cname}': a seedTrack collection needs a 'seeding' block")
+    unknown = sorted(set(seeding) - SEEDING_FIELDS)
+    if unknown:
+        raise ValueError(f"collection '{cname}': seeding has unknown key(s) {unknown}; valid keys are {sorted(SEEDING_FIELDS)}")
+    missing = sorted(SEEDING_REQUIRED - set(seeding))
+    if missing:
+        raise ValueError(f"collection '{cname}': seeding is missing {missing}")
+
+    out = {k: seeding[k] for k in sorted(SEEDING_REQUIRED)}
+    out["dxyErrScale"] = {"form": "none", "barrelMaxAbsEta": 0.0, "barrel": [], "endcap": []}
+    if isMC and "dxyErrScale" in seeding:
+        out["dxyErrScale"] = _forEra(cname, "dxyErrScale", seeding["dxyErrScale"], era)
+    return out
+
+
+def _forEra(cname, key, byEra, era):
+    if era not in byEra:
+        raise ValueError(f"collection '{cname}': '{key}' defines no entry for era '{era}'; it defines {sorted(byEra)}")
+    return byEra[era]
 
 
 def _checkMaxLen(cname, value):
@@ -295,7 +328,7 @@ def validateTriggers():
 
 
 ## Collections that are meant to differ between the two era sets
-ERA_SPECIFIC_COLLECTIONS = {"leptons", "jets"}
+ERA_SPECIFIC_COLLECTIONS = {"leptons", "jets", "vertexing"}
 
 
 def validateEraCopies(contentDir=None):

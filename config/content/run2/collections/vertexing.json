@@ -1,0 +1,121 @@
+{
+  "collections": {
+    "SeedTrack": {
+      "type": "seedTrack",
+      "src": "packedPFCandidates",
+      "seeding": {
+        "beamSpot": "offlineBeamSpot",
+        "primaryVertices": "offlineSlimmedPrimaryVertices",
+        "_goodPv": "The first vertex passing these seeds the dxy_PV cut. With none, the event gets no seed tracks",
+        "goodPv": {
+          "minNdof": 4,
+          "maxAbsZ": 24,
+          "maxRho": 2
+        },
+        "minPt": 1.0,
+        "minAbsDxyBs": 0,
+        "maxDxyErr": 1e9,
+        "minNSigmaDxyBs": 0,
+        "minRescaledNSigmaDxyBs": 4.0,
+        "minNSigmaDxyPv": 0,
+        "minHits": 0,
+        "minPixelHits": 0,
+        "minPixelLayers": 2,
+        "minStripLayers": 6,
+        "maxFirstPixelLayer": 1,
+        "_dxyErrScale": "MC only. BTagDispJet dxy uncertainty scale versus pT (from JMTucker)",
+        "dxyErrScale": {
+          "2016APV": {
+            "form": "p0-p2*exp(-p1*x)",
+            "barrelMaxAbsEta": 1.5,
+            "barrel": [0.90391, 0.896, -0.1585],
+            "endcap": [0.89441, 0.3372, -0.13827]
+          },
+          "2016": {
+            "form": "p0",
+            "barrelMaxAbsEta": 1.5,
+            "barrel": [0.981341],
+            "endcap": [0.998868]
+          },
+          "2017": {
+            "form": "p0-exp(-p1*x+p2)",
+            "barrelMaxAbsEta": 1.5,
+            "barrel": [1.17509, 0.771, -1.263],
+            "endcap": [1.3108, 0.2508, -0.9690]
+          },
+          "2018": {
+            "form": "p0-exp(-p1*x+p2)",
+            "barrelMaxAbsEta": 1.5,
+            "barrel": [1.09967, 1.582, -0.842],
+            "endcap": [1.1875, 0.3201, -1.4224]
+          }
+        }
+      },
+      "variables": {
+        "pt": {
+          "expr": "pt()",
+          "type": "float",
+          "doc": "Track pT [GeV]",
+          "precision": -1
+        },
+        "eta": {
+          "expr": "eta()",
+          "type": "float",
+          "doc": "Pseudorapidity",
+          "precision": -1
+        },
+        "phi": {
+          "expr": "phi()",
+          "type": "float",
+          "doc": "Azimuthal angle",
+          "precision": -1
+        },
+        "charge": {
+          "expr": "charge()",
+          "type": "int16",
+          "doc": "Electric charge"
+        },
+        "vx": {
+          "expr": "vx()",
+          "type": "float",
+          "doc": "Reference point x [cm]",
+          "precision": -1
+        },
+        "vy": {
+          "expr": "vy()",
+          "type": "float",
+          "doc": "Reference point y [cm]",
+          "precision": -1
+        },
+        "vz": {
+          "expr": "vz()",
+          "type": "float",
+          "doc": "Reference point z [cm]",
+          "precision": -1
+        },
+        "dxyErr": {
+          "expr": "dxyError()",
+          "type": "float",
+          "doc": "dxy uncertainty [cm]",
+          "precision": -1
+        },
+        "dzErr": {
+          "expr": "dzError()",
+          "type": "float",
+          "doc": "dz uncertainty [cm]",
+          "precision": -1
+        },
+        "nPixelLayers": {
+          "expr": "hitPattern().pixelLayersWithMeasurement()",
+          "type": "uint8",
+          "doc": "Pixel layers with a measurement"
+        },
+        "nStripLayers": {
+          "expr": "hitPattern().stripLayersWithMeasurement()",
+          "type": "uint8",
+          "doc": "Strip layers with a measurement"
+        }
+      }
+    }
+  }
+}

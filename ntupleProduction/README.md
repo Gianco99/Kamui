@@ -6,8 +6,8 @@ The first stage of the analysis: a DAS dataset in, ntuples out.
 
 | Path | What it is |
 | --- | --- |
-| `cmssw/kamuiNtuple_cfg.py` | The `cmsRun` configuration |
-| `cmssw/kamuiTables.py` | Turns a resolved content JSON into CMSSW table producers |
+| `cmssw/ntuple_cfg.py` | The `cmsRun` configuration |
+| `cmssw/ntupleTables.py` | Turns a resolved content JSON into CMSSW table producers |
 | `jobs/<task>/` | Generated job areas, one per task. Gitignored |
 | `.dasCache/` | Cached DAS responses. Gitignored |
 
@@ -24,11 +24,10 @@ Before submitting to a cluster, it is worth running things locally to make sure 
 
 ```
 ./kamui content dvSignal --era Summer24 --write /tmp/dvSignal.json
-cmsRun cmssw/kamuiNtuple_cfg.py content=/tmp/dvSignal.json isMC=True inputFiles=root://cmseos.fnal.gov//store/.../file.root outputFile=test.root maxEvents=1000
+cmsRun cmssw/ntuple_cfg.py content=/tmp/dvSignal.json isMC=True inputFiles=root://cmseos.fnal.gov//store/.../file.root outputFile=test.root maxEvents=1000
 ```
 
-Needs `cmsenv`. See `config/content/README.md` for what a preset declares.
-
+Needs `cmsenv`. See `config/content/README.md` for what a preset declares. 
 ## What A Job Area Contains
 
 `jobs/<task>/`:

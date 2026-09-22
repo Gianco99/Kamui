@@ -43,7 +43,7 @@ open("inputs.txt", "w").write(",".join(files))
 PY
 INPUTS=$(cat inputs.txt)
 
-cmsRun kamuiNtuple_cfg.py content={contentJson} isMC={isMC} \
+cmsRun ntuple_cfg.py content={contentJson} isMC={isMC} \
     inputFiles=$INPUTS outputFile=out.root maxEvents={maxEvents}
 
 xrdfs {eosRedirector} mkdir -p {outDir}
@@ -135,8 +135,8 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
             f.write(script)
         os.chmod(p, os.stat(p).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
-    inputFiles = ["fileLists.json", os.path.join(paths.CMSSW_DIR, "kamuiNtuple_cfg.py"),
-                  os.path.join(paths.CMSSW_DIR, "kamuiTables.py")] + list(contentCache.values())
+    inputFiles = ["fileLists.json", os.path.join(paths.CMSSW_DIR, "ntuple_cfg.py"),
+                  os.path.join(paths.CMSSW_DIR, "ntupleTables.py")] + list(contentCache.values())
     jdlName = "submit.jdl"
     with open(os.path.join(d, jdlName), "w") as f:
         f.write(JDL.format(jdlName=jdlName, inputFiles=",".join(inputFiles),

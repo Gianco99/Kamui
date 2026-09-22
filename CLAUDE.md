@@ -11,12 +11,14 @@
 - Say a thing once, in the fewest words that carry it.
 - Never define something by contrast: "it is X, not Y", "X rather than Y", "X is still a Y". State X. The reader was not thinking of Y until it was raised.
 - One example, when an example is genuinely needed. Not three.
+- Write DV, never displaced vertex, including in compounds such as DV reconstruction.
 - Use American English throughout, in code, comments and documentation: organize, behavior, analyze, center, license.
 - Start comments, docstrings, JSON `_doc` strings and anything the user reads, including argparse `help=` text, with a capital letter.
   - Exceptions are things that are naturally lowercase: a variable or function name, a camelCase identifier, a filename, a path, a CMSSW collection, a literal value such as `prod/global`.
 - Don't use em-dashes when writing docs or coding!
 ## Code
 - camelCase everywhere. This is just my (Gianfranco's) preference lol.
+- Do not start file or folder names with `kamui` unless the name needs it (the `kamui` CLI and the `python/kamui` package).
 - Use `python3`, not `python` - a cmsenv shell leaves `/usr/bin/python` with a mismatched `PYTHONHOME`, so bare `python` fails.
 - JSON configs: Keys starting with `_` are comments and are stripped on load.
 - Do not add `__init__.py` files unless something actually needs them.

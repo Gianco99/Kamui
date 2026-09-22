@@ -63,6 +63,43 @@ def _objectTable(name, c):
     return mod
 
 
+def _seedTrackModules(name, c, producerName):
+    """The seed-track producer, and the table writing its tracks with each one's packedPFCandidates index."""
+    s = c["seeding"]
+    pv, scale = s["goodPv"], s["dxyErrScale"]
+    producer = cms.EDProducer(
+        "SeedTrackProducer",
+        src=cms.InputTag(c["src"]),
+        beamSpot=cms.InputTag(s["beamSpot"]),
+        primaryVertices=cms.InputTag(s["primaryVertices"]),
+        goodPv=cms.PSet(
+            minNdof=cms.double(pv["minNdof"]),
+            maxAbsZ=cms.double(pv["maxAbsZ"]),
+            maxRho=cms.double(pv["maxRho"]),
+        ),
+        minPt=cms.double(s["minPt"]),
+        minAbsDxyBs=cms.double(s["minAbsDxyBs"]),
+        maxDxyErr=cms.double(s["maxDxyErr"]),
+        minNSigmaDxyBs=cms.double(s["minNSigmaDxyBs"]),
+        minRescaledNSigmaDxyBs=cms.double(s["minRescaledNSigmaDxyBs"]),
+        minNSigmaDxyPv=cms.double(s["minNSigmaDxyPv"]),
+        minHits=cms.int32(s["minHits"]),
+        minPixelHits=cms.int32(s["minPixelHits"]),
+        minPixelLayers=cms.int32(s["minPixelLayers"]),
+        minStripLayers=cms.int32(s["minStripLayers"]),
+        maxFirstPixelLayer=cms.int32(s["maxFirstPixelLayer"]),
+        dxyErrScale=cms.PSet(
+            form=cms.string(scale["form"]),
+            barrelMaxAbsEta=cms.double(scale["barrelMaxAbsEta"]),
+            barrel=cms.vdouble(*scale["barrel"]),
+            endcap=cms.vdouble(*scale["endcap"]),
+        ),
+    )
+    table = _objectTable(name, dict(c, src=producerName))
+    table.externalVariables = cms.PSet(candIdx=_extVar({"src": producerName + ":candIdx", "type": "int", "doc": "Index into packedPFCandidates"}))
+    return producer, table
+
+
 def buildTables(content):
     """Table producers for a resolved content dict, as (moduleName -> EDProducer, ordered names)."""
     modules = {}
@@ -75,6 +112,9 @@ def buildTables(content):
             modules[modName] = _genWeightTable()
         elif kind == "global":
             modules[modName] = _globalTable(name, c)
+        elif kind == "seedTrack":
+            producerName = name[0].lower() + name[1:] + "Producer"
+            modules[producerName], modules[modName] = _seedTrackModules(name, c, producerName)
         else:
             modules[modName] = _objectTable(name, c)
     return modules, sorted(modules)

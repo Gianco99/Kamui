@@ -8,7 +8,7 @@ from FWCore.ParameterSet.VarParsing import VarParsing
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.getcwd())
-from kamuiTables import buildSkim, buildTables, loadContent  # noqa: E402
+from ntupleTables import buildSkim, buildTables, loadContent  # noqa: E402
 
 SINGLETON = VarParsing.multiplicity.singleton
 
@@ -55,15 +55,15 @@ for name, mod in modules.items():
 ## The generator-weight producer must see every event, so it is kept out of the skimmed path.
 normNames = [n for n in order if "genweight" in n.lower()]
 tableNames = [n for n in order if n not in normNames]
-process.kamuiTables = cms.Task(*[getattr(process, n) for n in tableNames])
+process.ntupleTables = cms.Task(*[getattr(process, n) for n in tableNames])
 
 skimFilter, skimName = buildSkim(content.get("skim", {}))
 if skimFilter is not None:
     setattr(process, skimName, skimFilter)
-    process.dvPath = cms.Path(getattr(process, skimName), process.kamuiTables)
+    process.dvPath = cms.Path(getattr(process, skimName), process.ntupleTables)
     selectEvents = cms.untracked.PSet(SelectEvents=cms.vstring("dvPath"))
 else:
-    process.dvPath = cms.Path(process.kamuiTables)
+    process.dvPath = cms.Path(process.ntupleTables)
     selectEvents = cms.untracked.PSet()
 
 ## Scheduled

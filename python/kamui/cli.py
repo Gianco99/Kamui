@@ -457,7 +457,7 @@ def _cmdCheck(args):
 
     sites = loadSites()
     missingKeys = [k for k in ("eosRedirector", "sourceRedirector", "stageoutBase", "miniaodDir", "crabStageoutBase", "crabStorageSite") if k not in sites]
-    missingCfg = [f for f in ("kamuiNtuple_cfg.py", "kamuiTables.py") if not os.path.exists(os.path.join(paths.CMSSW_DIR, f))]
+    missingCfg = [f for f in ("ntuple_cfg.py", "ntupleTables.py") if not os.path.exists(os.path.join(paths.CMSSW_DIR, f))]
     for k in missingKeys:
         problems.append(f"sites.json is missing '{k}'")
     for f in missingCfg:
@@ -499,6 +499,14 @@ def _cmdCache(args):
 class _Formatter(argparse.RawDescriptionHelpFormatter):
     def add_usage(self, usage, actions, groups, prefix=None):
         return
+
+    ## argparse sizes the command column from the subparsers metavar, which we blank, and then prints
+    ## the command names one level deeper than it measured. Without this the longer names wrap.
+    def add_argument(self, action):
+        super().add_argument(action)
+        if action.nargs == argparse.PARSER:
+            widest = max((len(c) for c in action.choices), default=0)
+            self._action_max_length = max(self._action_max_length, widest + self._current_indent + 2)
 
     def _format_action(self, action):
         text = super()._format_action(action)

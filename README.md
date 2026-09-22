@@ -12,6 +12,7 @@ The philosophy behind this repo is to utilize easy to edit, human-readable confi
 | `config/` | All of the physics packaged into configuration files |
 | `ntupleProduction/` | Step 1: DAS datasets to ntuples |
 | `ntupleSelection/` | Step 2: Selections applied to ntuples |
+| `vertexing/` | DV reconstruction |
 | `tools/` | Standalone scripts that read what the framework produced, or what it is about to consume |
 | `CLAUDE.md` | Conventions for the AI |
 ## The Framework
@@ -35,6 +36,16 @@ First-time setup only! Create a CMSSW_16_1_2 release area in a convenient locati
 source /cvmfs/cms.cern.ch/cmsset_default.sh
 export SCRAM_ARCH=el9_amd64_gcc13
 cmsrel CMSSW_16_1_2
+```
+
+Then build the DV plugins into it, pointing the link at your Kamui clone:
+
+```bash
+cd CMSSW_16_1_2/src
+cmsenv
+mkdir Kamui
+ln -s /path/to/Kamui/vertexing Kamui/Vertexing
+scram b -j8
 ```
 
 Then per session, from that release's `src/`:

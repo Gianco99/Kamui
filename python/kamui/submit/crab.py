@@ -73,7 +73,7 @@ def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, a
     base = outputBase(sites, "crab", base)
     d, taskName = resolveTaskDir(taskName, assumeYes)
     _checkRequestNames(taskName, samples)
-    pset = os.path.join(paths.CMSSW_DIR, "kamuiNtuple_cfg.py")
+    pset = os.path.join(paths.CMSSW_DIR, "ntuple_cfg.py")
 
     contentCache = {}
     effective = {s["name"]: int(unitsPerJob or s.get("unitsPerJob") or DEFAULT_FILES_PER_JOB) for s in samples}
@@ -97,7 +97,7 @@ def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, a
                 f"content={contentJson}",
                 f"isMC={'True' if s['isMC'] else 'False'}",
             ],
-            inputFiles=[contentJson, os.path.join(paths.CMSSW_DIR, "kamuiTables.py")],
+            inputFiles=[contentJson, os.path.join(paths.CMSSW_DIR, "ntupleTables.py")],
             maxMemoryMB=maxMemoryMB,
             inputDBS=inputDBS,
             unitsPerJob=effective[s["name"]],

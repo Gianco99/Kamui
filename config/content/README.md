@@ -22,6 +22,7 @@ A collection names one thing in MiniAOD and lists the variables to keep from it.
 | `singleton` (optional, default: `false`) | One object per event |
 | `mcOnly` (optional, default: `false`) | The collection disappears when the preset is resolved for data |
 | `dataOnly` (optional, default: `false`) | The mirror of `mcOnly` |
+| `seeding` (required for `seedTrack`, default: None) | The seed-track cuts |
 
 Three groups of `type` behave differently!
 
@@ -49,6 +50,13 @@ A `global` collection rejects `cut`, `maxLen` and `singleton`, and each of its v
 | **`src`** (required, default: None) | The EDM product supplying the value |
 | `type` (optional, default: `double`) | As above |
 | `doc` (optional, default: `""`) | Written into the ROOT file as the branch description |
+
+A `seedTrack` collection writes the DV seed tracks, and its `variables` are methods of `reco::Track`.
+
+- The `seeding` block holds the seed cuts
+- It has an optional `dxyErrScale` that is MC only and keyed by era
+  - `form` is one of `p0`, `p0-p2*exp(-p1*x)` or `p0-exp(-p1*x+p2)`.
+- It needs the `vertexing/` plugins built into the release.
 
 ## Presets
 
@@ -89,6 +97,7 @@ Collections:
 | `vertices` | IVF secondary vertices from MiniAOD |
 | `tracks` | Tracks and lost tracks, preselected to pT > 1 GeV with at least 2 pixel and 6 strip layers for the seed track definition |
 | `gen` | Generator particles, generator MET, weights and pileup. All `mcOnly` |
+| `vertexing` | DV seed tracks |
 
 Presets:
 
