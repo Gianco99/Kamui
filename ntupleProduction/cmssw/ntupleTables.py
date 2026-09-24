@@ -100,6 +100,58 @@ def _seedTrackModules(name, c, producerName):
     return producer, table
 
 
+def _jetIdCut(jetId):
+    """The PATJetSelector cut string for one era's jet ID."""
+    terms = []
+    if "minPt" in jetId:
+        terms.append("pt > %s" % jetId["minPt"])
+    if "maxAbsEta" in jetId:
+        terms.append("abs(eta) < %s" % jetId["maxAbsEta"])
+    if "maxNeutralHadronFraction" in jetId:
+        terms.append("neutralHadronEnergyFraction < %s" % jetId["maxNeutralHadronFraction"])
+    if "maxNeutralEmFraction" in jetId:
+        terms.append("neutralEmEnergyFraction < %s" % jetId["maxNeutralEmFraction"])
+
+    central = dict(jetId.get("central") or {})
+    centralMaxAbsEta = central.pop("maxAbsEta", None)
+    names = [("maxNeutralEmFraction", "neutralEmEnergyFraction < %s"),
+             ("minDaughters", "numberOfDaughters > %s"),
+             ("maxMuonFraction", "muonEnergyFraction < %s"),
+             ("minChargedHadronFraction", "chargedHadronEnergyFraction > %s"),
+             ("minChargedMultiplicity", "chargedMultiplicity > %s"),
+             ("maxChargedEmFraction", "chargedEmEnergyFraction < %s")]
+    centralTerms = [fmt % central[key] for key, fmt in names if key in central]
+    if centralTerms and centralMaxAbsEta is not None:
+        terms.append("(abs(eta) >= %s || (%s))" % (centralMaxAbsEta, " && ".join(centralTerms)))
+    else:
+        terms += centralTerms
+    return " && ".join(terms)
+
+
+def _vertexJetModules(name, c, corrName, updatedName):
+    """The JEC, the jet update and the selection the vertexer reads."""
+    from PhysicsTools.PatAlgos.recoLayer0.jetCorrFactors_cfi import patJetCorrFactors
+    from PhysicsTools.PatAlgos.producersLayer1.jetUpdater_cfi import updatedPatJets
+    jec = c["jec"]
+    corr = patJetCorrFactors.clone(
+        src=cms.InputTag(c["src"]),
+        primaryVertices=cms.InputTag(jec["primaryVertices"]),
+        payload=cms.string(jec["payload"]),
+        levels=cms.vstring(*jec["levels"]),
+    )
+    updated = updatedPatJets.clone(
+        jetSource=cms.InputTag(c["src"]),
+        jetCorrFactorsSource=cms.VInputTag(cms.InputTag(corrName)),
+    )
+    selected = cms.EDFilter(
+        c["plugin"],
+        src=cms.InputTag(updatedName),
+        cut=cms.string(_jetIdCut(c["jetId"])),
+        filter=cms.bool(False),
+    )
+    return corr, updated, selected
+
+
 def buildTables(content):
     """Table producers for a resolved content dict, as (moduleName -> EDProducer, ordered names)."""
     modules = {}
@@ -112,6 +164,10 @@ def buildTables(content):
             modules[modName] = _genWeightTable()
         elif kind == "global":
             modules[modName] = _globalTable(name, c)
+        elif kind == "vertexJet":
+            label = name[0].lower() + name[1:]
+            corrName, updatedName = label + "CorrFactors", label + "Updated"
+            modules[corrName], modules[updatedName], modules[label] = _vertexJetModules(name, c, corrName, updatedName)
         elif kind == "seedTrack":
             producerName = name[0].lower() + name[1:] + "Producer"
             modules[producerName], modules[modName] = _seedTrackModules(name, c, producerName)

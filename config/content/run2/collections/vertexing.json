@@ -116,6 +116,75 @@
           "doc": "Strip layers with a measurement"
         }
       }
+    },
+    "VertexJet": {
+      "_doc": "Jets for shared-jet mitigation. Not written to the ntuple.",
+      "type": "vertexJet",
+      "src": "slimmedJets",
+      "jec": {
+        "payload": "AK4PFchs",
+        "primaryVertices": "offlineSlimmedPrimaryVertices",
+        "levels": ["L1FastJet", "L2Relative", "L3Absolute", "L2L3Residual"]
+      },
+      "_jetId": "TightLepVeto.",
+      "jetId": {
+        "2016APV": {
+          "minPt": 20,
+          "maxAbsEta": 2.5,
+          "maxNeutralHadronFraction": 0.9,
+          "maxNeutralEmFraction": 0.99,
+          "central": {
+            "maxAbsEta": 2.4,
+            "maxNeutralEmFraction": 0.9,
+            "minDaughters": 1,
+            "maxMuonFraction": 0.8,
+            "minChargedHadronFraction": 0,
+            "minChargedMultiplicity": 0,
+            "maxChargedEmFraction": 0.8
+          }
+        },
+        "2016": {
+          "minPt": 20,
+          "maxAbsEta": 2.5,
+          "maxNeutralHadronFraction": 0.9,
+          "maxNeutralEmFraction": 0.99,
+          "central": {
+            "maxAbsEta": 2.4,
+            "maxNeutralEmFraction": 0.9,
+            "minDaughters": 1,
+            "maxMuonFraction": 0.8,
+            "minChargedHadronFraction": 0,
+            "minChargedMultiplicity": 0,
+            "maxChargedEmFraction": 0.8
+          }
+        },
+        "2017": {
+          "minPt": 20,
+          "maxAbsEta": 2.5,
+          "maxNeutralHadronFraction": 0.9,
+          "maxNeutralEmFraction": 0.9,
+          "central": {
+            "minDaughters": 1,
+            "maxMuonFraction": 0.8,
+            "minChargedHadronFraction": 0,
+            "minChargedMultiplicity": 0,
+            "maxChargedEmFraction": 0.8
+          }
+        },
+        "2018": {
+          "minPt": 20,
+          "maxAbsEta": 2.5,
+          "maxNeutralHadronFraction": 0.9,
+          "maxNeutralEmFraction": 0.9,
+          "central": {
+            "minDaughters": 1,
+            "maxMuonFraction": 0.8,
+            "minChargedHadronFraction": 0,
+            "minChargedMultiplicity": 0,
+            "maxChargedEmFraction": 0.8
+          }
+        }
+      }
     }
   }
 }

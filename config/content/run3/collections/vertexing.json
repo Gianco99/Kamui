@@ -89,6 +89,18 @@
           "doc": "Strip layers with a measurement"
         }
       }
+    },
+    "VertexJet": {
+      "_doc": "Jets for shared-jet mitigation. Not written to the ntuple.",
+      "type": "vertexJet",
+      "src": "slimmedJets",
+      "jec": {
+        "payload": "AK4PFchs",
+        "primaryVertices": "offlineSlimmedPrimaryVertices",
+        "levels": ["L1FastJet", "L2Relative", "L3Absolute", "L2L3Residual"]
+      },
+      "_jetId": "TightLepVeto. No Run 3 working point yet.",
+      "jetId": {}
     }
   }
 }

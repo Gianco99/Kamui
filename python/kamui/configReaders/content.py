@@ -32,10 +32,14 @@ KIND_TO_PLUGIN = {
     "pileup":           "NPUTablesProducer",
     "genWeight":        "GenWeightsTableProducer",
     "seedTrack":        "SimpleTrackFlatTableProducer",
+    "vertexJet":        "PATJetSelector",
 }
 
 # Kinds whose producer needs conditions
-CONDITIONS_KINDS = set()
+CONDITIONS_KINDS = {"vertexJet"}
+
+# Kinds the vertexing plugins consume, which write no table
+PRODUCER_ONLY_KINDS = {"vertexJet"}
 
 # Kinds whose producer takes no `src`/`cut`/`variables`
 FIXED_CONTENT_KINDS = {"pileup", "genWeight"}
@@ -159,7 +163,7 @@ def _resolveSkim(skim):
 
 
 ## Every key a collection may carry
-COLLECTION_FIELDS = {"type", "src", "doc", "cut", "maxLen", "variables", "singleton", "mcOnly", "dataOnly", "seeding"}
+COLLECTION_FIELDS = {"type", "src", "doc", "cut", "maxLen", "variables", "singleton", "mcOnly", "dataOnly", "seeding", "jec", "jetId"}
 VARIABLE_FIELDS = {"expr", "type", "doc", "precision"}
 EXTVAR_FIELDS = {"src", "type", "doc"}
 
@@ -196,6 +200,14 @@ def _translate(cname, c, era, isMC):
         raise ValueError(f"collection '{cname}': missing 'src'")
     out["src"] = c["src"]
 
+    if kind in PRODUCER_ONLY_KINDS:
+        for k in ("variables", "cut", "maxLen", "singleton"):
+            if k in c:
+                raise ValueError(f"collection '{cname}': '{k}' has no meaning on a '{kind}' collection, which writes no table")
+        out["jec"] = _checkJec(cname, c.get("jec"))
+        out["jetId"] = _checkJetId(cname, _forEra(cname, "jetId", c.get("jetId") or {}, era))
+        return out
+
     out["variables"] = _checkVars(cname, c.get("variables", {}))
     if kind == "seedTrack":
         out["seeding"] = _resolveSeeding(cname, c.get("seeding"), era, isMC)
@@ -221,7 +233,7 @@ def _translate(cname, c, era, isMC):
     return out
 
 
-## Every key a seeding block may carry. The dxy uncertainty scale is MC only and keyed by era.
+## Every key a seeding block may carry
 SEEDING_REQUIRED = {"beamSpot", "primaryVertices", "goodPv", "minPt", "minAbsDxyBs", "maxDxyErr", "minNSigmaDxyBs", "minRescaledNSigmaDxyBs", "minNSigmaDxyPv", "minHits", "minPixelHits", "minPixelLayers", "minStripLayers", "maxFirstPixelLayer"}
 SEEDING_FIELDS = SEEDING_REQUIRED | {"dxyErrScale"}
 
@@ -241,6 +253,37 @@ def _resolveSeeding(cname, seeding, era, isMC):
     if isMC and "dxyErrScale" in seeding:
         out["dxyErrScale"] = _forEra(cname, "dxyErrScale", seeding["dxyErrScale"], era)
     return out
+
+
+## Every key the JECs and the jet ID may carry
+JEC_FIELDS = {"payload", "primaryVertices", "levels"}
+JET_ID_FIELDS = {"minPt", "maxAbsEta", "maxNeutralHadronFraction", "maxNeutralEmFraction", "central"}
+JET_ID_CENTRAL_FIELDS = {"maxAbsEta", "maxNeutralEmFraction", "minDaughters", "maxMuonFraction", "minChargedHadronFraction", "minChargedMultiplicity", "maxChargedEmFraction"}
+
+
+def _checkJec(cname, jec):
+    if not isinstance(jec, dict):
+        raise ValueError(f"collection '{cname}': a vertexJet collection needs a 'jec' block")
+    unknown = sorted(set(jec) - JEC_FIELDS)
+    if unknown:
+        raise ValueError(f"collection '{cname}': jec has unknown key(s) {unknown}; valid keys are {sorted(JEC_FIELDS)}")
+    missing = sorted(JEC_FIELDS - set(jec))
+    if missing:
+        raise ValueError(f"collection '{cname}': jec is missing {missing}")
+    if not jec["levels"]:
+        raise ValueError(f"collection '{cname}': jec names no correction levels")
+    return {"payload": jec["payload"], "primaryVertices": jec["primaryVertices"], "levels": list(jec["levels"])}
+
+
+def _checkJetId(cname, jetId):
+    unknown = sorted(set(jetId) - JET_ID_FIELDS)
+    if unknown:
+        raise ValueError(f"collection '{cname}': jetId has unknown key(s) {unknown}; valid keys are {sorted(JET_ID_FIELDS)}")
+    central = jetId.get("central") or {}
+    unknown = sorted(set(central) - JET_ID_CENTRAL_FIELDS)
+    if unknown:
+        raise ValueError(f"collection '{cname}': jetId.central has unknown key(s) {unknown}; valid keys are {sorted(JET_ID_CENTRAL_FIELDS)}")
+    return jetId
 
 
 def _forEra(cname, key, byEra, era):

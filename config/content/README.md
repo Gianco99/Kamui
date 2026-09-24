@@ -6,6 +6,10 @@ These JSONs decide what ends up in your ntuples.
 
 `presets/` combines those into a complete job configuration. Samples in `config/samples/` name one in their `content` field.
 
+Two styles of configuration live here, split by what they decide:
+
+- **Cut strings decide what gets stored:** A collection's `cut`, in the same CMSSW string language as `expr`.
+- **Named fields decide physics:** Producer parameters such as `seeding` and `jetId`, and everything in `config/selections/`.
 ## Layout
 ## Collections
 
@@ -23,12 +27,15 @@ A collection names one thing in MiniAOD and lists the variables to keep from it.
 | `mcOnly` (optional, default: `false`) | The collection disappears when the preset is resolved for data |
 | `dataOnly` (optional, default: `false`) | The mirror of `mcOnly` |
 | `seeding` (required for `seedTrack`, default: None) | The seed-track cuts |
+| `jec` (required for `vertexJet`, default: None) | The JECs to re-apply |
+| `jetId` (required for `vertexJet`, default: None) | The jet ID, keyed by era |
 
-Three groups of `type` behave differently!
+Four groups of `type` behave differently!
 
 -  `pileup` and `genWeight` have fixed content: their CMSSW producer decides what branches to emit, so `variables` is unused,`doc` is dropped, and `src` is recorded as a papertrail while the producer sets its own.
 - `global` names EDM products directly, described below.
 -  `beamSpot` and `genEvent` hold one object per event by construction and reject `singleton`.
+- `vertexJet` writes no output table, so it rejects `variables`, `cut`, `maxLen` and `singleton`.
 
 Each variable is a name and how to compute it:
 
@@ -57,6 +64,11 @@ A `seedTrack` collection writes the DV seed tracks, and its `variables` are meth
 - It has an optional `dxyErrScale` that is MC only and keyed by era
   - `form` is one of `p0`, `p0-p2*exp(-p1*x)` or `p0-exp(-p1*x+p2)`.
 - It needs the `vertexing/` plugins built into the release.
+
+A `vertexJet` collection produces the jets shared-jet mitigation reads and writes no table, so it takes no `variables` or `cut`.
+
+- The `jec` block names the payload, the primary vertices and the correction levels
+- The `jetId` block is keyed by era, and its `central` fields apply out to their own `maxAbsEta`, or everywhere when they name none
 
 ## Presets
 
@@ -97,7 +109,7 @@ Collections:
 | `vertices` | IVF secondary vertices from MiniAOD |
 | `tracks` | Tracks and lost tracks, preselected to pT > 1 GeV with at least 2 pixel and 6 strip layers for the seed track definition |
 | `gen` | Generator particles, generator MET, weights and pileup. All `mcOnly` |
-| `vertexing` | DV seed tracks |
+| `vertexing` | DV seed tracks, and the jets shared-jet mitigation reads |
 
 Presets:
 
