@@ -22,6 +22,7 @@ Standalone file containing the configuration for CMSSW, EOS, Condor and CRAB
 | `crabStageoutBase` | Where CRAB outputs are written |
 | `miniaodDir` | The subdirectory under `stageoutBase` holding raw MiniAOD copies |
 | `crabStorageSite` | The site CRAB is told to deliver to |
+| `globalTags` | The conditions tag per era, as `mc` and `data` |
 | `cmssw.version` | The CMSSW release jobs run in |
 | `cmssw.scramArch` | The architecture that release was built for |
 

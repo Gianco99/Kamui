@@ -15,7 +15,7 @@ SINGLETON = VarParsing.multiplicity.singleton
 opts = VarParsing("analysis")
 opts.register("content", "", SINGLETON, VarParsing.varType.string, "Path to a resolved content JSON")
 opts.register("isMC", True, SINGLETON, VarParsing.varType.bool, "MC (True) or data (False)")
-opts.register("globalTag", "", SINGLETON, VarParsing.varType.string, "Conditions global tag; empty takes it from the input file")
+opts.register("globalTag", "", SINGLETON, VarParsing.varType.string, "Conditions global tag")
 opts.register("nThreads", 1, SINGLETON, VarParsing.varType.int, "Number of cmsRun threads")
 opts.register("reportEvery", 1000, SINGLETON, VarParsing.varType.int, "MessageLogger reporting interval")
 opts.setDefault("outputFile", "kamuiNtuple.root")
@@ -47,6 +47,13 @@ if opts.globalTag:
     process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
     from Configuration.AlCa.GlobalTag import GlobalTag
     process.GlobalTag = GlobalTag(process.GlobalTag, opts.globalTag, "")
+
+if content.get("needsConditions"):
+    if not opts.globalTag:
+        raise RuntimeError("globalTag=<tag> is required for content that needs conditions")
+    process.load("Configuration.StandardSequences.GeometryRecoDB_cff")
+    process.load("Configuration.StandardSequences.MagneticField_cff")
+    process.load("TrackingTools.TransientTrack.TransientTrackBuilder_cfi")
 
 modules, order = buildTables(content)
 for name, mod in modules.items():

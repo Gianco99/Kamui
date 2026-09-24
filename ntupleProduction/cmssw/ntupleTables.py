@@ -64,7 +64,7 @@ def _objectTable(name, c):
 
 
 def _seedTrackModules(name, c, producerName):
-    """The seed-track producer, and the table writing its tracks with each one's packedPFCandidates index."""
+    """The seed-track producer and its table."""
     s = c["seeding"]
     pv, scale = s["goodPv"], s["dxyErrScale"]
     producer = cms.EDProducer(

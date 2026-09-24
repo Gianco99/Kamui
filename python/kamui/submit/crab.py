@@ -9,9 +9,8 @@ import os
 import subprocess
 
 ## Kamui modules
-from ..configReaders.content import eraGroup
 from ..configReaders.sites import loadSites
-from .common import checkTaskName, outputBase, publishRecord, resolveTaskDir, taskDir, writeResolvedContent, writeTaskRecord
+from .common import checkTaskName, globalTagArg, outputBase, publishRecord, resolveTaskDir, taskDir, writeResolvedContent, writeTaskRecord
 from ..foundations import paths
 
 ## Input files per job when neither the flag nor the sample says otherwise
@@ -79,11 +78,12 @@ def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, a
     effective = {s["name"]: int(unitsPerJob or s.get("unitsPerJob") or DEFAULT_FILES_PER_JOB) for s in samples}
     written = []
     for s in samples:
-        key = (s["content"], bool(s["isMC"]), eraGroup(s["era"]))
+        key = (s["content"], bool(s["isMC"]), s["era"])
         if key not in contentCache:
             contentCache[key] = writeResolvedContent(d, s["content"], bool(s["isMC"]), s["era"])
         contentJson = contentCache[key]
 
+        tag = globalTagArg(contentJson, s["era"], bool(s["isMC"]), sites)
         inputDBS = "phys03" if "phys03" in s["dasInstance"] else "global"
         lumiMaskLine = f"config.Data.lumiMask = {s['lumiMask']!r}\n" if s.get("lumiMask") else ""
 
@@ -96,7 +96,7 @@ def prepare(samples, taskName, sites=None, unitsPerJob=None, maxMemoryMB=2500, a
             pyCfgParams=[
                 f"content={contentJson}",
                 f"isMC={'True' if s['isMC'] else 'False'}",
-            ],
+            ] + ([f"globalTag={tag}"] if tag else []),
             inputFiles=[contentJson, os.path.join(paths.CMSSW_DIR, "ntupleTables.py")],
             maxMemoryMB=maxMemoryMB,
             inputDBS=inputDBS,

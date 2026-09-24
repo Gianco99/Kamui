@@ -14,8 +14,7 @@ import subprocess
 
 ## Kamui modules
 from ..configReaders.sites import loadSites
-from ..configReaders.content import eraGroup
-from .common import chunk, contentStem, outputBase, publishRecord, resolveTaskDir, runTool, taskDir, writeResolvedContent, writeTaskRecord
+from .common import chunk, contentStem, globalTagArg, outputBase, publishRecord, resolveTaskDir, runTool, taskDir, writeResolvedContent, writeTaskRecord
 from ..foundations import paths
 
 ## Input files per job when neither the flag nor the sample says otherwise
@@ -43,7 +42,7 @@ open("inputs.txt", "w").write(",".join(files))
 PY
 INPUTS=$(cat inputs.txt)
 
-cmsRun ntuple_cfg.py content={contentJson} isMC={isMC} \
+cmsRun ntuple_cfg.py content={contentJson} isMC={isMC} {globalTagArg}\
     inputFiles=$INPUTS outputFile=out.root maxEvents={maxEvents}
 
 xrdfs {eosRedirector} mkdir -p {outDir}
@@ -73,9 +72,9 @@ queue sample,index,script from {jobListName}
 '''
 
 
-def _scriptName(presetName, isMC, group):
-    """One run script per content preset, data/MC flavour and era set, since each combination resolves to its own content."""
-    return f"runJob_{contentStem(presetName)}_{'mc' if isMC else 'data'}_{group}.sh"
+def _scriptName(presetName, isMC, era):
+    """One run script per content preset, data/MC flavor and era"""
+    return f"runJob_{contentStem(presetName)}_{'mc' if isMC else 'data'}_{era}.sh"
 
 
 # fileLists maps a sample name to the list of LFNs it should run over, resolved by the caller from DAS or EOS.
@@ -101,7 +100,7 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
         if not lfns:
             dropped.append(s["name"])
             continue
-        key = (s["content"], bool(s["isMC"]), eraGroup(s["era"]))
+        key = (s["content"], bool(s["isMC"]), s["era"])
         if key not in contentCache:
             contentCache[key] = writeResolvedContent(d, s["content"], bool(s["isMC"]), s["era"])
         perJob = int(filesPerJob or s.get("unitsPerJob") or DEFAULT_FILES_PER_JOB)
@@ -119,18 +118,20 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxEvent
     with open(os.path.join(d, "jobList.txt"), "w") as f:
         f.write("\n".join(jobRows) + "\n")
 
-    # A task may mix content presets and MC with data, so each combination gets its own run script and the job rows name the one they need.
-    for (preset, isMC, group), contentJson in contentCache.items():
+    # A task may mix content presets and MC with data, so each combination gets its own run script
+    for (preset, isMC, era), contentJson in contentCache.items():
+        tag = globalTagArg(contentJson, era, isMC, sites)
         script = RUN_SCRIPT.format(
             scramArch=scramArch,
             cmsswVersion=cmsswVersion,
             contentJson=os.path.basename(contentJson),
             isMC="True" if isMC else "False",
+            globalTagArg=f"globalTag={tag} " if tag else "",
             maxEvents=maxEvents,
             eosRedirector=sites["eosRedirector"].rstrip("/"),
             outDir="/".join([base, "ntuples", taskName, "$SAMPLE"]),
         )
-        p = os.path.join(d, _scriptName(preset, isMC, group))
+        p = os.path.join(d, _scriptName(preset, isMC, era))
         with open(p, "w") as f:
             f.write(script)
         os.chmod(p, os.stat(p).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)

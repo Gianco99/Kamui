@@ -12,6 +12,13 @@
 
   "crabStorageSite": "T3_US_FNALLPC",
 
+  "globalTags": {
+    "2016APV": {"mc": "106X_mcRun2_asymptotic_preVFP_v11", "data": "106X_dataRun2_v37"},
+    "2016":    {"mc": "106X_mcRun2_asymptotic_v17",        "data": "106X_dataRun2_v37"},
+    "2017":    {"mc": "106X_mc2017_realistic_v10",         "data": "106X_dataRun2_v37"},
+    "2018":    {"mc": "106X_upgrade2018_realistic_v16_L1v1", "data": "106X_dataRun2_v37"}
+  },
+
   "cmssw": {
     "version": "CMSSW_16_1_2",
     "scramArch": "el9_amd64_gcc13"

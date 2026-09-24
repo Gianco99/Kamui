@@ -34,6 +34,9 @@ KIND_TO_PLUGIN = {
     "seedTrack":        "SimpleTrackFlatTableProducer",
 }
 
+# Kinds whose producer needs conditions
+CONDITIONS_KINDS = set()
+
 # Kinds whose producer takes no `src`/`cut`/`variables`
 FIXED_CONTENT_KINDS = {"pileup", "genWeight"}
 # Kinds that are inherently one-per-event
@@ -108,6 +111,7 @@ def resolveContent(name, contentDir=None, isMC=True, era="Summer24"):
     return {
         "name":        name,
         "isMC":        isMC,
+        "needsConditions": any(c["kind"] in CONDITIONS_KINDS for c in collections.values()),
         "collections": collections,
         "triggerBits": cfg.get("triggerBits", {}),
         "skim":        _resolveSkim(cfg.get("skim", {})),

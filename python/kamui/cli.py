@@ -457,12 +457,15 @@ def _cmdCheck(args):
 
     sites = loadSites()
     missingKeys = [k for k in ("eosRedirector", "sourceRedirector", "stageoutBase", "miniaodDir", "crabStageoutBase", "crabStorageSite") if k not in sites]
+    badTags = [era for era, v in (sites.get("globalTags") or {}).items() if not isinstance(v, dict) or not all(isinstance(v.get(f), str) and v.get(f) for f in ("mc", "data"))]
     missingCfg = [f for f in ("ntuple_cfg.py", "ntupleTables.py") if not os.path.exists(os.path.join(paths.CMSSW_DIR, f))]
     for k in missingKeys:
         problems.append(f"sites.json is missing '{k}'")
     for f in missingCfg:
         problems.append(f"missing cmssw/{f}")
-    note("Sites and CMSSW", "pass" if not missingKeys and not missingCfg else "fail", "Validated sites.json and the CMSSW job script configurations")
+    for era in badTags:
+        problems.append(f"sites.json globalTags['{era}'] needs an 'mc' and a 'data' tag")
+    note("Sites and CMSSW", "pass" if not missingKeys and not missingCfg and not badTags else "fail", "Validated sites.json and the CMSSW job script configurations")
 
     MARK = {"pass": "\u2705", "fail": "\u274c", "warn": "\u26a0\ufe0f "}
     width = max(len(label) for label, _, _ in report)

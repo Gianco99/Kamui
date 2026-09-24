@@ -27,6 +27,18 @@ def _expand(value, where):
     return value
 
 
+def globalTag(era, isMC, sites=None):
+    """The conditions global tag for an era, as MC or data."""
+    sites = sites if sites is not None else loadSites()
+    tags = sites.get("globalTags") or {}
+    if era not in tags:
+        raise ValueError(f"sites.json has no globalTags entry for era '{era}'; it defines {sorted(tags)}")
+    flavor = "mc" if isMC else "data"
+    if not tags[era].get(flavor):
+        raise ValueError(f"sites.json globalTags['{era}'] has no '{flavor}' tag")
+    return tags[era][flavor]
+
+
 def loadSites(path=None):
     """Load config/sites.json, expanding environment variables."""
     with open(path or paths.SITES_FILE) as f:

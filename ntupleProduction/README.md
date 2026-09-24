@@ -35,12 +35,12 @@ Needs `cmsenv`. See `config/content/README.md` for what a preset declares.
 | File | Backend | What it is |
 | --- | --- | --- |
 | `task.json` | both | The provenance record. Condor also records the cluster, the schedd and one entry per retry |
-| `<preset>.<mc\|data>.<run2\|run3>.json` | both | The flattened content, what the `cmsRun` job receives. One per preset, flavor and era set |
+| `<preset>.<mc\|data>.<era>.json` | both | The flattened content, what the `cmsRun` job receives. One per preset, flavor and era |
 | `crabConfig_<sample>.py` | CRAB | One per sample |
 | `crab/crab_<task>__<sample>/` | CRAB | The work area `crab status` and `crab resubmit` are pointed at |
 | `fileLists.json` | condor | Sample name to the list of input files each job index gets |
 | `jobList.txt` | condor | One `sample,index,script` row per job |
-| `runJob_<preset>_<mc\|data>_<run2\|run3>.sh` | condor | The script a worker runs. One per content file above |
+| `runJob_<preset>_<mc\|data>_<era>.sh` | condor | The script a worker runs. One per content file above |
 | `submit.jdl` | condor | What `condor_submit` is given |
 | `logs/` | condor | `<sample>_<index>.out`, `.err`, and `condor.log` |
 
