@@ -1,9 +1,11 @@
-# Personal working notes - reference only, not part of the repo
+# Personal working notes, for reference only
 docs/
+changeChecklist.md
+configFormats.md
+validationSummary.md
+reviewChecklist.md
 
-# Saved edmDumpEventContent output - reference only, regenerable
-
-# Generated job areas, DAS cache, python bytecode
+# Generated job areas, DAS cache, Python bytecode
 ntupleProduction/jobs/
 ntupleProduction/.dasCache/
 ntupleSelection/jobs/
@@ -12,8 +14,7 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Batch-system leavings. crab writes crab.log into whatever directory it is run from,
-# and condor writes .out/.err per job, so these appear at the repo root by accident.
+# Batch-system leavings (crab.log, condor .out/.err) that land at the repo root by accident
 *.log
 *.out
 *.err

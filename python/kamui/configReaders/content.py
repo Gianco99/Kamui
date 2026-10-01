@@ -205,6 +205,8 @@ def _translate(cname, c, era, isMC):
         out["jec"] = _checkJec(cname, c.get("jec"))
         where = f"Collection '{cname}'"
         out["cut"] = cutString(resolveRequirements(where, c.get("requirements"), era), _jetVariableExprs(era), where)
+        ## ntupleTables.py names the module from this flag, since nothing on the CMSSW side may import the package
+        out["writesTable"] = False
         return out
 
     out["variables"] = _checkVars(cname, c.get("variables", {}))

@@ -1,13 +1,13 @@
 # Kamui AI Documentation
 ## Writing
 - Write prose in normal paragraphs.
-- Do not hard-wrap lines at 80 characters or any other column - let the editor naturally wrap.
+- Do not hard-wrap lines at 80 characters or any other column. Let the editor wrap naturally.
   - The same applies to code. Do not break a statement across lines to keep it under some column width.
 - Tables and bullet lists are fine where the content is genuinely tabular or genuinely a list. Lists are preferred for the ease of human readability.
-- Prefer a pointer to a second copy. If a fact belongs somewhere else, name that file instead of restating it.
-- Do not put transient facts in a CLAUDE.md at all.
-  - Anything describing the current contents of code goes stale the next time somebody edits that code, and the reader has no way to tell. State the rule and the reason instead
-- Do not write history. Describe what the code does now, not what it used to do, what it replaced, or why it was changed.
+- Prefer a pointer to a second copy. If a fact belongs somewhere else, name that file.
+- Do not put transient facts in a Caveats section.
+  - Anything describing the current contents of code goes stale the next time somebody edits that code, and the reader has no way to tell. State the rule and the reason.
+- Do not write history, such as what the code used to do, what it replaced, or why it was changed. Describe what the code does now.
 - Say a thing once, in the fewest words that carry it.
 - Never define something by contrast: "it is X, not Y", "X rather than Y", "X is still a Y". State X. The reader was not thinking of Y until it was raised.
 - One example, when an example is genuinely needed. Not three.
@@ -19,16 +19,18 @@
 ## Code
 - camelCase everywhere. This is just my (Gianfranco's) preference lol.
 - Do not start file or folder names with `kamui` unless the name needs it (the `kamui` CLI and the `python/kamui` package).
-- Use `python3`, not `python` - a cmsenv shell leaves `/usr/bin/python` with a mismatched `PYTHONHOME`, so bare `python` fails.
+- Use `python3`. A cmsenv shell leaves `/usr/bin/python` with a mismatched `PYTHONHOME`, so bare `python` fails.
 - JSON configs: Keys starting with `_` are comments and are stripped on load.
 - Do not add `__init__.py` files unless something actually needs them.
 - A module docstring opens and closes on its own line, with the text between.
 - Group the imports and label the groups with comment headers. A single `#` heading for the whole block, `##` for each group.
 - Individual imports get no comment.
 - A leading underscore means module-internal. A `_name` is used only inside the file that defines it, and anything imported across modules carries no underscore. `check` does not enforce this, so it is on us to keep true.
+- One source of truth: a change should never need the same edit in two files. Derive the second place from the first, for example through the resolved content JSON a job receives.
 ## Working Here
+- Before editing files in a folder, read that folder's README.md, including its Caveats section, and treat the information presented as rules.
 - Correcting typos is encouraged.
 - Blatant errors should be pointed out to the user and not silently corrected.
-- Changing a config or a piece of functionality means updating the relevant README.md and CLAUDE.md that reference it.
+- Changing a config or a piece of functionality means updating the relevant README.md files that reference it, their Caveats included.
 - When something moves, move its documentation with it.
 - In general, we want to stick to the latest, greatest CMSSW releases. However, do not update to new releases without asking the maintainer, Gianfranco. This can introduce errors throughout the repository. So let's stick with the current CMSSW we are working with unless prompted to update.

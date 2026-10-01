@@ -52,7 +52,7 @@ def _resolvePath(nameOrPath, searchDir):
             cand = os.path.join(d, nameOrPath + ".json")
             if os.path.exists(cand):
                 return cand
-    raise FileNotFoundError(f"no config '{nameOrPath}' under {', '.join(dirs)}")
+    raise FileNotFoundError(f"No config '{nameOrPath}' under {', '.join(dirs)}")
 
 def loadWithIncludes(nameOrPath, searchDir, _seen=None):
     """Load a config and flatten its "include" chain (depth-first, deep-merged)."""
@@ -60,7 +60,7 @@ def loadWithIncludes(nameOrPath, searchDir, _seen=None):
     _seen = _seen if _seen is not None else []
     real = os.path.realpath(path)
     if real in _seen:
-        raise ValueError(f"circular include: {' -> '.join(_seen + [real])}")
+        raise ValueError(f"Circular include: {' -> '.join(_seen + [real])}")
     _seen = _seen + [real]
 
     cfg = loadJson(path)

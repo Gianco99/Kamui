@@ -1,5 +1,5 @@
 # Kamui: Run 3 Analysis Framework
-The philosophy behind this repo is to utilize easy to edit, human-readable configuration files that compartmentalize the physics we want to study. It contains a CLI called Kamui which allows users to perform common tasks. It also utilizes CLAUDE.md and README.md files in relevant subdirectories to track important design choices so that both the user or an AI helper are able to easily understand the code.
+The philosophy behind this repo is to utilize easy to edit, human-readable configuration files that compartmentalize the physics we want to study. It contains a CLI called Kamui which allows users to perform common tasks. It also utilizes README.md files in relevant subdirectories to track important design choices, each closing with a Caveats section so that both the user and an AI helper can easily understand the code.
 
 **Important Note:** Even though AI is used in the development of this framework, every single commit and piece of written code MUST BE HUMAN-REVIEWED before it is merged!
 
@@ -25,10 +25,8 @@ A dataset is processed in two stages, each driven by their own configuration fil
 
 An **ntuple** here is a ROOT file holding an `Events` tree with one entry per event, carrying the collections and variables a content preset names.
 
-Cross sections, filter efficiencies, generator weight sums and luminosities live in `config/normalizations/`. These are only applied in post-processing when reporting or analyzing yields, not directly to the ntuples.
-
-We have performed a validation against [JMTucker](https://github.com/DisplacedVertices/cmssw-usercode/tree/UL_Lepton) using the Low-HT analysis' Run 2 selections reproduced in `config/selections/`. Ten cases reproduce event-by-event, covering both the lepton- and displacement-triggered channels across all four Run 2 eras. The denominators are the trigger-skimmed ntuples rather than the full datasets, so they differ from JMTucker's unfiltered totals.
-## Quick start - CMSSW
+Cross sections, filter efficiencies, generator weight sums and luminosities live in `config/normalizations/`. These are applied only in post-processing, when reporting or analyzing yields.
+## Quick start: CMSSW
 
 First-time setup only! Create a CMSSW_16_1_2 release area in a convenient location:
 
@@ -57,7 +55,7 @@ cmsenv
 voms-proxy-init --rfc --voms cms -valid 192:00
 ```
 
-## Quick start - Kamui
+## Quick start: Kamui
 
 Everything runs through one command, `./kamui`, from the repo root.
 

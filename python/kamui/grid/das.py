@@ -41,12 +41,9 @@ def _proxyTimeLeft():
 def _requireProxy(minSeconds=3600):
     left = _proxyTimeLeft()
     if left is None:
-        raise DasError("voms-proxy-info not found - did you run cmsenv?")
+        raise DasError("voms-proxy-info not found; did you run cmsenv?")
     if left < minSeconds:
-        raise DasError(
-            f"grid proxy has {left}s left (need >{minSeconds}s). Run:\n"
-            "    voms-proxy-init --rfc --voms cms -valid 192:00"
-        )
+        raise DasError(f"Grid proxy has {left}s left (need >{minSeconds}s). Run:\n    voms-proxy-init --rfc --voms cms -valid 192:00")
 
 
 ## How stale a cached DAS answer may be before we ask again
@@ -60,8 +57,7 @@ def _cachePath(query, instance, jsonOut=False):
 
 def query(q, instance="prod/global", refresh=False, maxAgeDays=CACHE_MAX_AGE_DAYS, jsonOut=False):
     """
-    Run one dasgoclient query and return its lines (or parsed JSON if jsonOut).
-    Results are cached; `maxAgeDays` bounds how stale a cache entry may be.
+    Run one dasgoclient query and return its lines (or parsed JSON if jsonOut). Results are cached; `maxAgeDays` bounds how stale a cache entry may be.
     """
     cp = _cachePath(q, instance, jsonOut)
     if not refresh and os.path.exists(cp):
@@ -76,7 +72,7 @@ def query(q, instance="prod/global", refresh=False, maxAgeDays=CACHE_MAX_AGE_DAY
                 pass                            # Unreadable entry, so treat it as a miss and ask DAS again.
 
     if not _haveDasgoclient():
-        raise DasError("dasgoclient not on PATH - source cmsset_default.sh and cmsenv first")
+        raise DasError("dasgoclient not on PATH; source cmsset_default.sh and cmsenv first")
     _requireProxy()
 
     cmd = ["dasgoclient", f"--query={q} instance={instance}", "--limit=0"]
@@ -92,7 +88,7 @@ def query(q, instance="prod/global", refresh=False, maxAgeDays=CACHE_MAX_AGE_DAY
         raise DasError(f"dasgoclient returned unparseable JSON for '{q}':\n{e}")
 
     if not result and r.stderr.strip():
-        print(f"  warning: dasgoclient returned nothing for '{q}' and said: {r.stderr.strip().splitlines()[-1]}")
+        print(f"  Warning: dasgoclient returned nothing for '{q}' and said: {r.stderr.strip().splitlines()[-1]}")
         return result
 
     os.makedirs(paths.CACHE_DIR, exist_ok=True)
@@ -102,7 +98,7 @@ def query(q, instance="prod/global", refresh=False, maxAgeDays=CACHE_MAX_AGE_DAY
             json.dump({"query": q, "instance": instance, "jsonOut": bool(jsonOut), "when": time.time(), "result": result}, f)
         os.replace(tmp, cp)                     # Atomic, so an interrupted query cannot leave a broken entry.
     except OSError:
-        pass                                    # A cache that cannot be written is a cache miss next time, never a failure now.
+        pass                                    # A failed cache write only costs a miss next time.
     return result
 
 
@@ -112,7 +108,7 @@ def listFiles(dataset, instance="prod/global", refresh=False):
 
 
 def datasetSummary(dataset, instance="prod/global", refresh=False):
-    """{'nfiles','nevents','sizeGB','found'} for a dataset. found is False when DAS knows nothing about it, which is a different thing from a dataset that is genuinely empty."""
+    """{'nfiles','nevents','sizeGB','found'} for a dataset. found is False when DAS knows nothing about it."""
     rows = query(f"summary dataset={dataset}", instance, refresh, jsonOut=True)
     def num(v, cast):
         try:
@@ -125,8 +121,7 @@ def datasetSummary(dataset, instance="prod/global", refresh=False):
         for s in row.get("summary") or []:
             if not isinstance(s, dict):
                 continue
-            ## DAS answers a name it does not know with a full summary of zeros and null dates
-            ## rather than with nothing, so the dates are what separate "unknown" from "empty".
+            ## DAS answers a name it does not know with a summary of zeros and null dates, so the dates separate "unknown" from "empty".
             return {
                 "nfiles":  num(s.get("nfiles", 0), int),
                 "nevents": num(s.get("nevents", 0), int),
@@ -136,29 +131,23 @@ def datasetSummary(dataset, instance="prod/global", refresh=False):
     return {"nfiles": 0, "nevents": 0, "sizeGB": 0.0, "found": False}
 
 
-# The generator weight sum is not in DAS: it is a property of the event payload, so nobody
-# records it centrally. Central NanoAOD carries it in the Runs tree, so the denominator comes
-# from the NanoAOD sibling of whatever MiniAOD a sample names.
+# The generator weight sum is not in DAS, so it comes from the Runs tree of the central NanoAOD sibling of a sample's MiniAOD.
 def nanoSibling(dataset, instance="prod/global", refresh=False):
-    """The central NanoAOD dataset matching a MiniAOD one, or None when no match is unambiguous."""
+    """The central NanoAOD dataset matching a MiniAOD one, the last in string order when several match, or None when none does."""
     primary, processed = dataset.strip("/").split("/")[:2]
     if "MiniAOD" not in processed:
         return None
     campaign = processed.split("MiniAOD")[0]                  # RunIISummer20UL18
     conditions = processed.split("-", 1)[1] if "-" in processed else ""
-    ## The trailing -vN is the dataset version, which MiniAOD and NanoAOD reprocess
-    ## independently, so only the global tag ahead of it can pin the reprocessing.
+    ## MiniAOD and NanoAOD number the trailing -vN independently, so only the global tag ahead of it pins the reprocessing.
     conditions = re.sub(r"-v\d+$", "", conditions)   # 106X_..._L1v1
 
     found = findDatasets(f"/{primary}/*/NANOAODSIM", instance=instance, refresh=refresh)
-    ## The campaign pins the era and the conditions tag pins the reprocessing, so a Run 2
-    ## sample can never pick up its own Run 3 twin or a different global tag.
-    matches = [d for d in found
-               if d.strip("/").split("/")[1].startswith(campaign)
-               and (not conditions or conditions in d.strip("/").split("/")[1])]
+    ## The campaign pins the era and the conditions tag pins the reprocessing.
+    matches = [d for d in found if d.strip("/").split("/")[1].startswith(campaign) and (not conditions or conditions in d.strip("/").split("/")[1])]
     if not matches:
         return None
-    ## Several NanoAOD versions of one campaign exist; the newest is the one to trust.
+    ## Several NanoAOD versions of one campaign can match, and plain string order picks the last (see the grid README, Caveats).
     return sorted(matches)[-1]
 
 
@@ -229,7 +218,7 @@ def pruneCache(maxAgeDays=CACHE_MAX_AGE_DAYS):
                 os.remove(e["path"])
                 gone += 1
             except IsADirectoryError:
-                print(f"  warning: {e['path']} is a directory, not a cache entry; remove it by hand")
+                print(f"  Warning: {e['path']} is a directory; remove it by hand")
             except OSError:
                 pass
     return gone

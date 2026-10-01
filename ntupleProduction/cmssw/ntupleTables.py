@@ -123,10 +123,6 @@ def _vertexJetModules(name, c, corrName, updatedName):
     return corr, updated, selected
 
 
-## Kinds whose module label is the collection stem, since they write no table
-PRODUCER_ONLY_KINDS = {"vertexJet"}
-
-
 def _moduleStem(name):
     """The module label a collection's producers are built under."""
     return name.lower() if name.isupper() else name[0].lower() + name[1:]
@@ -138,7 +134,7 @@ def _inputLabel(content, name):
     if c is None:
         raise RuntimeError("Collection '%s' is named as an input but the content does not include it" % name)
     stem = _moduleStem(name)
-    return stem if c["kind"] in PRODUCER_ONLY_KINDS else stem + "Producer"
+    return stem + "Producer" if c.get("writesTable", True) else stem
 
 
 def _dvModules(content, name, c, producerName):

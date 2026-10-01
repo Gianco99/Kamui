@@ -21,7 +21,7 @@ def _listStaged(sites, sampleName):
     try:
         r = subprocess.run(["xrdfs", sites["eosRedirector"].rstrip("/"), "ls", _eosDir(sites, sampleName)], capture_output=True, text=True, timeout=120)
     except (OSError, subprocess.SubprocessError) as e:
-        print(f"  warning: could not list EOS ({e}); assuming nothing is staged")
+        print(f"  Warning: could not list EOS ({e}); assuming nothing is staged")
         return []
     if r.returncode != 0:
         return []
@@ -29,7 +29,7 @@ def _listStaged(sites, sampleName):
 
 
 def stage(sample, sites=None, maxFiles=None, dryRun=False, refresh=False):
-    """Copy files for one sample, capped at maxFiles when given. Returns (nCopied, nFailed)."""
+    """Copy files for one sample, capped at maxFiles when given. Returns (nPresent, nFailed), where nPresent counts files copied, already on EOS, or listed in a dry run."""
     sites = sites or loadSites()
     dest = _eosDir(sites, sample["name"])
     eosRed = sites["eosRedirector"].rstrip("/")
@@ -37,7 +37,7 @@ def stage(sample, sites=None, maxFiles=None, dryRun=False, refresh=False):
 
     lfns = das.listFiles(sample["dataset"], sample["dasInstance"], refresh=refresh)
     if not lfns:
-        print("  no files found in DAS")
+        print("  No files found in DAS")
         return 0, 0
 
     total = len(lfns)
@@ -49,7 +49,7 @@ def stage(sample, sites=None, maxFiles=None, dryRun=False, refresh=False):
     else:
         r = subprocess.run(["xrdfs", eosRed, "mkdir", "-p", dest], capture_output=True, text=True)
         if r.returncode != 0:
-            print(f"  could not create {dest}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}")
+            print(f"  Could not create {dest}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}")
             return 0, len(lfns)
 
     # A dry run lists EOS too, so what it prints is what a real run would copy.
@@ -58,7 +58,7 @@ def stage(sample, sites=None, maxFiles=None, dryRun=False, refresh=False):
     for lfn in lfns:
         fn = os.path.basename(lfn)
         if fn in already:
-            print(f"  skip (already on EOS) {fn}")
+            print(f"  Skip (already on EOS) {fn}")
             ok += 1
             continue
         src, dst = f"{srcRed}/{lfn}", f"{eosRed}/{dest}/{fn}"
@@ -71,6 +71,6 @@ def stage(sample, sites=None, maxFiles=None, dryRun=False, refresh=False):
             print(f"  FAILED {fn}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}")
             bad += 1
         else:
-            print(f"  copied {fn}")
+            print(f"  Copied {fn}")
             ok += 1
     return ok, bad

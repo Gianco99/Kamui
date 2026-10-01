@@ -74,7 +74,5 @@ See `python/kamui/README.md` for the flags and worked examples.
 ## Caveats
  
 - The gen-weight table is picked out by substring: `normNames` matches `"genweight"` against a module name built from the collection key.
-- `PRODUCER_ONLY_KINDS` in `ntupleTables.py` copies the set of the same name in `python/kamui/configReaders/content.py`, since nothing here may import from the package. T
-  - The two must be kept in sync.
 - The CMSSW release in `config/sites.json` is what condor builds. Do not bump it without checking. CRAB ignores it and ships the release you submit from.
 - The schedd is recorded at submit time. LPC spreads a submission across schedds and `condor_q` asks the default one, so a task submitted elsewhere reads as finished. A `task.json` with no `schedd` key falls back to the default.
