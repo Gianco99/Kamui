@@ -3,8 +3,14 @@
 <use name="FWCore/Utilities"/>
 <use name="DataFormats/BeamSpot"/>
 <use name="DataFormats/Common"/>
+<use name="DataFormats/Math"/>
 <use name="DataFormats/PatCandidates"/>
 <use name="DataFormats/SiPixelDetId"/>
 <use name="DataFormats/TrackReco"/>
 <use name="DataFormats/VertexReco"/>
+<use name="RecoVertex/KalmanVertexFit"/>
+<use name="RecoVertex/VertexTools"/>
+<use name="TrackingTools/IPTools"/>
+<use name="TrackingTools/Records"/>
+<use name="TrackingTools/TransientTrack"/>
 <flags EDM_PLUGIN="1"/>
