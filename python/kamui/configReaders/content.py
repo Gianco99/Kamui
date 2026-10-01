@@ -1,6 +1,5 @@
 """
-Turns a content config into a form the cmsRun config consumes.
-The file format is documented in config/content/README.md, and its details in the CLAUDE.md beside it.
+Turns a content config into a form the cmsRun config consumes. The file format is documented in config/content/README.md.
 """
 
 # Import Block
@@ -11,6 +10,7 @@ import os
 ## Kamui modules
 from ..foundations import paths
 from ..foundations.config import loadJson, loadWithIncludes
+from .requirements import cutString, resolveRequirements
 
 # CMSSW plugin language
 KIND_TO_PLUGIN = {
@@ -33,26 +33,27 @@ KIND_TO_PLUGIN = {
     "genWeight":        "GenWeightsTableProducer",
     "seedTrack":        "SimpleTrackFlatTableProducer",
     "vertexJet":        "PATJetSelector",
+    "dv":               "SimpleVertexFlatTableProducer",
 }
 
 # Kinds whose producer needs conditions
-CONDITIONS_KINDS = {"vertexJet"}
+CONDITIONS_KINDS = {"vertexJet", "dv"}
 
 # Kinds the vertexing plugins consume, which write no table
 PRODUCER_ONLY_KINDS = {"vertexJet"}
 
-# Kinds whose producer takes no `src`/`cut`/`variables`
+# Kinds whose CMSSW producer decides its own branches (config/content/README.md)
 FIXED_CONTENT_KINDS = {"pileup", "genWeight"}
 # Kinds that are inherently one-per-event
 ALWAYS_SINGLETON_KINDS = {"beamSpot", "genEvent"}
-# `global` uses externalVariables-style entries (src/type/doc) instead of expr.
+# `global` uses externalVariables-style entries (src/type/doc).
 EXTVAR_KINDS = {"global"}
 
 VALID_TYPES = {"float", "double", "int", "uint", "int16", "uint16", "uint8", "bool"}
 
 
 def listPresets(contentDir=None):
-    """Presets an era defines, as {era: [names]}. Only presets/, since collections are building blocks rather than things a sample names."""
+    """Presets an era defines, as {era: [names]}. Only presets/ is read, since those are what a sample names."""
     contentDir = contentDir or paths.CONTENT_DIR
     out = {}
     for era in sorted(os.listdir(contentDir)):
@@ -93,19 +94,19 @@ def contentDirs(era, contentDir=None):
 
 
 def resolveContent(name, contentDir=None, isMC=True, era="Summer24"):
-    """Flatten a preset's include chain and translate it into what a job receives: name, isMC, collections, triggerBits, skim."""
+    """Flatten a preset's include chain and translate it into what a job receives."""
     cfg = loadWithIncludes(name, contentDirs(era, contentDir))
 
     unknown = sorted(set(cfg) - CONTENT_FIELDS)
     if unknown:
-        raise ValueError(f"content config '{name}' has unknown key(s) {unknown}; valid keys are {sorted(CONTENT_FIELDS)}")
+        raise ValueError(f"Content config '{name}' has unknown key(s) {unknown}; valid keys are {sorted(CONTENT_FIELDS)}")
     if not cfg.get("collections"):
-        raise ValueError(f"content config '{name}' defines no collections; check the spelling of 'include'")
+        raise ValueError(f"Content config '{name}' defines no collections; check the spelling of 'include'")
 
     collections = {}
     for cname, c in cfg.get("collections", {}).items():
         if not isinstance(c, dict):
-            raise ValueError(f"content config '{name}': collection '{cname}' must be an object, got {type(c).__name__}")
+            raise ValueError(f"Content config '{name}': collection '{cname}' must be an object, got {type(c).__name__}")
         if c.get("mcOnly") and not isMC:
             continue
         if c.get("dataOnly") and isMC:
@@ -130,7 +131,7 @@ def loadTriggerPaths(name):
     """The HLT path patterns a trigger config defines."""
     trig = loadWithIncludes(name, paths.TRIGGERS_DIR)
     if "paths" not in trig:
-        raise ValueError(f"trigger config '{name}' defines no 'paths'")
+        raise ValueError(f"Trigger config '{name}' defines no 'paths'")
     return list(trig["paths"])
 
 
@@ -142,17 +143,17 @@ def _resolveSkim(skim):
         return {}
     unknown = sorted(set(skim) - SKIM_FIELDS)
     if unknown:
-        raise ValueError(f"skim has unknown key(s) {unknown}; valid keys are {sorted(SKIM_FIELDS)}")
+        raise ValueError(f"Skim has unknown key(s) {unknown}; valid keys are {sorted(SKIM_FIELDS)}")
     name = skim.get("triggers")
     if not name:
         return {}
     trig = loadWithIncludes(name, paths.TRIGGERS_DIR)
     if "paths" not in trig:
-        raise ValueError(f"trigger config '{name}' defines no 'paths'")
+        raise ValueError(f"Trigger config '{name}' defines no 'paths'")
     out = dict(skim)
     mode = skim.get("mode", trig.get("mode", "any"))
     if mode not in ("any", "all"):
-        raise ValueError(f"skim mode '{mode}' is not 'any' or 'all'")
+        raise ValueError(f"Skim mode '{mode}' is not 'any' or 'all'")
     out.update({
         "triggers":  name,
         "hltPaths":  trig["paths"],
@@ -163,7 +164,7 @@ def _resolveSkim(skim):
 
 
 ## Every key a collection may carry
-COLLECTION_FIELDS = {"type", "src", "doc", "cut", "maxLen", "variables", "singleton", "mcOnly", "dataOnly", "seeding", "jec", "jetId"}
+COLLECTION_FIELDS = {"type", "src", "doc", "cut", "maxLen", "variables", "singleton", "mcOnly", "dataOnly", "seeding", "jec", "requirements", "vertexing"}
 VARIABLE_FIELDS = {"expr", "type", "doc", "precision"}
 EXTVAR_FIELDS = {"src", "type", "doc"}
 
@@ -171,13 +172,10 @@ EXTVAR_FIELDS = {"src", "type", "doc"}
 def _translate(cname, c, era, isMC):
     unknown = sorted(set(c) - COLLECTION_FIELDS)
     if unknown:
-        raise ValueError(f"collection '{cname}' has unknown key(s) {unknown}; valid keys are {sorted(COLLECTION_FIELDS)}")
+        raise ValueError(f"Collection '{cname}' has unknown key(s) {unknown}; valid keys are {sorted(COLLECTION_FIELDS)}")
     kind = c.get("type")
     if kind not in KIND_TO_PLUGIN:
-        raise ValueError(
-            f"collection '{cname}': unknown type '{kind}'. "
-            f"Known types: {', '.join(sorted(KIND_TO_PLUGIN))}"
-        )
+        raise ValueError(f"Collection '{cname}': unknown type '{kind}'. Known types: {', '.join(sorted(KIND_TO_PLUGIN))}")
 
     out = {
         "plugin":    KIND_TO_PLUGIN[kind],
@@ -192,31 +190,39 @@ def _translate(cname, c, era, isMC):
     if kind in EXTVAR_KINDS:
         for k in ("cut", "maxLen", "singleton"):
             if k in c:
-                raise ValueError(f"collection '{cname}': '{k}' has no meaning on a '{kind}' collection")
+                raise ValueError(f"Collection '{cname}': '{k}' has no meaning on a '{kind}' collection")
         out["extVariables"] = _checkExtVars(cname, c.get("variables", {}))
         return out
 
     if "src" not in c:
-        raise ValueError(f"collection '{cname}': missing 'src'")
+        raise ValueError(f"Collection '{cname}': missing 'src'")
     out["src"] = c["src"]
 
     if kind in PRODUCER_ONLY_KINDS:
         for k in ("variables", "cut", "maxLen", "singleton"):
             if k in c:
-                raise ValueError(f"collection '{cname}': '{k}' has no meaning on a '{kind}' collection, which writes no table")
+                raise ValueError(f"Collection '{cname}': '{k}' has no meaning on a '{kind}' collection, which writes no table")
         out["jec"] = _checkJec(cname, c.get("jec"))
-        out["jetId"] = _checkJetId(cname, _forEra(cname, "jetId", c.get("jetId") or {}, era))
+        where = f"Collection '{cname}'"
+        out["cut"] = cutString(resolveRequirements(where, c.get("requirements"), era), _jetVariableExprs(era), where)
         return out
 
     out["variables"] = _checkVars(cname, c.get("variables", {}))
+    if kind == "dv":
+        for k in ("cut", "maxLen", "singleton"):
+            if k in c:
+                raise ValueError(f"Collection '{cname}': '{k}' has no meaning on a 'dv' collection, since SeedTrack_dvIdx indexes every vertex it writes")
+        out["vertexing"] = _checkVertexing(cname, c.get("vertexing"))
+    elif "vertexing" in c:
+        raise ValueError(f"Collection '{cname}': 'vertexing' has no meaning on a '{kind}' collection")
     if kind == "seedTrack":
         out["seeding"] = _resolveSeeding(cname, c.get("seeding"), era, isMC)
     elif "seeding" in c:
-        raise ValueError(f"collection '{cname}': 'seeding' has no meaning on a '{kind}' collection")
+        raise ValueError(f"Collection '{cname}': 'seeding' has no meaning on a '{kind}' collection")
     if kind in ALWAYS_SINGLETON_KINDS:
         for k in ("cut", "maxLen"):
             if k in c:
-                raise ValueError(f"collection '{cname}': '{k}' has no meaning on a singleton collection")
+                raise ValueError(f"Collection '{cname}': '{k}' has no meaning on a singleton collection")
         # These plugins are one-per-event by construction and reject a `singleton` parameter
         out["singleton"] = True
         out["singletonImplicit"] = True
@@ -225,7 +231,7 @@ def _translate(cname, c, era, isMC):
         if out["singleton"]:
             for k in ("cut", "maxLen"):
                 if k in c:
-                    raise ValueError(f"collection '{cname}': '{k}' has no meaning on a singleton collection")
+                    raise ValueError(f"Collection '{cname}': '{k}' has no meaning on a singleton collection")
         else:
             out["cut"] = c.get("cut", "")
             if "maxLen" in c:
@@ -234,75 +240,107 @@ def _translate(cname, c, era, isMC):
 
 
 ## Every key a seeding block may carry
-SEEDING_REQUIRED = {"beamSpot", "primaryVertices", "goodPv", "minPt", "minAbsDxyBs", "maxDxyErr", "minNSigmaDxyBs", "minRescaledNSigmaDxyBs", "minNSigmaDxyPv", "minHits", "minPixelHits", "minPixelLayers", "minStripLayers", "maxFirstPixelLayer"}
-SEEDING_FIELDS = SEEDING_REQUIRED | {"dxyErrScale"}
+SEEDING_REQUIRED = {"beamSpot", "primaryVertices", "goodPv", "ptAbove", "nSigmaDxyBsAbove", "minPixelLayers", "minStripLayers", "maxFirstPixelLayer"}
+SEEDING_FIELDS = SEEDING_REQUIRED | {"dxyErrScale", "trackDrop"}
+TRACK_DROP_FIELDS = {"coefficient", "absDxyBsCap"}
 
 
 def _resolveSeeding(cname, seeding, era, isMC):
     if not isinstance(seeding, dict):
-        raise ValueError(f"collection '{cname}': a seedTrack collection needs a 'seeding' block")
+        raise ValueError(f"Collection '{cname}': a seedTrack collection needs a 'seeding' block")
     unknown = sorted(set(seeding) - SEEDING_FIELDS)
     if unknown:
-        raise ValueError(f"collection '{cname}': seeding has unknown key(s) {unknown}; valid keys are {sorted(SEEDING_FIELDS)}")
+        raise ValueError(f"Collection '{cname}': seeding has unknown key(s) {unknown}; valid keys are {sorted(SEEDING_FIELDS)}")
     missing = sorted(SEEDING_REQUIRED - set(seeding))
     if missing:
-        raise ValueError(f"collection '{cname}': seeding is missing {missing}")
+        raise ValueError(f"Collection '{cname}': seeding is missing {missing}")
 
     out = {k: seeding[k] for k in sorted(SEEDING_REQUIRED)}
-    out["dxyErrScale"] = {"form": "none", "barrelMaxAbsEta": 0.0, "barrel": [], "endcap": []}
+    out["dxyErrScale"] = {"form": "none", "barrelAbsEtaBelow": 0.0, "barrel": [], "endcap": []}
     if isMC and "dxyErrScale" in seeding:
         out["dxyErrScale"] = _forEra(cname, "dxyErrScale", seeding["dxyErrScale"], era)
+    out["trackDrop"] = {"coefficient": 0.0, "absDxyBsCap": 0.0}
+    if isMC and "trackDrop" in seeding:
+        drop = seeding["trackDrop"]
+        if set(drop) != TRACK_DROP_FIELDS:
+            raise ValueError(f"Collection '{cname}': trackDrop needs exactly {sorted(TRACK_DROP_FIELDS)}")
+        coefficient = drop["coefficient"]
+        out["trackDrop"] = {"coefficient": _forEra(cname, "trackDrop.coefficient", coefficient, era) if isinstance(coefficient, dict) else coefficient, "absDxyBsCap": drop["absDxyBsCap"]}
     return out
 
 
-## Every key the JECs and the jet ID may carry
+## Every key the JECs may carry
 JEC_FIELDS = {"payload", "primaryVertices", "levels"}
-JET_ID_FIELDS = {"minPt", "maxAbsEta", "maxNeutralHadronFraction", "maxNeutralEmFraction", "central"}
-JET_ID_CENTRAL_FIELDS = {"maxAbsEta", "maxNeutralEmFraction", "minDaughters", "maxMuonFraction", "minChargedHadronFraction", "minChargedMultiplicity", "maxChargedEmFraction"}
 
 
 def _checkJec(cname, jec):
     if not isinstance(jec, dict):
-        raise ValueError(f"collection '{cname}': a vertexJet collection needs a 'jec' block")
+        raise ValueError(f"Collection '{cname}': a vertexJet collection needs a 'jec' block")
     unknown = sorted(set(jec) - JEC_FIELDS)
     if unknown:
-        raise ValueError(f"collection '{cname}': jec has unknown key(s) {unknown}; valid keys are {sorted(JEC_FIELDS)}")
+        raise ValueError(f"Collection '{cname}': jec has unknown key(s) {unknown}; valid keys are {sorted(JEC_FIELDS)}")
     missing = sorted(JEC_FIELDS - set(jec))
     if missing:
-        raise ValueError(f"collection '{cname}': jec is missing {missing}")
+        raise ValueError(f"Collection '{cname}': jec is missing {missing}")
     if not jec["levels"]:
-        raise ValueError(f"collection '{cname}': jec names no correction levels")
+        raise ValueError(f"Collection '{cname}': jec names no correction levels")
     return {"payload": jec["payload"], "primaryVertices": jec["primaryVertices"], "levels": list(jec["levels"])}
 
 
-def _checkJetId(cname, jetId):
-    unknown = sorted(set(jetId) - JET_ID_FIELDS)
+def _jetVariableExprs(era):
+    """The expressions behind the Jet collection's variables, which a vertexJet requirement names."""
+    jets = loadWithIncludes("jets", contentDirs(era))
+    return {name: v["expr"] for name, v in jets["collections"]["Jet"]["variables"].items()}
+
+
+## Every key the vertexing blocks may carry
+VERTEXING_FIELDS = {"beamSpot", "jets", "minTracks", "maxChi2PerDof", "kalman", "sharedTracks", "zRefit", "mergeNearby", "sharedJets"}
+VERTEXING_BLOCKS = {
+    "kalman":       {"maxDistance", "maxIterations", "smoothing"},
+    "sharedTracks": {"mergeBelowSigma", "keepBelowSigma", "tieBelowSigma"},
+    "zRefit":       {"maxShiftSigma"},
+    "mergeNearby":  {"deltaPhiBelow", "distance2dBelow", "dbvAbove"},
+    "sharedJets":   {"maxDeltaPhi"},
+}
+
+
+def _checkVertexing(cname, vertexing):
+    """The vertexer parameters, with every block complete."""
+    if not isinstance(vertexing, dict):
+        raise ValueError(f"Collection '{cname}': a dv collection needs a 'vertexing' block")
+    unknown = sorted(set(vertexing) - VERTEXING_FIELDS)
     if unknown:
-        raise ValueError(f"collection '{cname}': jetId has unknown key(s) {unknown}; valid keys are {sorted(JET_ID_FIELDS)}")
-    central = jetId.get("central") or {}
-    unknown = sorted(set(central) - JET_ID_CENTRAL_FIELDS)
-    if unknown:
-        raise ValueError(f"collection '{cname}': jetId.central has unknown key(s) {unknown}; valid keys are {sorted(JET_ID_CENTRAL_FIELDS)}")
-    return jetId
+        raise ValueError(f"Collection '{cname}': vertexing has unknown key(s) {unknown}; valid keys are {sorted(VERTEXING_FIELDS)}")
+    missing = sorted(VERTEXING_FIELDS - set(vertexing))
+    if missing:
+        raise ValueError(f"Collection '{cname}': vertexing is missing {missing}")
+    for block, fields in VERTEXING_BLOCKS.items():
+        unknown = sorted(set(vertexing[block]) - fields)
+        if unknown:
+            raise ValueError(f"Collection '{cname}': vertexing.{block} has unknown key(s) {unknown}; valid keys are {sorted(fields)}")
+        missing = sorted(fields - set(vertexing[block]))
+        if missing:
+            raise ValueError(f"Collection '{cname}': vertexing.{block} is missing {missing}")
+    return vertexing
 
 
 def _forEra(cname, key, byEra, era):
     if era not in byEra:
-        raise ValueError(f"collection '{cname}': '{key}' defines no entry for era '{era}'; it defines {sorted(byEra)}")
+        raise ValueError(f"Collection '{cname}': '{key}' defines no entry for era '{era}'; it defines {sorted(byEra)}")
     return byEra[era]
 
 
 def _checkMaxLen(cname, value):
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(f"collection '{cname}': maxLen must be an integer, got {value!r}")
+        raise ValueError(f"Collection '{cname}': maxLen must be an integer, got {value!r}")
     if not 1 <= value <= 100000:
-        raise ValueError(f"collection '{cname}': maxLen must be between 1 and 100000, got {value}")
+        raise ValueError(f"Collection '{cname}': maxLen must be between 1 and 100000, got {value}")
     return value
 
 
 def _checkVars(cname, variables):
     if not variables:
-        raise ValueError(f"collection '{cname}': no variables defined")
+        raise ValueError(f"Collection '{cname}': no variables defined")
     out = {}
     for vname, v in variables.items():
         unknown = sorted(set(v) - VARIABLE_FIELDS)
@@ -325,7 +363,7 @@ def _checkVars(cname, variables):
 
 def _checkExtVars(cname, variables):
     if not variables:
-        raise ValueError(f"collection '{cname}': no variables defined")
+        raise ValueError(f"Collection '{cname}': no variables defined")
     out = {}
     for vname, v in variables.items():
         unknown = sorted(set(v) - EXTVAR_FIELDS)
@@ -341,7 +379,7 @@ def _checkExtVars(cname, variables):
 
 
 def summarize(resolved):
-    """One line per collection - what `kamui content <name>` prints."""
+    """One line per collection, as `kamui content <name>` prints it."""
     lines = ["  " + " ".join([f"{'Collection':<12}", f"{'Type':<16}", f"{'Source':<34}", f"{'Vars':>4}"])]
     for cname, c in sorted(resolved["collections"].items()):
         n = len(c.get("variables", c.get("extVariables", {})))
@@ -367,10 +405,10 @@ def validateTriggers():
         try:
             trig = loadWithIncludes(f[:-5], paths.TRIGGERS_DIR)
         except Exception as e:
-            problems.append(f"trigger config '{f}': {e}")
+            problems.append(f"Trigger config '{f}': {e}")
             continue
         if not trig.get("paths"):
-            problems.append(f"trigger config '{f}' declares no paths")
+            problems.append(f"Trigger config '{f}' declares no paths")
     return problems
 
 
@@ -384,16 +422,16 @@ def validateEraCopies(contentDir=None):
     problems = []
     colls = listCollections(contentDir)
     if set(colls) != {"run2", "run3"}:
-        return [f"expected content sets run2 and run3, found {sorted(colls)}"]
+        return [f"Expected content sets run2 and run3, found {sorted(colls)}"]
     for name in sorted(set(colls["run2"]) | set(colls["run3"])):
         a = os.path.join(contentDir, "run2", "collections", name + ".json")
         b = os.path.join(contentDir, "run3", "collections", name + ".json")
         if not (os.path.exists(a) and os.path.exists(b)):
-            problems.append(f"collection '{name}' exists in only one era set")
+            problems.append(f"Collection '{name}' exists in only one era set")
             continue
         same = loadJson(a) == loadJson(b)
         if name in ERA_SPECIFIC_COLLECTIONS and same:
-            problems.append(f"collection '{name}' is meant to differ by era but both copies are identical")
+            problems.append(f"Collection '{name}' is meant to differ by era but both copies are identical")
         if name not in ERA_SPECIFIC_COLLECTIONS and not same:
-            problems.append(f"collection '{name}' differs between run2 and run3; add it to ERA_SPECIFIC_COLLECTIONS if deliberate, otherwise the copies have drifted")
+            problems.append(f"Collection '{name}' differs between run2 and run3; add it to ERA_SPECIFIC_COLLECTIONS if deliberate, otherwise the copies have drifted")
     return problems

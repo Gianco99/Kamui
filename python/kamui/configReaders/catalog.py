@@ -1,6 +1,5 @@
 """
-Reads the sample config files and filters them.
-The file format is documented in config/samples/README.md and the CLAUDE.md beside it.
+Reads the sample config files and filters them. The file format is documented in config/samples/README.md.
 """
 
 # Import Block
@@ -35,7 +34,7 @@ def _axisPoints(axisName, entries):
 
 
 def _expandGrid(grid, defaults):
-    """Cartesian product of the axes -> list of sample dicts."""
+    """The Cartesian product of the axes, as a list of sample dicts."""
     axisNames = list(grid.get("axes", {}).keys())
     points = [_axisPoints(a, grid["axes"][a]) for a in axisNames]
     skip = set(grid.get("skip", []))
@@ -61,7 +60,7 @@ def _expandGrid(grid, defaults):
 
     stale = sorted(skip - generated)
     if stale:
-        raise ValueError(f"grid '{grid.get('name')}' skips sample(s) it never generates: {stale}")
+        raise ValueError(f"Grid '{grid.get('name')}' skips sample(s) it never generates: {stale}")
     return samples
 
 
@@ -113,17 +112,14 @@ def _loadFamily(path):
 def loadCatalog(samplesDir=None):
     """Load every family file into one list of samples."""
     samplesDir = samplesDir or paths.SAMPLES_DIR
-    ## Walked rather than listed, so families can be grouped into subdirectories as the
-    ## catalog grows. A sample means the same thing wherever its file sits.
-    files = sorted(os.path.join(root, f)
-                   for root, _, names in os.walk(samplesDir)
-                   for f in names if f.endswith(".json"))
+    ## Walked recursively so families can be grouped into subdirectories; a sample means the same thing wherever its file sits.
+    files = sorted(os.path.join(root, f) for root, _, names in os.walk(samplesDir) for f in names if f.endswith(".json"))
     catalog = []
     names = set()
     for path in files:
         for s in _loadFamily(path):
             if s["name"] in names:
-                raise ValueError(f"duplicate sample name across families: '{s['name']}'")
+                raise ValueError(f"Duplicate sample name across families: '{s['name']}'")
             names.add(s["name"])
             catalog.append(s)
     return catalog
@@ -136,11 +132,11 @@ def _resolve(value, allowed, what):
         return value
     hit = sorted(a for a in allowed if a.lower() == value.lower())
     if len(hit) > 1:
-        raise KeyError(f"{what} '{value}' is ambiguous; the catalog spells it {hit}. Use the exact spelling.")
+        raise KeyError(f"Ambiguous {what} '{value}': the catalog spells it {hit}. Use the exact spelling.")
     if hit:
         return hit[0]
     plural = "families" if what == "family" else what + "s"
-    raise KeyError(f"unknown {what} '{value}'. Known {plural}: {', '.join(sorted(allowed))}")
+    raise KeyError(f"Unknown {what} '{value}'. Known {plural}: {', '.join(sorted(allowed))}")
 
 
 def select(catalog, names=None, family=None, era=None, tag=None, pattern=None):
@@ -152,7 +148,7 @@ def select(catalog, names=None, family=None, era=None, tag=None, pattern=None):
         out = [s for s in out if s["name"] in wanted]
         missing = wanted - {s["name"] for s in out}
         if missing:
-            raise KeyError(f"unknown sample(s): {sorted(missing)}")
+            raise KeyError(f"Unknown sample(s): {sorted(missing)}")
     if family:
         family = _resolve(family, {s.get("family") for s in catalog}, "family")
         out = [s for s in out if s.get("family") == family]
