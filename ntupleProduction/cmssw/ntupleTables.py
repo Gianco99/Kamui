@@ -1,8 +1,14 @@
-"""Turn a resolved content JSON into CMSSW table producers."""
+"""
+Turn a resolved content JSON into CMSSW table producers.
+"""
 
+# Import Block
+
+## Standard Python imports
 import json
 import os
 
+## CMSSW modules
 import FWCore.ParameterSet.Config as cms
 
 
@@ -18,13 +24,8 @@ def _extVar(v):
 
 
 def _pileupTable(c):
-    return cms.EDProducer(
-        "NPUTablesProducer",
-        src=cms.InputTag(c.get("src", "slimmedAddPileupInfo")),
-        pvsrc=cms.InputTag("offlineSlimmedPrimaryVertices"),
-        zbins=cms.vdouble([0.0, 1.7, 2.6, 3.0, 3.5, 4.2, 5.2, 6.0, 7.5, 9.0, 12.0]),
-        savePtHatMax=cms.bool(False),
-    )
+    from PhysicsTools.NanoAOD.globals_cff import puTable
+    return puTable.clone(src=cms.InputTag(c.get("src", "slimmedAddPileupInfo")), savePtHatMax=cms.bool(False))
 
 
 def _genWeightTable():
@@ -66,66 +67,36 @@ def _objectTable(name, c):
 def _seedTrackModules(name, c, producerName):
     """The seed-track producer and its table."""
     s = c["seeding"]
-    pv, scale = s["goodPv"], s["dxyErrScale"]
+    pv, scale, drop = s["goodPv"], s["dxyErrScale"], s["trackDrop"]
     producer = cms.EDProducer(
         "SeedTrackProducer",
         src=cms.InputTag(c["src"]),
         beamSpot=cms.InputTag(s["beamSpot"]),
         primaryVertices=cms.InputTag(s["primaryVertices"]),
         goodPv=cms.PSet(
-            minNdof=cms.double(pv["minNdof"]),
+            ndofAbove=cms.double(pv["ndofAbove"]),
             maxAbsZ=cms.double(pv["maxAbsZ"]),
-            maxRho=cms.double(pv["maxRho"]),
+            rhoBelow=cms.double(pv["rhoBelow"]),
         ),
-        minPt=cms.double(s["minPt"]),
-        minAbsDxyBs=cms.double(s["minAbsDxyBs"]),
-        maxDxyErr=cms.double(s["maxDxyErr"]),
-        minNSigmaDxyBs=cms.double(s["minNSigmaDxyBs"]),
-        minRescaledNSigmaDxyBs=cms.double(s["minRescaledNSigmaDxyBs"]),
-        minNSigmaDxyPv=cms.double(s["minNSigmaDxyPv"]),
-        minHits=cms.int32(s["minHits"]),
-        minPixelHits=cms.int32(s["minPixelHits"]),
+        ptAbove=cms.double(s["ptAbove"]),
+        nSigmaDxyBsAbove=cms.double(s["nSigmaDxyBsAbove"]),
         minPixelLayers=cms.int32(s["minPixelLayers"]),
         minStripLayers=cms.int32(s["minStripLayers"]),
         maxFirstPixelLayer=cms.int32(s["maxFirstPixelLayer"]),
         dxyErrScale=cms.PSet(
             form=cms.string(scale["form"]),
-            barrelMaxAbsEta=cms.double(scale["barrelMaxAbsEta"]),
+            barrelAbsEtaBelow=cms.double(scale["barrelAbsEtaBelow"]),
             barrel=cms.vdouble(*scale["barrel"]),
             endcap=cms.vdouble(*scale["endcap"]),
+        ),
+        trackDrop=cms.PSet(
+            coefficient=cms.double(drop["coefficient"]),
+            absDxyBsCap=cms.double(drop["absDxyBsCap"]),
         ),
     )
     table = _objectTable(name, dict(c, src=producerName))
     table.externalVariables = cms.PSet(candIdx=_extVar({"src": producerName + ":candIdx", "type": "int", "doc": "Index into packedPFCandidates"}))
     return producer, table
-
-
-def _jetIdCut(jetId):
-    """The PATJetSelector cut string for one era's jet ID."""
-    terms = []
-    if "minPt" in jetId:
-        terms.append("pt > %s" % jetId["minPt"])
-    if "maxAbsEta" in jetId:
-        terms.append("abs(eta) < %s" % jetId["maxAbsEta"])
-    if "maxNeutralHadronFraction" in jetId:
-        terms.append("neutralHadronEnergyFraction < %s" % jetId["maxNeutralHadronFraction"])
-    if "maxNeutralEmFraction" in jetId:
-        terms.append("neutralEmEnergyFraction < %s" % jetId["maxNeutralEmFraction"])
-
-    central = dict(jetId.get("central") or {})
-    centralMaxAbsEta = central.pop("maxAbsEta", None)
-    names = [("maxNeutralEmFraction", "neutralEmEnergyFraction < %s"),
-             ("minDaughters", "numberOfDaughters > %s"),
-             ("maxMuonFraction", "muonEnergyFraction < %s"),
-             ("minChargedHadronFraction", "chargedHadronEnergyFraction > %s"),
-             ("minChargedMultiplicity", "chargedMultiplicity > %s"),
-             ("maxChargedEmFraction", "chargedEmEnergyFraction < %s")]
-    centralTerms = [fmt % central[key] for key, fmt in names if key in central]
-    if centralTerms and centralMaxAbsEta is not None:
-        terms.append("(abs(eta) >= %s || (%s))" % (centralMaxAbsEta, " && ".join(centralTerms)))
-    else:
-        terms += centralTerms
-    return " && ".join(terms)
 
 
 def _vertexJetModules(name, c, corrName, updatedName):
@@ -146,10 +117,51 @@ def _vertexJetModules(name, c, corrName, updatedName):
     selected = cms.EDFilter(
         c["plugin"],
         src=cms.InputTag(updatedName),
-        cut=cms.string(_jetIdCut(c["jetId"])),
+        cut=cms.string(c["cut"]),
         filter=cms.bool(False),
     )
     return corr, updated, selected
+
+
+## Kinds whose module label is the collection stem, since they write no table
+PRODUCER_ONLY_KINDS = {"vertexJet"}
+
+
+def _moduleStem(name):
+    """The module label a collection's producers are built under."""
+    return name.lower() if name.isupper() else name[0].lower() + name[1:]
+
+
+def _inputLabel(content, name):
+    """The module label producing the collection another one names as an input."""
+    c = content["collections"].get(name)
+    if c is None:
+        raise RuntimeError("Collection '%s' is named as an input but the content does not include it" % name)
+    stem = _moduleStem(name)
+    return stem if c["kind"] in PRODUCER_ONLY_KINDS else stem + "Producer"
+
+
+def _dvModules(content, name, c, producerName):
+    """The vertexer and the table of the vertices it keeps."""
+    v = c["vertexing"]
+    producer = cms.EDProducer(
+        "DVProducer",
+        seedTracks=cms.InputTag(_inputLabel(content, c["src"])),
+        beamSpot=cms.InputTag(v["beamSpot"]),
+        jets=cms.InputTag(_inputLabel(content, v["jets"])),
+        minTracks=cms.int32(v["minTracks"]),
+        maxChi2PerDof=cms.double(v["maxChi2PerDof"]),
+        kalman=cms.PSet(
+            maxDistance=cms.double(v["kalman"]["maxDistance"]),
+            maxNbrOfIterations=cms.int32(v["kalman"]["maxIterations"]),
+            doSmoothing=cms.bool(v["kalman"]["smoothing"]),
+        ),
+        sharedTracks=cms.PSet(**{k: cms.double(x) for k, x in v["sharedTracks"].items()}),
+        zRefit=cms.PSet(**{k: cms.double(x) for k, x in v["zRefit"].items()}),
+        mergeNearby=cms.PSet(**{k: cms.double(x) for k, x in v["mergeNearby"].items()}),
+        sharedJets=cms.PSet(**{k: cms.double(x) for k, x in v["sharedJets"].items()}),
+    )
+    return producer, _objectTable(name, dict(c, src=producerName))
 
 
 def buildTables(content):
@@ -157,7 +169,7 @@ def buildTables(content):
     modules = {}
     for name, c in sorted(content["collections"].items()):
         kind = c["kind"]
-        modName = name[0].lower() + name[1:] + "Table"
+        modName = _moduleStem(name) + "Table"
         if kind == "pileup":
             modules[modName] = _pileupTable(c)
         elif kind == "genWeight":
@@ -165,14 +177,25 @@ def buildTables(content):
         elif kind == "global":
             modules[modName] = _globalTable(name, c)
         elif kind == "vertexJet":
-            label = name[0].lower() + name[1:]
-            corrName, updatedName = label + "CorrFactors", label + "Updated"
-            modules[corrName], modules[updatedName], modules[label] = _vertexJetModules(name, c, corrName, updatedName)
+            stem = _moduleStem(name)
+            corrName, updatedName = stem + "CorrFactors", stem + "Updated"
+            modules[corrName], modules[updatedName], modules[stem] = _vertexJetModules(name, c, corrName, updatedName)
         elif kind == "seedTrack":
-            producerName = name[0].lower() + name[1:] + "Producer"
+            producerName = _moduleStem(name) + "Producer"
             modules[producerName], modules[modName] = _seedTrackModules(name, c, producerName)
+        elif kind == "dv":
+            producerName = _moduleStem(name) + "Producer"
+            modules[producerName], modules[modName] = _dvModules(content, name, c, producerName)
         else:
             modules[modName] = _objectTable(name, c)
+
+    for name, c in content["collections"].items():
+        if c["kind"] != "dv":
+            continue
+        seedTable = modules.get(_moduleStem(c["src"]) + "Table")
+        if seedTable is not None:
+            link = _extVar({"src": _moduleStem(name) + "Producer:trackVertexIdx", "type": "int", "doc": "Index into the %s collection, -1 when the track is in none" % name})
+            setattr(seedTable.externalVariables, _moduleStem(name) + "Idx", link)
     return modules, sorted(modules)
 
 
@@ -199,4 +222,4 @@ def loadContent(path):
         if os.path.isfile(c):
             with open(c) as f:
                 return json.load(f)
-    raise RuntimeError("content JSON not found; looked for %s" % " and ".join(candidates))
+    raise RuntimeError("Content JSON not found; looked for %s" % " and ".join(candidates))

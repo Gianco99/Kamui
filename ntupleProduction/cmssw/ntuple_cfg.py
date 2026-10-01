@@ -1,14 +1,21 @@
-"""cmsRun configuration: MiniAOD in, ntuple out. Content comes from a resolved content JSON."""
+"""
+cmsRun configuration: MiniAOD in, ntuple out. Content comes from a resolved content JSON.
+"""
 
+# Import Block
+
+## Standard Python imports
 import os
 import sys
 
+## CMSSW modules
 import FWCore.ParameterSet.Config as cms
 from FWCore.ParameterSet.VarParsing import VarParsing
 
+## Local modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.getcwd())
-from ntupleTables import buildSkim, buildTables, loadContent  # noqa: E402
+from ntupleTables import buildSkim, buildTables, loadContent
 
 SINGLETON = VarParsing.multiplicity.singleton
 
