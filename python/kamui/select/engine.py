@@ -6,6 +6,7 @@ Applies a resolved selection to an ntuple and writes an ntuple with the same bra
 
 ## Standard Python imports
 import fnmatch
+import operator
 import os
 import subprocess
 import tempfile
@@ -15,8 +16,18 @@ import awkward as ak
 import numpy as np
 import uproot
 
-## Kamui modules
-from .quantities import evaluate
+## How each bound compares: whether it reads the absolute value, and the comparison it makes
+COMPARISONS = {
+    "min":      (False, operator.ge),
+    "max":      (False, operator.le),
+    "absMin":   (True,  operator.ge),
+    "absMax":   (True,  operator.le),
+    "above":    (False, operator.gt),
+    "below":    (False, operator.lt),
+    "absAbove": (True,  operator.gt),
+    "absBelow": (True,  operator.lt),
+}
+SYMBOLS = {operator.ge: ">=", operator.le: "<=", operator.gt: ">", operator.lt: "<"}
 
 
 def triggerMask(events, patterns, branches):
@@ -36,21 +47,19 @@ def triggerMask(events, patterns, branches):
     return mask, matched
 
 
-def cutMask(cut, events, branches, era):
+def cutMask(cut, events, branches):
     """
-    The mask a single cut keeps. Returns (mask, note) where note describes what it matched.
+    The mask a single cut keeps, returned as (mask, note) where note describes what it matched.
 
-    A cut carrying "invert" keeps exactly the events it would otherwise have thrown away,
-    which is how an orthogonality veto is written: state the selection the other channel
-    makes, then invert it, rather than restating its negation by hand.
+    A cut carrying "invert" keeps exactly the events it would otherwise have thrown away. An orthogonality veto is the other channel's selection, inverted.
     """
-    mask, note = _cutMask(cut, events, branches, era)
+    mask, note = _cutMask(cut, events, branches)
     if cut.get("invert"):
         return ~mask, f"NOT ({note})"
     return mask, note
 
 
-def _cutMask(cut, events, branches, era):
+def _cutMask(cut, events, branches):
     kind = cut["type"]
 
     if kind == "trigger":
@@ -59,23 +68,11 @@ def _cutMask(cut, events, branches, era):
         return mask, f"{len(matched)}/{len(paths)} paths present"
 
     if kind == "object":
-        ## An existence test, not an object filter: the event is kept when at least one
-        ## object satisfies every requirement of some leg. Nothing is removed from the ntuple.
-        mask = np.zeros(len(events), dtype=bool)
-        notes = []
-        for leg in cut["legs"]:
-            legMask, note = _legMask(leg, events, branches, era)
-            ## A gated leg only counts when its own trigger fired
-            if leg.get("hltPaths"):
-                fired, matched = triggerMask(events, leg["hltPaths"], branches)
-                legMask &= fired
-                note = f"({len(matched)} path(s) fired) and " + note
-            mask |= legMask
-            notes.append(note)
-        return mask, " OR ".join(notes)
+        ## The event is kept when enough objects satisfy the requirements. Nothing is removed from the ntuple.
+        return _legMask(cut, events, branches)
 
     if kind == "flags":
-        ## Every named flag must be true. A flag absent from the file is reported rather than assumed.
+        ## Every named flag must be true, and a flag absent from the file is skipped and reported as MISSING
         missing = [f for f in cut["flags"] if f not in branches]
         mask = np.ones(len(events), dtype=bool)
         for f in cut["flags"]:
@@ -87,53 +84,37 @@ def _cutMask(cut, events, branches, era):
         return mask, note
 
     if kind == "quantity":
-        return _conditionMask(cut, events, era), _bounds(cut)
-
-    if kind == "veto":
-        paths = cut["hltPaths"]
-        fired, matched = triggerMask(events, paths, branches)
-        offline = _conditionMask(cut, events, era)
-        ## Drop only events that both fired the vetoed trigger and meet every offline condition
-        return ~(fired & offline), f"{len(matched)}/{len(paths)} paths present, {_bounds(cut)}"
+        return _conditionMask(cut, events, branches), _bounds(cut)
 
     if kind == "anyOf":
-        ## Each alternative is an ordinary list of cuts that must all hold. The event passes
-        ## if any one alternative does. This is how a channel accepts several triggers, each
-        ## with its own offline emulation.
+        ## Each alternative is a list of cuts that must all hold, which lets a channel accept several triggers, each with its own offline emulation
         mask = np.zeros(len(events), dtype=bool)
         notes = []
         for option in cut["anyOf"]:
             optionMask = np.ones(len(events), dtype=bool)
             for sub in option["cuts"]:
-                subMask, _ = cutMask(sub, events, branches, era)
+                subMask, _ = cutMask(sub, events, branches)
                 optionMask &= subMask
             mask |= optionMask
             notes.append(f"{option['name']} keeps {int(optionMask.sum())}")
         return mask, " OR ".join(notes) if notes else "no alternative applies to this era"
 
-    raise ValueError(f"cut '{cut['name']}' has unknown type '{kind}'")
+    raise ValueError(f"Cut '{cut['name']}' has unknown type '{kind}'")
 
 
 def _primaryVertex(events):
     """Position of the first vertex passing the standard good-vertex definition."""
     if "PV_isGood" not in events.fields:
-        raise ValueError("selection needs branch 'PV_isGood' to identify the primary vertex")
+        raise ValueError("Selection needs branch 'PV_isGood' to identify the primary vertex")
     first = ak.argmax(events["PV_isGood"] == 1, axis=1, keepdims=True)
     return tuple(ak.firsts(events[f"PV_{k}"][first]) for k in ("x", "y", "z"))
 
 
 def _trackIP(coll, events, wrt):
     """
-    Impact parameters computed the way CMSSW does, from the track reference point.
+    Impact parameters computed the way CMSSW does, from the track reference point the ntuples store.
 
-    `dzPV` is the track dz with respect to the primary vertex, and `dxyBS` is the
-    track dxy with respect to the beamspot taken at the track's own z, which is what the
-    beam tilt correction means. Storing the reference point rather than a precomputed
-    impact parameter is what makes both reproducible here.
-
-    The ntuples keep every reconstructed vertex, and the first one is not always a real
-    vertex: a fit with ndof below one sits at index 0 often enough to shift dz by a
-    centimetre. The primary vertex is the first that passes `PV_isGood`.
+    `dzPV` is dz to the primary vertex, and `dxyBeamspot` is dxy to the beamspot at the track's own z, which applies the beam tilt. The primary vertex is the first passing `PV_isGood`, since a fit with ndof below one sits at index 0 often enough to shift dz by a centimeter.
     """
     px = events[f"{coll}_pt"] * np.cos(events[f"{coll}_phi"])
     py = events[f"{coll}_pt"] * np.sin(events[f"{coll}_phi"])
@@ -151,16 +132,8 @@ def _trackIP(coll, events, wrt):
     return (-(vx - bx) * py + (vy - by) * px) / pt
 
 
-def _derived(coll, variable, events, era):
-    """
-    Per-object quantities that are computed rather than stored.
-
-    The ntuples keep raw jet energy fractions instead of a precomputed identification flag,
-    so the working point is applied here. The per-era functions in quantities.py carry it.
-    """
-    if coll == "Jet" and variable == "tightLepVeto":
-        from .quantities import tightLepVeto
-        return tightLepVeto(events, era)
+def _derived(coll, variable, events):
+    """Per-object quantities computed from stored branches."""
     if variable == "dzPV":
         return _trackIP(coll, events, "PV")
     if variable == "dxyBeamspot":
@@ -168,61 +141,63 @@ def _derived(coll, variable, events, era):
     return None
 
 
-def _oneRequirement(req, coll, events, branches, era, ones):
+def _oneRequirement(req, coll, events, branches, ones):
     """Per-object mask for a single requirement, or for an anyOf group of requirement lists."""
     if "anyOf" in req:
-        ## Regions of one collection, ORed per object: an electron satisfies the barrel group
-        ## or the endcap group. Without this a region-dependent bound needs a duplicate leg.
+        ## Groups are ORed per object, so one leg can carry region-dependent bounds such as an electron's barrel and endcap cuts
         out = None
         for group in req["anyOf"]:
             sub = ones
             for r in group:
-                sub = sub & _oneRequirement(r, coll, events, branches, era, ones)
+                sub = sub & _oneRequirement(r, coll, events, branches, ones)
             out = sub if out is None else (out | sub)
         return ones if out is None else out
 
     name = f"{coll}_{req['variable']}"
-    value = _derived(coll, req["variable"], events, era)
+    value = _derived(coll, req["variable"], events)
     if value is None:
         if name not in branches:
-            raise ValueError(f"selection needs branch '{name}', which the ntuple does not have")
+            raise ValueError(f"Selection needs branch '{name}', which the ntuple does not have")
         value = events[name]
-    keep = ones
-    if "min" in req:
-        keep = keep & (value >= req["min"])
-    if "max" in req:
-        keep = keep & (value <= req["max"])
-    if "absMin" in req:
-        keep = keep & (abs(value) >= req["absMin"])
-    if "absMax" in req:
-        keep = keep & (abs(value) <= req["absMax"])
+    return _within(value, req, ones)
+
+
+def _within(value, bounds, keep):
+    """Mask of the values inside every bound given."""
+    for bound, (useAbs, compare) in COMPARISONS.items():
+        if bound in bounds:
+            keep = keep & compare(abs(value) if useAbs else value, bounds[bound])
     return keep
 
 
-def _objectMask(leg, events, branches, era):
+def _boundsText(name, bounds):
+    return " and ".join(f"{'|' + name + '|' if useAbs else name} {SYMBOLS[compare]} {bounds[bound]:g}" for bound, (useAbs, compare) in COMPARISONS.items() if bound in bounds)
+
+
+def _objectMask(leg, events, branches):
     """Per-object mask: which objects of a collection satisfy every requirement of this leg."""
     coll = leg["collection"]
-    ones = ak.ones_like(events[f"{coll}_pt"], dtype=bool)
+    first = next((b for b in branches if b.startswith(coll + "_")), None)
+    if first is None:
+        raise ValueError(f"Selection needs collection '{coll}', which the ntuple does not have")
+    ones = ak.ones_like(events[first], dtype=bool)
     keep = ones
     for req in leg["requirements"]:
-        keep = keep & _oneRequirement(req, coll, events, branches, era, ones)
+        keep = keep & _oneRequirement(req, coll, events, branches, ones)
     return keep
 
 
-# A leg asks whether enough objects of one collection satisfy it. Two requirements cannot be
-# written per object: an ordered pT ladder is a statement about the sorted list, and a pair
-# requirement is a statement about two objects at once. Both live here rather than in _objectMask.
-def _legMask(leg, events, branches, era):
+# Ordered pT ladders and pair requirements live here, since they read the sorted list and two objects at once
+def _legMask(leg, events, branches):
     """Events where a leg is satisfied, and a description of what it asked for."""
     coll = leg["collection"]
-    passing = _objectMask(leg, events, branches, era)
+    passing = _objectMask(leg, events, branches)
     mask = np.asarray(ak.sum(passing, axis=1) >= leg["min"])
     parts = [f"{leg['min']}+ {coll} with " + ", ".join(_reqText(r) for r in leg["requirements"])]
 
     ladder = leg.get("orderedMinPt")
     if ladder:
-        ## The k-th hardest surviving object must clear the k-th threshold, which is how a
-        ## multi-jet trigger is written down: QuadPFJet 95/65/60/55.
+        ## The k-th hardest surviving object must clear the k-th threshold, which is how a multi-jet trigger such as QuadPFJet 95/65/60/55 is written
         pt = ak.sort(events[f"{coll}_pt"][passing], axis=1, ascending=False)
         for k, threshold in enumerate(ladder):
             kth = ak.fill_none(ak.firsts(pt[:, k:k + 1]), -1.0)
@@ -230,11 +205,11 @@ def _legMask(leg, events, branches, era):
         parts.append("pT ordered " + "/".join(f"{t:g}" for t in ladder))
 
     for pair in leg.get("pairRequirements", []):
-        value = _derived(coll, pair["variable"], events, era)
+        value = _derived(coll, pair["variable"], events)
         if value is None:
             name = f"{coll}_{pair['variable']}"
             if name not in branches:
-                raise ValueError(f"selection needs branch '{name}', which the ntuple does not have")
+                raise ValueError(f"Selection needs branch '{name}', which the ntuple does not have")
             value = events[name]
         left, right = ak.unzip(ak.combinations(value[passing], 2))
         separation = abs(left - right)
@@ -261,42 +236,45 @@ def _pairText(pair):
 
 def _reqText(req):
     if "anyOf" in req:
-        return "(" + " or ".join(
-            "(" + " and ".join(_reqText(r) for r in group) + ")" for group in req["anyOf"]
-        ) + ")"
-    v = req["variable"]
-    parts = []
-    if "min" in req:
-        parts.append(f"{v} >= {req['min']:g}")
-    if "max" in req:
-        parts.append(f"{v} <= {req['max']:g}")
-    if "absMin" in req:
-        parts.append(f"|{v}| >= {req['absMin']:g}")
-    if "absMax" in req:
-        parts.append(f"|{v}| <= {req['absMax']:g}")
-    return " and ".join(parts)
+        return "(" + " or ".join("(" + " and ".join(_reqText(r) for r in group) + ")" for group in req["anyOf"]) + ")"
+    return _boundsText(req["variable"], req)
 
 
-def _conditionMask(cut, events, era):
+def _quantity(q, events, branches):
+    """An event branch by name, or a count or sum over the objects of a collection passing requirements."""
+    if isinstance(q, str):
+        if q not in branches:
+            raise ValueError(f"Selection needs branch '{q}', which the ntuple does not have")
+        return events[q]
+    passing = _objectMask(q, events, branches)
+    if "sum" not in q:
+        return ak.sum(passing, axis=1)
+    name = f"{q['collection']}_{q['sum']}"
+    if name not in branches:
+        raise ValueError(f"Selection needs branch '{name}', which the ntuple does not have")
+    return ak.sum(events[name][passing], axis=1)
+
+
+def _quantityText(q):
+    if isinstance(q, str):
+        return q
+    text = f"sum of {q['collection']} {q['sum']}" if "sum" in q else f"number of {q['collection']}"
+    if q["requirements"]:
+        text += " with " + ", ".join(_reqText(r) for r in q["requirements"])
+    return text
+
+
+def _conditionMask(cut, events, branches):
     """Every condition on a cut must hold."""
     mask = np.ones(len(events), dtype=bool)
     for cond in cut["conditions"]:
-        value = evaluate(cond["quantity"], events, era)
-        if "min" in cond:
-            mask &= np.asarray(value >= cond["min"])
-        if "max" in cond:
-            mask &= np.asarray(value <= cond["max"])
+        value = _quantity(cond["quantity"], events, branches)
+        mask &= np.asarray(_within(value, cond, True))
     return mask
 
 
 def _bounds(cut):
-    parts = []
-    for cond in cut["conditions"]:
-        if "min" in cond:
-            parts.append(f"{cond['quantity']} >= {cond['min']:g}")
-        if "max" in cond:
-            parts.append(f"{cond['quantity']} <= {cond['max']:g}")
-    return " and ".join(parts)
+    return " and ".join(_boundsText(_quantityText(cond["quantity"]), cond) for cond in cut["conditions"])
 
 
 def applySelection(inputPaths, selection, outputPath, treeName="Events"):
@@ -310,7 +288,7 @@ def applySelection(inputPaths, selection, outputPath, treeName="Events"):
 
     for cut in selection["cuts"]:
         before = int(keep.sum())
-        mask, note = cutMask(cut, events, branches, selection.get("era"))
+        mask, note = cutMask(cut, events, branches)
         keep &= mask
         after = int(keep.sum())
         flow.append({
@@ -329,19 +307,14 @@ def applySelection(inputPaths, selection, outputPath, treeName="Events"):
 
 
 def _localCopy(path, scratch):
-    """
-    Bring a remote file local before reading it.
-
-    uproot needs fsspec-xrootd to open a root:// URL directly, and the CMSSW python
-    stack does not ship it, so copying first is what works both on a worker and here.
-    """
+    """Bring a remote file local before reading it, since uproot needs fsspec-xrootd to open a root:// URL and the CMSSW Python stack does not ship it."""
     if not path.startswith("root://"):
         return path, False
     os.makedirs(scratch, exist_ok=True)
     dest = os.path.join(scratch, os.path.basename(path))
     r = subprocess.run(["xrdcp", "-f", "-s", path, dest], capture_output=True, text=True)
     if r.returncode != 0:
-        raise RuntimeError(f"could not copy {path}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}")
+        raise RuntimeError(f"Could not copy {path}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}")
     return dest, True
 
 
@@ -368,19 +341,12 @@ def _readAll(inputPaths, treeName):
             except OSError:
                 pass
     if not parts:
-        raise ValueError("no input files")
+        raise ValueError("No input files")
     return (parts[0] if len(parts) == 1 else ak.concatenate(parts)), branches
 
 
 def _write(events, path, treeName):
-    """
-    Write with one shared counter per collection, the way NanoAOD does it.
-
-    Writing each jagged branch on its own would make uproot emit a counter per branch,
-    so a file that went in with nElectron would come out with nElectron_pt, nElectron_eta
-    and so on. Grouping the fields of a collection into one record keeps the schema stable
-    under repeated selection passes.
-    """
+    """Write with one shared counter per collection, the way NanoAOD does it, so the schema stays stable under repeated selection passes."""
     fields = list(events.fields)
     counters = {f[1:] for f in fields if f.startswith("n") and f[1:2].isupper()}
     collections = sorted(c for c in counters if any(f.startswith(c + "_") for f in fields))

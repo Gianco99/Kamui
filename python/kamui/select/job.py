@@ -1,8 +1,7 @@
 """
-Worker-side entry point: apply one resolved selection to one group of input files.
+What each condor selection job runs: apply one resolved selection to one group of input files.
 
-Run as `python3 -m kamui.select.runOne <selectionJson> <outputFile> <input> [input ...]`.
-The selection arrives already resolved, so the worker never reads a config directory.
+The job script that `batch.py` writes runs it as `python3 -m kamui.select.job <selectionJson> <outputFile> <input> [input ...]`. Users run `./kamui select`. The selection arrives already resolved, so the job never reads a config directory.
 """
 
 # Import Block
@@ -18,7 +17,7 @@ from .engine import applySelection
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if len(argv) < 3:
-        sys.exit("usage: runOne.py <selectionJson> <outputFile> <input> [input ...]")
+        sys.exit("Usage: python3 -m kamui.select.job <selectionJson> <outputFile> <input> [input ...]")
 
     selectionPath, outputPath, inputs = argv[0], argv[1], argv[2:]
     with open(selectionPath) as f:

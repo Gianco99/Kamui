@@ -14,9 +14,7 @@ from ..foundations import paths
 from ..configReaders.sites import loadSites
 
 
-# Both layouts give the sample its own directory, so the sample name is a whole path component.
-# Testing for it as a substring instead would make one sample claim another's files whenever one
-# name is a prefix of the other, which is exactly the case for '..._2016' and '..._2016APV'.
+# Matching whole path components keeps '..._2016' from claiming the files of '..._2016APV'
 def _namesSample(path, sampleName):
     """Whether a path has the sample as one of its directory components."""
     return sampleName in path.replace(os.sep, "/").split("/")
@@ -27,8 +25,7 @@ def findInputs(inputTask, sampleName, inputBase=None):
     sites = loadSites()
     base = (inputBase or sites["stageoutBase"]).rstrip("/")
 
-    ## Condor writes <task>/<sample>/*.root while CRAB nests under <task>/<primaryDataset>/<sample>/<timestamp>/0000/.
-    ## Searching the whole task and keeping paths whose directories name the sample handles both.
+    ## Condor writes <task>/<sample>/*.root and CRAB nests under <task>/<primaryDataset>/<sample>/<timestamp>/0000/, so the whole task is searched for paths naming the sample
     if os.path.isdir(base):
         root = os.path.join(base, "ntuples", inputTask)
         if not os.path.isdir(root):
@@ -43,13 +40,12 @@ def findInputs(inputTask, sampleName, inputBase=None):
     try:
         r = subprocess.run(["xrdfs", redirector, "ls", "-R", remote], capture_output=True, text=True, timeout=300)
     except (OSError, subprocess.SubprocessError) as e:
-        raise RuntimeError(f"could not list {remote}: {e}")
+        raise RuntimeError(f"Could not list {remote}: {e}")
     if r.returncode != 0:
-        ## A task directory that is not there has no ntuples. Anything else, an expired proxy most often,
-        ## would otherwise read as an empty production and send you looking at the wrong stage.
+        ## Only a missing task directory means no ntuples, so a failure such as an expired proxy never passes for an empty production
         if "no such file or directory" in r.stderr.lower():
             return []
-        raise RuntimeError(f"could not list {remote}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}")
+        raise RuntimeError(f"Could not list {remote}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}")
     return sorted(f"{redirector}/{line.strip()}" for line in r.stdout.splitlines()
                   if line.strip().endswith(".root") and _namesSample(os.path.dirname(line.strip()), sampleName))
 
@@ -66,16 +62,11 @@ def writeCutflow(task, selectionName, flows):
 
 
 def withGenerated(flow, genEvents):
-    """
-    Prepend the generated-event row and rebase every efficiency on it.
-
-    The row above the ntuple is what the trigger skim did, so the first efficiency in the
-    table becomes the skim efficiency instead of a cut that removed nothing.
-    """
+    """Prepend the generated-event row and rebase every efficiency on it, so the first efficiency in the table is the skim efficiency."""
     if not genEvents:
         return flow
     out = [{"cut": "generated", "type": "", "doc": "Generated events in the whole dataset",
-            "detail": "recorded by kamui norm, not measured here",
+            "detail": "recorded by kamui norm",
             "kept": int(genEvents), "removed": 0, "efficiency": 1.0, "cumulative": 1.0}]
     prev = int(genEvents)
     for row in flow:
@@ -92,34 +83,31 @@ def printCutflow(task):
     """Print the cutflow table for a select task."""
     path = os.path.join(paths.SELECTION_OUT_DIR, task, "cutflow.json")
     if not os.path.isfile(path):
-        raise FileNotFoundError(f"no cutflow at {path}")
+        raise FileNotFoundError(f"No cutflow at {path}")
     with open(path) as f:
         record = json.load(f)
 
-    print(f"task {record['task']}  selection {record['selection']}\n")
+    print(f"Task {record['task']}  selection {record['selection']}\n")
     for sample, flow in sorted(record["samples"].items()):
         print(sample)
         print(f"  {'Cut':<16} {'Type':<9} {'Events':>11} {'Removed':>10} {'Step Eff':>10} {'Cumulative':>12}")
         for row in flow:
-            print(f"  {row['cut']:<16} {row.get('type',''):<9} {row['kept']:>11,} {row.get('removed',0):>10,} "
-                  f"{100 * row['efficiency']:>9.2f}% {100 * row['cumulative']:>11.2f}%")
+            print(f"  {row['cut']:<16} {row.get('type',''):<9} {row['kept']:>11,} {row.get('removed',0):>10,} {100 * row['efficiency']:>9.2f}% {100 * row['cumulative']:>11.2f}%")
             ## What the cut actually is, so the table explains itself without opening the config
             if row.get("doc"):
                 print(f"      {row['doc']}")
             if row.get("detail"):
-                print(f"      applied as: {row['detail']}")
+                print(f"      Applied as: {row['detail']}")
         print()
 
-    ## Totals across samples, since a task usually spans several. Summing is only meaningful when every
-    ## sample ran the same cuts: a sample with no recorded generator count has no `generated` row, and
-    ## adding row 0 of one flow to row 0 of another would then add different cuts together.
+    ## Summed only when every sample ran the same cuts: a sample with no recorded generator count has no `generated` row, and summing by position would add different cuts together
     if len(record["samples"]) > 1:
         flows = list(record["samples"].values())
         names = [r["cut"] for r in flows[0]]
         if any([r["cut"] for r in f] != names for f in flows):
-            print("all samples: not totalled, the samples did not all run the same cuts")
+            print("All samples: not totaled, the samples did not all run the same cuts")
             return
-        print("all samples")
+        print("All samples")
         print(f"  {'Cut':<16} {'Events':>12} {'Cumulative':>12}")
         first = None
         for i, cut in enumerate(names):

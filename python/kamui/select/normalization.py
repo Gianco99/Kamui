@@ -1,10 +1,7 @@
 """
-The generator sums a sample must be normalized by.
+The generator sums a sample must be normalized by, read from its central NanoAOD and stored.
 
-These belong to the whole dataset as it was generated, not to whatever subset a job
-happened to read, so they are never measured from our own output. They are read from
-the sample's central NanoAOD and stored. A skim or a capped file list would otherwise
-silently shrink the denominator and inflate every yield computed from it.
+They cover the whole generated dataset, so a skim or a capped file list can never shrink the denominator and inflate every yield computed from it.
 """
 
 # Import Block
@@ -36,7 +33,7 @@ def measureFromNano(fileNames, redirector="root://cms-xrd-global.cern.ch/"):
     try:
         import ROOT
     except ImportError:
-        raise RuntimeError("reading central NanoAOD needs ROOT, so run this from a cmsenv shell")
+        raise RuntimeError("Reading central NanoAOD needs ROOT, so run this from a cmsenv shell")
     ROOT.gErrorIgnoreLevel = ROOT.kError
 
     count = 0
@@ -54,21 +51,14 @@ def measureFromNano(fileNames, redirector="root://cms-xrd-global.cern.ch/"):
             sumw += float(entry.genEventSumw)
             sumw2 += float(entry.genEventSumw2)
         handle.Close()
-    ## A missing file makes the sum too small, and a denominator that is too small inflates
-    ## every yield, so an incomplete read is reported rather than returned as a number.
+    ## A missing file would shrink the denominator and inflate every yield, so an incomplete read raises
     if unreadable:
-        raise RuntimeError(f"could not read {len(unreadable)} of {len(fileNames)} NanoAOD file(s); first: {unreadable[0]}")
+        raise RuntimeError(f"Could not read {len(unreadable)} of {len(fileNames)} NanoAOD file(s); first: {unreadable[0]}")
     return {"genEvents": count, "sumGenWeight": sumw, "sumGenWeight2": sumw2}
 
 
 def record(sampleName, measured=None, genEvents=None, write=True):
-    """
-    Assemble what is known about a sample's normalization, and store it when asked.
-
-    Only the dataset as generated is stored: the event count and the generator weight sums,
-    both read from its central NanoAOD. Nothing about what we processed belongs here. With write
-    False the entry is returned for display and the file on disk is left alone.
-    """
+    """Assemble a sample's generated event count and generator weight sums, and store them when write is True."""
     data = loadSums()
     entry = dict(data["samples"].get(sampleName, {}))
     if measured:
