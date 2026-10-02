@@ -51,7 +51,7 @@ Written by the Kamui CLI command `norm`, with one entry per sample name under `s
 | `sumGenWeight` (optional, default: None) | Sum of `genEventSumw`, the normalization denominator |
 | `sumGenWeight2` (optional, default: None) | Sum of `genEventSumw2`, for the statistical uncertainty |
 
-The current functionality reads everything from the run-level `Runs` tree written by the NanoAOD `genWeightsTable` producer. In the future this has to be adapted for other file formats.
+`norm` reads everything from the run-level `Runs` tree that the NanoAOD `genWeightsTable` producer writes, so another file format needs its own reader.
 ## lumi.json
 
 Integrated luminosity in inverse picobarns.
@@ -73,16 +73,35 @@ Integrated luminosity in inverse picobarns.
 
 Run 3 comes from the certified-golden luminosity:
 
--  `brilcalc totrecorded` with `-b 'STABLE BEAMS'` and `--normtag normtag_PHYSICS.json`, integrated over the official golden JSON for the era. 
+- `totrecorded` from `brilcalc lumi` with `-b 'STABLE BEAMS'` and `--normtag normtag_PHYSICS.json`, integrated over the official golden JSON for the era.
 
 Run 2 entries are taken from JMTucker `AnalysisConstants.h`.
 
 `channels` holds the smaller luminosity a channel integrates when its triggers were not active for a whole era. 
 
 -   Ex: `channels.displaced` overrides 2017 and 2018 for the displacement-triggered channel.
+    - The b-jet triggers were active for only part of 2017 and 2018.
 
 ## Relevant Commands
 
 - Use `norm` to register entries into `generatorSums.json`. 
 
-See Kamui/python/kamui/README.md for the flags and worked examples.
+See `python/kamui/README.md` for the flags and worked examples.
+
+## Caveats
+
+- Cross sections are stored unfiltered and `filterEfficiencies` are applied separately.
+- The luminosity value moves with the golden JSON and normtag, which is why each Run 3 `source` records the exact brilcalc command. Re-run it against whatever golden JSON the data was filtered with.
+
+Physics caveats per model are kept here so the configs stay readable.
+
+**Exotic Higgs (exoticHiggs.json)**
+- Higgs production at MH = 125 GeV, assuming BR(H -> LLP) = 1.
+- Run 2 numbers assume a center-of-mass energy of 13 TeV. The exotic Higgs cross sections would have to be updated for Run 3's center-of-mass energy.
+- The Run 2 VH samples are generated with leptonic decays only, so their cross sections are just summed over the three lepton flavors.
+  - `WplusH`: three times the inclusive W+H cross section times BR(W -> lv) for one lepton flavor.
+  - `WminusH`: three times the inclusive W-H cross section times BR(W -> lv) for one lepton flavor.
+- `ZH` is the qq-initiated piece, with the gg component split off into `ggZH`.
+  - `ZH`: three times the ZH -> llH cross section for one lepton flavor, minus its gg-initiated part.
+  - `ggZH`: three times the inclusive ggZH cross section times BR(Z -> ll) for one lepton flavor.
+- Even though the `filterEfficiencies` are keyed by scalar mass, the filter itself is on gen-HT.

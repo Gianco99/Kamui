@@ -1,9 +1,1 @@
-{
-  "_doc": "Event, jets, leptons, vertices.",
-  "include": [
-    "core",
-    "jets",
-    "leptons",
-    "vertices"
-  ]
-}
+{"include": ["core", "jets", "leptons", "vertices"]}

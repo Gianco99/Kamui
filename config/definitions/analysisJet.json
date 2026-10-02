@@ -1,0 +1,1 @@
+{"requirements": [{"variable": "pt", "above": 20}, {"variable": "eta", "absBelow": 2.5}, {"definition": "tightLepVeto"}]}

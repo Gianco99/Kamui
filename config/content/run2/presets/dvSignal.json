@@ -1,7 +1,1 @@
-{
-  "_doc": "Adds generator information to dvBase.",
-  "include": [
-    "dvBase",
-    "gen"
-  ]
-}
+{"include": ["dvBase", "gen"]}

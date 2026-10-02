@@ -1,9 +1,1 @@
-{
-  "_doc": "Lepton-triggered channel for Run 2, matching JMTucker.",
-  "include": [
-    "dvFull"
-  ],
-  "skim": {
-    "triggers": "run2Lepton"
-  }
-}
+{"include": ["dvFull"], "skim": {"triggers": "run2Lepton"}}

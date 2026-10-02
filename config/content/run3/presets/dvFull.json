@@ -1,7 +1,1 @@
-{
-  "_doc": "Adds tracks to dvSignal.",
-  "include": [
-    "dvSignal",
-    "tracks"
-  ]
-}
+{"include": ["dvSignal", "tracks"]}

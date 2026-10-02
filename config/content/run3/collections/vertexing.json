@@ -6,101 +6,62 @@
       "seeding": {
         "beamSpot": "offlineBeamSpot",
         "primaryVertices": "offlineSlimmedPrimaryVertices",
-        "_goodPv": "The first vertex passing these seeds the dxy_PV cut. With none, the event gets no seed tracks",
-        "goodPv": {
-          "minNdof": 4,
-          "maxAbsZ": 24,
-          "maxRho": 2
-        },
-        "minPt": 1.0,
-        "minAbsDxyBs": 0,
-        "maxDxyErr": 1e9,
-        "minNSigmaDxyBs": 0,
-        "minRescaledNSigmaDxyBs": 4.0,
-        "minNSigmaDxyPv": 0,
-        "minHits": 0,
-        "minPixelHits": 0,
+        "goodPv": {"ndofAbove": 4, "maxAbsZ": 24, "rhoBelow": 2},
+        "ptAbove": 1.0,
+        "nSigmaDxyBsAbove": 4.0,
         "minPixelLayers": 2,
         "minStripLayers": 6,
         "maxFirstPixelLayer": 1
       },
       "variables": {
-        "pt": {
-          "expr": "pt()",
-          "type": "float",
-          "doc": "Track pT [GeV]",
-          "precision": -1
-        },
-        "eta": {
-          "expr": "eta()",
-          "type": "float",
-          "doc": "Pseudorapidity",
-          "precision": -1
-        },
-        "phi": {
-          "expr": "phi()",
-          "type": "float",
-          "doc": "Azimuthal angle",
-          "precision": -1
-        },
-        "charge": {
-          "expr": "charge()",
-          "type": "int16",
-          "doc": "Electric charge"
-        },
-        "vx": {
-          "expr": "vx()",
-          "type": "float",
-          "doc": "Reference point x [cm]",
-          "precision": -1
-        },
-        "vy": {
-          "expr": "vy()",
-          "type": "float",
-          "doc": "Reference point y [cm]",
-          "precision": -1
-        },
-        "vz": {
-          "expr": "vz()",
-          "type": "float",
-          "doc": "Reference point z [cm]",
-          "precision": -1
-        },
-        "dxyErr": {
-          "expr": "dxyError()",
-          "type": "float",
-          "doc": "dxy uncertainty [cm]",
-          "precision": -1
-        },
-        "dzErr": {
-          "expr": "dzError()",
-          "type": "float",
-          "doc": "dz uncertainty [cm]",
-          "precision": -1
-        },
-        "nPixelLayers": {
-          "expr": "hitPattern().pixelLayersWithMeasurement()",
-          "type": "uint8",
-          "doc": "Pixel layers with a measurement"
-        },
-        "nStripLayers": {
-          "expr": "hitPattern().stripLayersWithMeasurement()",
-          "type": "uint8",
-          "doc": "Strip layers with a measurement"
-        }
+        "pt": {"expr": "pt()", "type": "float", "doc": "Track pT [GeV]", "precision": -1},
+        "eta": {"expr": "eta()", "type": "float", "doc": "Pseudorapidity", "precision": -1},
+        "phi": {"expr": "phi()", "type": "float", "doc": "Azimuthal angle", "precision": -1},
+        "charge": {"expr": "charge()", "type": "int16", "doc": "Electric charge"},
+        "vx": {"expr": "vx()", "type": "float", "doc": "Reference point x [cm]", "precision": -1},
+        "vy": {"expr": "vy()", "type": "float", "doc": "Reference point y [cm]", "precision": -1},
+        "vz": {"expr": "vz()", "type": "float", "doc": "Reference point z [cm]", "precision": -1},
+        "dxyErr": {"expr": "dxyError()", "type": "float", "doc": "dxy uncertainty [cm]", "precision": -1},
+        "dzErr": {"expr": "dzError()", "type": "float", "doc": "dz uncertainty [cm]", "precision": -1},
+        "nPixelLayers": {"expr": "hitPattern().pixelLayersWithMeasurement()", "type": "uint8", "doc": "Pixel layers with a measurement"},
+        "nStripLayers": {"expr": "hitPattern().stripLayersWithMeasurement()", "type": "uint8", "doc": "Strip layers with a measurement"}
       }
     },
     "VertexJet": {
-      "_doc": "Jets for shared-jet mitigation. Not written to the ntuple.",
+      "_doc": "Jets the vertexer uses to separate vertices that share a jet. Not written to the ntuple.",
       "type": "vertexJet",
       "src": "slimmedJets",
-      "jec": {
-        "payload": "AK4PFchs",
-        "primaryVertices": "offlineSlimmedPrimaryVertices",
-        "levels": ["L1FastJet", "L2Relative", "L3Absolute", "L2L3Residual"]
+      "jec": {"payload": "AK4PFchs", "primaryVertices": "offlineSlimmedPrimaryVertices", "levels": ["L1FastJet", "L2Relative", "L3Absolute", "L2L3Residual"]},
+      "requirements": [{"variable": "pt", "above": 20}, {"variable": "eta", "absBelow": 2.5}]
+    },
+    "DV": {
+      "type": "dv",
+      "src": "SeedTrack",
+      "vertexing": {
+        "beamSpot": "offlineBeamSpot",
+        "jets": "VertexJet",
+        "minTracks": 3,
+        "maxChi2PerDof": 5,
+        "kalman": {"maxDistance": 0.01, "maxIterations": 10, "smoothing": true},
+        "sharedTracks": {"_doc": "When two vertices share a track, they merge if they are close, and otherwise the track stays only in the vertex it fits best.", "mergeBelowSigma": 4, "keepBelowSigma": 5, "tieBelowSigma": 1.5},
+        "zRefit": {"_doc": "A track whose removal moves the vertex in z by more than maxShiftSigma standard deviations is dropped.", "maxShiftSigma": 3},
+        "mergeNearby": {"deltaPhiBelow": 0.5, "distance2dBelow": 0.03, "dbvAbove": 0.01},
+        "sharedJets": {"_doc": "When two vertices share a jet, a vertex's only track in that jet is dropped if its phi differs from the vertex's phi by more than maxDeltaPhi.", "maxDeltaPhi": 1.5707963267948966}
       },
-      "_jetId": "TightLepVeto. No Run 3 working point yet.",
-      "jetId": {}
+      "variables": {
+        "x": {"expr": "x()", "type": "float", "doc": "DV x [cm]", "precision": -1},
+        "y": {"expr": "y()", "type": "float", "doc": "DV y [cm]", "precision": -1},
+        "z": {"expr": "z()", "type": "float", "doc": "DV z [cm]", "precision": -1},
+        "cxx": {"expr": "covariance(0,0)", "type": "float", "doc": "Position covariance xx [cm^2]", "precision": -1},
+        "cxy": {"expr": "covariance(0,1)", "type": "float", "doc": "Position covariance xy [cm^2]", "precision": -1},
+        "cxz": {"expr": "covariance(0,2)", "type": "float", "doc": "Position covariance xz [cm^2]", "precision": -1},
+        "cyy": {"expr": "covariance(1,1)", "type": "float", "doc": "Position covariance yy [cm^2]", "precision": -1},
+        "cyz": {"expr": "covariance(1,2)", "type": "float", "doc": "Position covariance yz [cm^2]", "precision": -1},
+        "czz": {"expr": "covariance(2,2)", "type": "float", "doc": "Position covariance zz [cm^2]", "precision": -1},
+        "chi2": {"expr": "chi2()", "type": "float", "doc": "Vertex fit chi2", "precision": -1},
+        "ndof": {"expr": "ndof()", "type": "float", "doc": "Vertex fit ndof", "precision": -1},
+        "nTracks": {"expr": "tracksSize()", "type": "uint8", "doc": "Seed tracks in the vertex"}
+      }
     }
   }
 }

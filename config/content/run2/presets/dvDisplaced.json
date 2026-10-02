@@ -1,9 +1,1 @@
-{
-  "_doc": "Displacement-triggered channel for Run 2, matching JMTucker.",
-  "include": [
-    "dvFull"
-  ],
-  "skim": {
-    "triggers": "run2Displaced"
-  }
-}
+{"include": ["dvFull"], "skim": {"triggers": "run2Displaced"}}

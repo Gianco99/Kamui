@@ -1,0 +1,11 @@
+{
+  "_doc": "Muon on the plateau of the single-muon trigger.",
+  "requirements": [
+    {"variable": "pt", "min": {"2016APV": 27, "2016": 27, "2017": 30, "2018": 27}},
+    {"variable": "eta", "absMax": 2.4},
+    {"variable": "mediumId", "min": 1},
+    {"variable": "pfRelIso04", "max": 0.15},
+    {"variable": "dxyBeamspot", "absMax": 0.02},
+    {"variable": "dzPV", "absMax": 0.5}
+  ]
+}

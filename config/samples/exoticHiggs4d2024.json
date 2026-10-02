@@ -1,59 +1,21 @@
 {
-  "_doc": "Exotic Higgs H->SS->4d. Summer24. Central production.",
   "family": "exoticHiggs4d2024",
-  "defaults": {
-    "era": "Summer24",
-    "isMC": true,
-    "dasInstance": "prod/global",
-    "content": "dvSignal",
-    "tags": [
-      "signal",
-      "exoticHiggs",
-      "run3"
-    ]
-  },
+  "defaults": {"era": "Summer24", "isMC": true, "dasInstance": "prod/global", "content": "dvSignal", "tags": ["signal", "exoticHiggs", "run3"]},
   "grids": [
     {
-      "_doc": "6 production modes x mS {15,40,55} GeV x ctau {0.1,1,10} mm = 54 points.",
       "name": "{mode}-2S-4D_mS{mS}_ctau{ctau}mm_2024",
       "dataset": "/{dasMode}Hto2Sto4D_Par-ctauS-{ctau}-MH-125-MS-{mS}_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
       "axes": {
         "mode": [
-          {
-            "mode": "ggH",
-            "dasMode": "GluGluH-"
-          },
-          {
-            "mode": "VBFH",
-            "dasMode": "VBFH-"
-          },
-          {
-            "mode": "WplusH",
-            "dasMode": "WplusH_"
-          },
-          {
-            "mode": "WminusH",
-            "dasMode": "WminusH_"
-          },
-          {
-            "mode": "ZH",
-            "dasMode": "ZH_"
-          },
-          {
-            "mode": "ttH",
-            "dasMode": "ttH_"
-          }
+          {"mode": "ggH", "dasMode": "GluGluH-"},
+          {"mode": "VBFH", "dasMode": "VBFH-"},
+          {"mode": "WplusH", "dasMode": "WplusH_"},
+          {"mode": "WminusH", "dasMode": "WminusH_"},
+          {"mode": "ZH", "dasMode": "ZH_"},
+          {"mode": "ttH", "dasMode": "ttH_"}
         ],
-        "mS": [
-          "15",
-          "40",
-          "55"
-        ],
-        "ctau": [
-          "0p1",
-          "1",
-          "10"
-        ]
+        "mS": ["15", "40", "55"],
+        "ctau": ["0p1", "1", "10"]
       }
     }
   ]

@@ -1,11 +1,6 @@
 {
-  "_doc": "Lepton-triggered channel for Run 2, matching JMTucker. Cuts apply in the order listed, which is also the cutflow order.",
-  "eras": [
-    "2016",
-    "2016APV",
-    "2017",
-    "2018"
-  ],
+  "_doc": "Lepton-triggered channel for Run 2.",
+  "eras": ["2016", "2016APV", "2017", "2018"],
   "cuts": [
     {
       "name": "metFilters",
@@ -62,127 +57,27 @@
     },
     {
       "name": "leptonPlateau",
-      "type": "object",
+      "type": "anyOf",
       "doc": "At least one lepton on the plateau of the path that actually fired, passing the appropriate ID and ISO.",
       "anyOf": [
         {
-          "collection": "Muon",
-          "min": 1,
-          "triggers": {
-            "2016APV": [
-              "HLT_IsoMu24_v*"
-            ],
-            "2016": [
-              "HLT_IsoMu24_v*"
-            ],
-            "2017": [
-              "HLT_IsoMu27_v*"
-            ],
-            "2018": [
-              "HLT_IsoMu24_v*"
-            ]
-          },
+          "name": "muon",
           "doc": "Muon leg",
-          "requirements": [
-            {
-              "variable": "pt",
-              "min": {
-                "2016APV": 27,
-                "2016": 27,
-                "2017": 30,
-                "2018": 27
-              }
-            },
-            {
-              "variable": "eta",
-              "absMax": 2.4
-            },
-            {
-              "variable": "mediumId",
-              "min": 1
-            },
-            {
-              "variable": "pfRelIso04",
-              "max": 0.15
-            },
-            {
-              "variable": "dxyBeamspot",
-              "absMax": 0.02
-            },
-            {
-              "variable": "dzPV",
-              "absMax": 0.5
-            }
+          "cuts": [
+            {"name": "fired", "type": "trigger", "triggers": {"2016APV": ["HLT_IsoMu24_v*"], "2016": ["HLT_IsoMu24_v*"], "2017": ["HLT_IsoMu27_v*"], "2018": ["HLT_IsoMu24_v*"]}},
+            {"name": "plateau", "type": "object", "collection": "Muon", "min": 1, "requirements": [{"definition": "plateauMuon"}]}
           ]
         },
         {
-          "collection": "Electron",
-          "min": 1,
-          "triggers": {
-            "2016APV": [
-              "HLT_Ele27_WPTight_Gsf_v*"
-            ],
-            "2016": [
-              "HLT_Ele27_WPTight_Gsf_v*"
-            ],
-            "2017": [
-              "HLT_Ele35_WPTight_Gsf_v*"
-            ],
-            "2018": [
-              "HLT_Ele32_WPTight_Gsf_v*"
-            ]
-          },
+          "name": "electron",
           "doc": "Electron leg. The impact parameter requirement differs either side of |eta| = 1.48",
-          "requirements": [
+          "cuts": [
             {
-              "variable": "pt",
-              "min": {
-                "2016APV": 30,
-                "2016": 30,
-                "2017": 38,
-                "2018": 35
-              }
+              "name": "fired",
+              "type": "trigger",
+              "triggers": {"2016APV": ["HLT_Ele27_WPTight_Gsf_v*"], "2016": ["HLT_Ele27_WPTight_Gsf_v*"], "2017": ["HLT_Ele35_WPTight_Gsf_v*"], "2018": ["HLT_Ele32_WPTight_Gsf_v*"]}
             },
-            {
-              "variable": "eta",
-              "absMax": 2.4
-            },
-            {
-              "variable": "cutBased",
-              "min": 4
-            },
-            {
-              "anyOf": [
-                [
-                  {
-                    "variable": "eta",
-                    "absMax": 1.48
-                  },
-                  {
-                    "variable": "dxyBeamspot",
-                    "absMax": 0.05
-                  },
-                  {
-                    "variable": "dzPV",
-                    "absMax": 0.1
-                  }
-                ],
-                [
-                  {
-                    "variable": "eta",
-                    "absMin": 1.48
-                  },
-                  {
-                    "variable": "dxyBeamspot",
-                    "absMax": 0.1
-                  },
-                  {
-                    "variable": "dzPV",
-                    "absMax": 0.2
-                  }
-                ]
-              ]
-            }
+            {"name": "plateau", "type": "object", "collection": "Electron", "min": 1, "requirements": [{"definition": "plateauElectron"}]}
           ]
         }
       ]

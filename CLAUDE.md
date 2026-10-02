@@ -1,6 +1,8 @@
 # Kamui AI Documentation
 ## Writing
 - Write prose in normal paragraphs.
+- Every README opens by telling a newcomer what is going on: what the folder is for, what its key ideas mean, and a short example when it helps. Details come after.
+- Never quote current values in a README, such as cut thresholds, working points or counts, since they go stale when the JSON changes. Say what a thing is for, and write examples with placeholders.
 - Do not hard-wrap lines at 80 characters or any other column. Let the editor wrap naturally.
   - The same applies to code. Do not break a statement across lines to keep it under some column width.
 - Tables and bullet lists are fine where the content is genuinely tabular or genuinely a list. Lists are preferred for the ease of human readability.
@@ -11,7 +13,7 @@
 - Say a thing once, in the fewest words that carry it.
 - Never define something by contrast: "it is X, not Y", "X rather than Y", "X is still a Y". State X. The reader was not thinking of Y until it was raised.
 - One example, when an example is genuinely needed. Not three.
-- Write DV, never displaced vertex, including in compounds such as DV reconstruction.
+- Write DV, never displaced vertex or displaced-vertex, including in compounds such as DV reconstruction. Write displaced track, never displaced-track.
 - Use American English throughout, in code, comments and documentation: organize, behavior, analyze, center, license.
 - Start comments, docstrings, JSON `_doc` strings and anything the user reads, including argparse `help=` text, with a capital letter.
   - Exceptions are things that are naturally lowercase: a variable or function name, a camelCase identifier, a filename, a path, a CMSSW collection, a literal value such as `prod/global`.
@@ -20,7 +22,10 @@
 - camelCase everywhere. This is just my (Gianfranco's) preference lol.
 - Do not start file or folder names with `kamui` unless the name needs it (the `kamui` CLI and the `python/kamui` package).
 - Use `python3`. A cmsenv shell leaves `/usr/bin/python` with a mismatched `PYTHONHOME`, so bare `python` fails.
-- JSON configs: Keys starting with `_` are comments and are stripped on load.
+- JSON configs: `_doc` is the only comment key, and comments are stripped on load. No other key may start with `_`.
+  - At most one `_doc` per object: one concise sentence on what that object is for.
+  - Never cite temporary sources in a `_doc`, such as an AN section or JMTucker.
+  - `doc` is different: it is text Kamui writes into its outputs, such as ntuple branch docs and cutflow rows.
 - Do not add `__init__.py` files unless something actually needs them.
 - A module docstring opens and closes on its own line, with the text between.
 - Group the imports and label the groups with comment headers. A single `#` heading for the whole block, `##` for each group.

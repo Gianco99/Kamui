@@ -1,0 +1,57 @@
+{
+  "_doc": "TightLepVeto PF jet ID.",
+  "requirements": {
+    "2016APV": [
+      {"variable": "neHEF", "below": 0.9},
+      {"variable": "neEmEF", "below": 0.99},
+      {
+        "anyOf": [
+          [{"variable": "eta", "absMin": 2.4}],
+          [
+            {"variable": "neEmEF", "below": 0.9},
+            {"variable": "nConstituents", "above": 1},
+            {"variable": "muEF", "below": 0.8},
+            {"variable": "chHEF", "above": 0},
+            {"variable": "chMultiplicity", "above": 0},
+            {"variable": "chEmEF", "below": 0.8}
+          ]
+        ]
+      }
+    ],
+    "2016": [
+      {"variable": "neHEF", "below": 0.9},
+      {"variable": "neEmEF", "below": 0.99},
+      {
+        "anyOf": [
+          [{"variable": "eta", "absMin": 2.4}],
+          [
+            {"variable": "neEmEF", "below": 0.9},
+            {"variable": "nConstituents", "above": 1},
+            {"variable": "muEF", "below": 0.8},
+            {"variable": "chHEF", "above": 0},
+            {"variable": "chMultiplicity", "above": 0},
+            {"variable": "chEmEF", "below": 0.8}
+          ]
+        ]
+      }
+    ],
+    "2017": [
+      {"variable": "neHEF", "below": 0.9},
+      {"variable": "neEmEF", "below": 0.9},
+      {"variable": "nConstituents", "above": 1},
+      {"variable": "muEF", "below": 0.8},
+      {"variable": "chHEF", "above": 0},
+      {"variable": "chMultiplicity", "above": 0},
+      {"variable": "chEmEF", "below": 0.8}
+    ],
+    "2018": [
+      {"variable": "neHEF", "below": 0.9},
+      {"variable": "neEmEF", "below": 0.9},
+      {"variable": "nConstituents", "above": 1},
+      {"variable": "muEF", "below": 0.8},
+      {"variable": "chHEF", "above": 0},
+      {"variable": "chMultiplicity", "above": 0},
+      {"variable": "chEmEF", "below": 0.8}
+    ]
+  }
+}

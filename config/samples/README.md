@@ -1,19 +1,19 @@
 # Sample Configs Documentation
 
-A sample family is defined by a JSON file which declares a set of datasets to process.
+A sample family is a JSON file that lists a set of datasets to process.
 ## JSON Fields
 
-Below are all the supported fields one can add to the JSON file. JSONs don't natively support comments, but you can add any arbitrary field with a leading `_` to make in-line notes. These fields are stripped when parsed to enable this functionality.
+Below are all the supported fields one can add to the JSON file. Keys beginning with `_` are comments.
 
 **Top level**
 
 | Field | Meaning |
 |---|---|
-| `family` (optional, default: the file name) | The handle the samples in this JSON are selected by |
+| `family` (optional, default: the file name) | The name for selecting this file's samples with `--family` |
 | `defaults` (optional, default: None) | Sample fields applied to every sample in the file |
 | `samples` (optional, default: None) | A list of explicit sample entries |
 | `grids` (optional, default: None) | A list of grids, each generating samples from templates and axes |
-| `overrides` (optional, default: None) | Override defaults, keyed by generated sample name |
+| `overrides` (optional, default: None) | Fields to override on individual samples, keyed by sample name |
 
 A file needs at least one of `samples` or `grids` to define samples.
 
@@ -32,16 +32,16 @@ A grid may also carry any sample field from the table below, applying it to ever
 
 | Field | Meaning |
 |---|---|
-| **`name`** (required, default: None) | Short handle for the sample, unique across every family. It is also the per-sample output subdirectory on EOS and the CRAB output dataset tag. |
+| **`name`** (required, default: None) | Short name for the sample, unique across every family. It also names the sample's output folder on EOS and its CRAB output dataset tag. |
 | **`dataset`** (required, default: None) | The full DAS dataset path. |
-| **`era`** (required, default: None) | Data-taking period. Picks the content set the sample resolves against and the selection thresholds it is cut with. |
+| **`era`** (required, default: None) | Data-taking period. It picks the content set and the selection thresholds the sample uses. |
 | `dasInstance` (optional, default: `prod/global`) | `prod/global` for central datasets, `prod/phys03` for USER-created datasets. |
 | `isMC` (optional, default: `true`) | `false` for data. `true` for MC. |
-| `family` (optional, default: the file's `family` key, then the file name) | The handle the samples in this JSON are selected by. |
+| `family` (optional, default: the file's `family` key, then the file name) | The name for selecting this file's samples with `--family`. |
 | `content` (optional, default: `dvBase`) | The content preset defining the branches to write. |
-| `tags` (optional, default: `[]`) | Free-form labels, used for selection. A sample may carry several. |
+| `tags` (optional, default: `[]`) | Free-form labels, for selecting samples with `--tag`. A sample may carry several. |
 | `unitsPerJob` (optional, default: None) | A positive integer, the input files per job for this sample. `--filesPerJob` in the CLI overrides it. |
-| `lumiMask` (optional, default: None) | Mask certain lumi-blocks from being processed. Data only. |
+| `lumiMask` (optional, default: None) | A lumi mask JSON, such as the golden JSON, restricting processing to the lumi sections it lists. Data only. CRAB applies it and condor ignores it. |
 ## Writing a JSON Sample Family File
 
 A family lists samples one of two ways: 
@@ -66,14 +66,14 @@ Example grid for two masses in one era:
 
 Write an axis as a plain list when each value fills in one placeholder of the same name, as `mass` does. Write it as a list of blocks when picking one value has to fill in several placeholders at once, as `era` does.
 
-Four fields layer with increasing precedence, so that later fields override earlier definitions:
+A sample's fields come from four layers, each overriding the ones before it:
 
 1. `defaults`
 2. The grid's own fields, or the explicit sample entry
-3. Any axis substitution whose key happens to be a sample field
+3. Any axis value whose key is also a sample field, such as `era` in the example
 4. `overrides`
 
-Merging replaces lists and scalars; for example, a grid that names `tags` throws away the `tags` in `defaults`.
+A later layer replaces lists and single values outright, so a grid that names `tags` throws away the `tags` in `defaults`.
 ## What Is Here Now
 
 | File | Samples | What |
@@ -91,4 +91,24 @@ Merging replaces lists and scalars; for example, a grid that names `tags` throws
 - Use `query` to ask DAS how many files, events and GB each registered sample holds.
 - Use `stage` to copy MiniAOD files to EOS when you want to open one by hand.
 
-See Kamui/python/kamui/README.md for the flags and worked examples.
+See `python/kamui/README.md` for the flags and worked examples.
+
+## Caveats
+
+Physics caveats per family are kept here so the configs stay readable.
+
+**Exotic Higgs (exoticHiggs4d2024)**
+- Run 3 ggH has no gen-HT filter. The Run 2 samples had gen-HT > 200 GeV.
+- ZH and WH decays are inclusive in Run 3. For Run 2 they are exclusive to lepton decays.
+- Summer24 has exclusive ZH-Zto2L and WH-WtoLNu available. They have yet to be registered.
+
+**RPV (rpv2024)**
+- One private point from Bruno. Nothing exists in Run 3 for gluino to tbs or stop to bb, official or private.
+
+**Stealth SUSY (stealthSusy2024)**
+- Private from Bruno.
+- Each sample holds a single (mStop, mSo, ctau) point.
+- Inclusive samples exist for Run 2. These can be filtered using `randPar`.
+
+**Run 2 validation (run2Validation)**
+- Dataset paths copied from JMTucker's `Tools/python/Samples.py`.

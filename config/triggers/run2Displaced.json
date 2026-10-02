@@ -1,5 +1,5 @@
 {
-  "_doc": "Run 2 displacement-triggered channel.",
+  "_doc": "Run 2 displacement-triggered channel, listing the paths of the 2016, 2017 and 2018 menus together.",
   "process": "HLT",
   "mode": "any",
   "paths": [
@@ -14,27 +14,5 @@
     "HLT_HT650_DisplacedDijet80_Inclusive_v*",
     "HLT_HT430_DisplacedDijet40_DisplacedTrack_v*",
     "HLT_HT650_DisplacedDijet60_Inclusive_v*"
-  ],
-  "_pathsByEra": {
-    "_doc": "Which paths belong to which era's menu. Bookkeeping only.",
-    "2016": [
-      "HLT_QuadJet45_TripleBTagCSV_p087_v*",
-      "HLT_DoubleJet90_Double30_TripleBTagCSV_p087_v*",
-      "HLT_DoubleJetsC100_DoubleBTagCSV_p014_DoublePFJetsC100MaxDeta1p6_v*",
-      "HLT_HT350_DisplacedDijet40_DisplacedTrack_v*",
-      "HLT_HT650_DisplacedDijet80_Inclusive_v*"
-    ],
-    "2017": [
-      "HLT_DoublePFJets100MaxDeta1p6_DoubleCaloBTagCSV_p33_v*",
-      "HLT_PFHT300PT30_QuadPFJet_75_60_45_40_TriplePFBTagCSV_3p0_v*",
-      "HLT_HT430_DisplacedDijet40_DisplacedTrack_v*",
-      "HLT_HT650_DisplacedDijet60_Inclusive_v*"
-    ],
-    "2018": [
-      "HLT_DoublePFJets116MaxDeta1p6_DoubleCaloBTagDeepCSV_p71_v*",
-      "HLT_PFHT330PT30_QuadPFJet_75_60_45_40_TriplePFBTagDeepCSV_4p5_v*",
-      "HLT_HT430_DisplacedDijet40_DisplacedTrack_v*",
-      "HLT_HT650_DisplacedDijet60_Inclusive_v*"
-    ]
-  }
+  ]
 }
