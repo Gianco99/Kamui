@@ -41,7 +41,7 @@
       "name": "leptonVeto",
       "type": "anyOf",
       "invert": true,
-      "doc": "Orthogonality with the lepton-triggered channel: the run2Lepton legs, inverted.",
+      "doc": "Orthogonality with the lepton-triggered channel: the lepton selection's legs, inverted.",
       "anyOf": [
         {
           "name": "muon",

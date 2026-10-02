@@ -9,7 +9,7 @@ import os
 
 ## Kamui modules
 from ..foundations import paths
-from ..foundations.config import loadJson, loadWithIncludes
+from ..foundations.config import RUNS, eraGroup, loadJson, loadWithIncludes, runDir
 from .requirements import cutString, resolveRequirements
 
 # CMSSW plugin language
@@ -78,19 +78,9 @@ def listCollections(contentDir=None):
 CONTENT_FIELDS = {"collections", "triggerBits", "skim"}
 
 
-## Which content set an era draws from
-RUN2_ERAS = {"2016", "2016APV", "2017", "2018"}
-
-
-def eraGroup(era):
-    """run2 or run3, the content set an era's samples must use."""
-    return "run2" if era in RUN2_ERAS else "run3"
-
-
 def contentDirs(era, contentDir=None):
     """Search path for a content config: only that era's own set, so a Run 3 config can never reach a Run 2 sample."""
-    contentDir = contentDir or paths.CONTENT_DIR
-    return [os.path.join(contentDir, eraGroup(era))]
+    return [runDir(contentDir or paths.CONTENT_DIR, era)]
 
 
 def resolveContent(name, contentDir=None, isMC=True, era="Summer24"):
@@ -119,7 +109,7 @@ def resolveContent(name, contentDir=None, isMC=True, era="Summer24"):
         "needsConditions": any(c["kind"] in CONDITIONS_KINDS for c in collections.values()),
         "collections": collections,
         "triggerBits": cfg.get("triggerBits", {}),
-        "skim":        _resolveSkim(cfg.get("skim", {})),
+        "skim":        _resolveSkim(cfg.get("skim", {}), era),
     }
 
 
@@ -127,15 +117,15 @@ def resolveContent(name, contentDir=None, isMC=True, era="Summer24"):
 SKIM_FIELDS = {"triggers", "mode", "process"}
 
 
-def loadTriggerPaths(name):
-    """The HLT path patterns a trigger config defines."""
-    trig = loadWithIncludes(name, paths.TRIGGERS_DIR)
+def loadTriggerPaths(name, era=None):
+    """The HLT path patterns a trigger config defines, read from the era's run folder."""
+    trig = loadWithIncludes(name, runDir(paths.TRIGGERS_DIR, era))
     if "paths" not in trig:
         raise ValueError(f"Trigger config '{name}' defines no 'paths'")
     return list(trig["paths"])
 
 
-def _resolveSkim(skim):
+def _resolveSkim(skim, era):
     """
     Expand a skim block.
     """
@@ -147,7 +137,7 @@ def _resolveSkim(skim):
     name = skim.get("triggers")
     if not name:
         return {}
-    trig = loadWithIncludes(name, paths.TRIGGERS_DIR)
+    trig = loadWithIncludes(name, runDir(paths.TRIGGERS_DIR, era))
     if "paths" not in trig:
         raise ValueError(f"Trigger config '{name}' defines no 'paths'")
     out = dict(skim)
@@ -396,21 +386,22 @@ def summarize(resolved):
 
 
 def listTriggerConfigs():
-    """Names of the trigger configs available."""
-    return sorted(f[:-5] for f in os.listdir(paths.TRIGGERS_DIR) if f.endswith(".json"))
+    """Names of the trigger configs available, each with its run folder, such as run2/lepton."""
+    runs = [r for r in RUNS if os.path.isdir(os.path.join(paths.TRIGGERS_DIR, r))]
+    return sorted(f"{r}/{f[:-5]}" for r in runs for f in os.listdir(os.path.join(paths.TRIGGERS_DIR, r)) if f.endswith(".json"))
 
 
 def validateTriggers():
     """Check every trigger config parses and declares paths. Returns a list of problems, empty if all are fine."""
     problems = []
-    for f in sorted(x for x in os.listdir(paths.TRIGGERS_DIR) if x.endswith(".json")):
+    for name in listTriggerConfigs():
         try:
-            trig = loadWithIncludes(f[:-5], paths.TRIGGERS_DIR)
+            trig = loadWithIncludes(name, paths.TRIGGERS_DIR)
         except Exception as e:
-            problems.append(f"Trigger config '{f}': {e}")
+            problems.append(f"Trigger config '{name}': {e}")
             continue
         if not trig.get("paths"):
-            problems.append(f"Trigger config '{f}' declares no paths")
+            problems.append(f"Trigger config '{name}' declares no paths")
     return problems
 
 

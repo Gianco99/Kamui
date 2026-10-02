@@ -1,6 +1,6 @@
 # Vertexing
 
-DV reconstruction. It runs as CMSSW plugins inside the ntuple production job when the content preset includes the vertexing collections.
+This folder reconstructs DVs: vertices fit from displaced tracks, the tracks that pass far from the beamspot. Its CMSSW plugins run inside the ntuple production job when the content preset includes the vertexing collections.
 
 `plugins/SeedTrackProducer.cc`: Selects the seed tracks the vertices are built from.
 
@@ -37,9 +37,9 @@ Output:
 
 ## Constants
 
-Numbers hard-coded in `plugins/DVProducer.cc`
-- A track matches a jet when (1 + |dpT|)(1 + |deta|)(1 + |dphi|) against one of the jet's tracks is below 1.3.
-- `sharedJets` only compares vertices with at least 3 tracks each.
+Cuts hard-coded in `plugins/DVProducer.cc`:
+- A track matches a jet when (1 + |dpT|)(1 + |deta|)(1 + |dphi|) against one of the jet's tracks is below `trackJetMatchScoreBelow`.
+- `sharedJets` only compares vertices that each hold a minimum number of tracks.
 
 ## Known JMTucker Bugs
 
@@ -58,12 +58,8 @@ When porting the vertexing code from JMTucker, bugs were identified. For the sak
 ## Caveats
 
 - The MC track drop draws from an engine seeded by each event's run, lumi and event number, so an event always drops the same tracks, no matter the job configuration.
-  - On the other hand, if one seed was shared by every job, it would give each job the same random sequence and correlate the drops.
+  - Because every event has its own seed, the drops in different jobs are independent.
   - JMTucker seeds its engine once per job and keeps drawing from it event after event, so its drops cannot be replayed.
-- A few vertices differ from JMTucker even on identical seed tracks: 
-  - 4 of 39,005 in MC, with the track drop turned off in both frameworks
-  - 1 of 10,652 3-track vertices in data. 
-  - Each traces to one of two `zRefit` bugs above, the unstable significance or the unchecked refit, on nearly degenerate track sets that CMSSW 16_1_2 and JMTucker's 10_6 fit slightly differently.
-- Seed tracks keep `packedPFCandidates` order, and fits take their tracks in seed-track order, which is the order a `std::set<reco::TrackRef>` gives. The Kalman fit is order sensitive!
+- Seed tracks keep their `packedPFCandidates` order. Every fit takes its tracks in that order too, since `plugins/DVProducer.cc` gathers them in a `std::set<reco::TrackRef>`, which sorts them by seed-track index. The Kalman fit is order sensitive!
 - `DxyErrScale` scales only the dxy diagonal of the covariance.
 - A plugin name must be unique across all of CMSSW, the release included. Before naming a new one, grep `$CMSSW_RELEASE_BASE/lib/$SCRAM_ARCH/.edmplugincache` for it.

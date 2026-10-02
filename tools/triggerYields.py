@@ -7,7 +7,7 @@ This is the number we compare against JMTucker.
 Needs cmsenv (uses ROOT) and no grid proxy for files already on our EOS.
 
   python3 tools/triggerYields.py --task run2val
-  python3 tools/triggerYields.py --files out.root --triggers run2Lepton
+  python3 tools/triggerYields.py --files out.root --triggers run2/lepton
 """
 
 # Import Block
@@ -91,7 +91,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--task", metavar="NAME", help="Task name under ntupleProduction/jobs/")
     ap.add_argument("--files", nargs="+", metavar="FILE", help="Ntuple files to read; --task is ignored when these are given")
-    ap.add_argument("--triggers", metavar="NAME", help="Trigger config name; required with --files")
+    ap.add_argument("--triggers", metavar="NAME", help="Trigger config, named with its run folder such as run2/lepton; required with --files")
     ap.add_argument("--sample", action="append", metavar="NAME", help="Restrict to these samples")
     ap.add_argument("--perPath", action="store_true", help="Print the per-path breakdown")
     args = ap.parse_args()

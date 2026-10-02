@@ -22,8 +22,8 @@ from .configReaders.content import eraGroup, listPresets, listTriggerConfigs, re
 from .submit import condor as condorBackend, crab as crabBackend
 from .select import batch as selectBatch, io as selectBackend, normalization
 from .select.engine import applySelection
-from .configReaders.requirements import definitionEras, listDefinitions, resolveRequirements
-from .configReaders.selections import listSelections, resolveSelection, selectionEras
+from .configReaders.requirements import definitionEras, definitionFiles, resolveRequirements
+from .configReaders.selections import resolveSelection, selectionEras, selectionFiles
 from .configReaders.sites import loadSites
 from .submit.common import runTool, taskDir
 
@@ -388,27 +388,27 @@ def _cmdCheck(args):
 
     ## Resolving a selection collapses every era-keyed value and checks every cut type and quantity name.
     nSel = nSelTried = 0
-    for name in listSelections():
-        for era in (selectionEras(name) or [None]):
+    for run, selDir, name in selectionFiles():
+        for era in (selectionEras(name, selDir) or [None]):
             nSelTried += 1
             try:
-                resolveSelection(name, era=era)
+                resolveSelection(name, selDir, era=era)
                 nSel += 1
             except Exception as e:                                    # noqa: BLE001
-                problems.append(f"Selection '{name}' for era '{era}': {e}")
+                problems.append(f"Selection '{run}/{name}' for era '{era}': {e}")
     note("Selections", "pass" if nSel == nSelTried else "fail", f"Validated the format of every cut ({nSel}/{nSelTried})")
 
-    ## A definition resolves for each era it is keyed by, or for every selection era when it has none.
-    selectionEraSet = sorted({e for n in listSelections() for e in selectionEras(n)})
+    ## A definition resolves for each era it is keyed by, or for every era of its run's selections when it has none.
     nDef = nDefTried = 0
-    for name in listDefinitions():
-        for era in (definitionEras(name) or selectionEraSet):
+    for run, defDir, name in definitionFiles():
+        runEras = sorted({e for r, selDir, n in selectionFiles() if r == run for e in selectionEras(n, selDir)})
+        for era in (definitionEras(name, defDir) or runEras):
             nDefTried += 1
             try:
-                resolveRequirements(f"definition '{name}'", [{"definition": name}], era)
+                resolveRequirements(f"definition '{run}/{name}'", [{"definition": name}], era)
                 nDef += 1
             except Exception as e:                                    # noqa: BLE001
-                problems.append(f"Definition '{name}' for era '{era}': {e}")
+                problems.append(f"Definition '{run}/{name}' for era '{era}': {e}")
     note("Definitions", "pass" if nDef == nDefTried else "fail", f"Every definition resolves for each era ({nDef}/{nDefTried})")
 
     nTrig = len(listTriggerConfigs())
@@ -599,7 +599,7 @@ def main(argv=None):
 
     q = _addCmd(sub, "select", help="Apply an event selection to ntuples", description=_cmdSelect.__doc__)
     _addSelection(q)
-    q.add_argument("--selection", metavar="NAME", required=True, help="Selection config name, e.g. run2Lepton")
+    q.add_argument("--selection", metavar="NAME", required=True, help="Selection config name, e.g. lepton, read from the run folder of the samples' era")
     q.add_argument("--task", metavar="NAME", required=True, help="Name for this selection pass")
     q.add_argument("--inputTask", metavar="NAME", required=True, help="The ntuple production task to read from")
     q.add_argument("--inputBase", metavar="PATH", help="EOS base holding the input ntuples (default: the site stageout base)")

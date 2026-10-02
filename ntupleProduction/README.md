@@ -1,6 +1,6 @@
 # NtupleProduction
 
-The first stage of the analysis: a DAS dataset in, ntuples out.
+This folder holds the first stage of the analysis: a DAS dataset in, ntuples out. `./kamui submit` turns the samples you pick into a task, a named batch of jobs on condor or CRAB. Each task gets a job area, `jobs/<task>/`, holding the files its jobs are built from. Every job runs `cmssw/ntuple_cfg.py` with its sample's content preset.
 
 ## What Lives Here
 
@@ -15,12 +15,12 @@ The submission code is in `python/kamui/submit/`.
 
 ## Choosing A Backend
 
-- **condor** for a fast answer: a new preset, a handful of files, a private dataset CRAB is awkward about. It asks DAS for the file list up front, reads inputs over the global redirector, and has no automatic retries.
-- **CRAB** for a full production. One task per sample, sent to sites that already hold the data, splitting and retrying on its own.
+- **condor** for a fast answer: a new preset, a handful of files, a private dataset CRAB is awkward about. It asks DAS for the file list up front, reads inputs through `sourceRedirector` from `config/sites.json`, and has no automatic retries.
+- **CRAB** for a full production. It makes one CRAB task per sample, runs jobs at sites that already hold the data, and splits and retries them on its own.
 
 ## Running One Job By Hand
 
-Before submitting to a cluster, it is worth running things locally to make sure they work. Write out the preset as a job receives it, then run the same `cmsRun` command the workers run. An example for the `dvSignal` preset:
+Before submitting to a cluster, it is worth running things locally to make sure they work. First save the preset with `./kamui content --write`, which writes the same file a job receives, with every include and per-era value filled in. Then run the same `cmsRun` command the workers run. An example for the `dvSignal` preset:
 
 ```
 ./kamui content dvSignal --era Summer24 --write /tmp/dvSignal.json
@@ -50,7 +50,7 @@ Note: Content with the vertexing collections also needs `globalTag=`, the era's 
 
 | | condor | CRAB |
 | --- | --- | --- |
-| Base | `/store/user/lpcdisplacedvertices/$USER` | `/store/user/$USER/Kamui` |
+| Base | `stageoutBase` | `crabStageoutBase` |
 | Ntuples | `<base>/ntuples/<task>/<sample>/<sample>_ntuple_<index>.root` | Under `<base>/ntuples/<task>/`, with the output dataset tag set to the sample name |
 | Provenance | `<base>/ntuples/<task>/task.json` | `<base>/ntuples/<task>/task.json` |
 
@@ -73,6 +73,6 @@ See `python/kamui/README.md` for the flags and worked examples.
 
 ## Caveats
  
-- Any collection whose key contains `genweight`, ignoring case, runs outside the skim so it sees every event. This is how the gen-weight table is picked out.
+- The job finds the gen-weight table by its key: any collection whose key contains `genweight`, ignoring case, runs outside the skim so it sees every event.
 - Condor jobs set up the CMSSW release named in `config/sites.json`. Do not bump it without checking. CRAB ignores it and uses the release you submit from.
-- The schedd is recorded at submit time so kamui asks the right one later. LPC spreads a submission across schedds and `condor_q` asks the default one, so a task submitted elsewhere would otherwise read as finished. A `task.json` with no `schedd` key falls back to the default.
+- LPC has several schedds, the servers that hold the condor job queue, and each submission lands on one of them. A bare `condor_q` asks only the default schedd, where a task on another schedd shows no jobs and looks finished. So kamui records the schedd in `task.json` at submit time and asks that one later. A `task.json` with no `schedd` key falls back to the default.

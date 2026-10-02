@@ -12,7 +12,7 @@ import re
 
 ## Kamui modules
 from ..foundations import paths
-from ..foundations.config import deepMerge, loadJson
+from ..foundations.config import deepMerge, eraGroup, loadJson
 
 # Classes and Functions
 
@@ -117,9 +117,13 @@ def loadCatalog(samplesDir=None):
     catalog = []
     names = set()
     for path in files:
+        rel = os.path.relpath(path, samplesDir)
         for s in _loadFamily(path):
             if s["name"] in names:
                 raise ValueError(f"Duplicate sample name across families: '{s['name']}'")
+            ## A family sits in its run's folder, so the folder a reader sees always matches the run Kamui uses
+            if rel.split(os.sep)[0] != eraGroup(s["era"]):
+                raise ValueError(f"Sample '{s['name']}' is a {eraGroup(s['era'])} sample ({s['era']}), so {rel} belongs under {eraGroup(s['era'])}/")
             names.add(s["name"])
             catalog.append(s)
     return catalog

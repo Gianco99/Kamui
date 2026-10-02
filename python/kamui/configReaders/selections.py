@@ -9,7 +9,7 @@ import os
 
 ## Kamui modules
 from ..foundations import paths
-from ..foundations.config import loadWithIncludes
+from ..foundations.config import RUNS, loadWithIncludes, runDir
 from ..configReaders.content import loadTriggerPaths
 from .requirements import BOUNDS, resolveRequirements, resolveThreshold
 
@@ -40,6 +40,12 @@ def listSelections(selectionDir=None):
     return sorted(f[:-5] for f in os.listdir(selectionDir) if f.endswith(".json"))
 
 
+def selectionFiles(selectionDir=None):
+    """Every selection config as (run, folder, name), from one folder per run."""
+    selectionDir = selectionDir or paths.SELECTIONS_DIR
+    return [(r, os.path.join(selectionDir, r), n) for r in RUNS for n in listSelections(os.path.join(selectionDir, r))]
+
+
 def selectionEras(name, selectionDir=None):
     """The eras a selection config declares, empty when it names none."""
     cfg = loadWithIncludes(name, selectionDir or paths.SELECTIONS_DIR)
@@ -48,7 +54,7 @@ def selectionEras(name, selectionDir=None):
 
 def resolveSelection(name, selectionDir=None, era=None):
     """Flatten a selection config and resolve every era-dependent threshold to a single number."""
-    selectionDir = selectionDir or paths.SELECTIONS_DIR
+    selectionDir = selectionDir or runDir(paths.SELECTIONS_DIR, era)
     cfg = loadWithIncludes(name, selectionDir)
 
     unknown = sorted(set(cfg) - SELECTION_FIELDS)
@@ -150,7 +156,7 @@ def _resolveCut(name, cut, era, i):
             triggers = triggers[era]
         out["triggers"] = triggers
         ## The path list is expanded here so the resolved selection is self-contained and a worker never reads config/triggers/.
-        out["hltPaths"] = loadTriggerPaths(triggers) if isinstance(triggers, str) else list(triggers)
+        out["hltPaths"] = loadTriggerPaths(triggers, era) if isinstance(triggers, str) else list(triggers)
 
     return out
 

@@ -1,9 +1,9 @@
 # Sample Configs Documentation
 
-A sample family is a JSON file that lists a set of datasets to process.
+Each JSON file here is a sample family: a set of datasets to process that belong together, such as one signal model. A sample is one DAS dataset with a short name, the era it belongs to, and the content preset its ntuples are written with. Commands such as `submit` work on the samples you pick by name, family, era or tag. A family lists its samples one by one, or generates them from a grid: name and dataset templates whose `{placeholders}` are filled in from lists of values called axes.
 ## JSON Fields
 
-Below are all the supported fields one can add to the JSON file. Keys beginning with `_` are comments.
+Below are all the supported fields one can add to the JSON file.
 
 **Top level**
 
@@ -34,7 +34,7 @@ A grid may also carry any sample field from the table below, applying it to ever
 |---|---|
 | **`name`** (required, default: None) | Short name for the sample, unique across every family. It also names the sample's output folder on EOS and its CRAB output dataset tag. |
 | **`dataset`** (required, default: None) | The full DAS dataset path. |
-| **`era`** (required, default: None) | Data-taking period. It picks the content set and the selection thresholds the sample uses. |
+| **`era`** (required, default: None) | Data-taking period. It picks the content folder the sample's preset comes from, `run2/` or `run3/`, and the selection thresholds the sample uses. |
 | `dasInstance` (optional, default: `prod/global`) | `prod/global` for central datasets, `prod/phys03` for USER-created datasets. |
 | `isMC` (optional, default: `true`) | `false` for data. `true` for MC. |
 | `family` (optional, default: the file's `family` key, then the file name) | The name for selecting this file's samples with `--family`. |
@@ -76,13 +76,15 @@ A sample's fields come from four layers, each overriding the ones before it:
 A later layer replaces lists and single values outright, so a grid that names `tags` throws away the `tags` in `defaults`.
 ## What Is Here Now
 
-| File | Samples | What |
-|---|---|---|
-| `exoticHiggs4d2024.json` | 54 | Summer24 Exotic Higgs H->SS->4d. Central |
-| `stealthSusy2024.json` | 64 | Summer24 Stealth SUSY SHH and SYY. Private |
-| `rpv2024.json` | 1 | Summer24 RPV stop->dd. Private |
-| `run2Validation.json` | 24 | Run 2 UL points for reproducing JMTucker results. Central |
-| `tutorial/zhLeptonTriggered.json` | 1 | A single sample used in the tutorial slides. Central |
+| File | What |
+|---|---|
+| `run3/exoticHiggs4d2024.json` | Summer24 Exotic Higgs H->SS->4d. Central |
+| `run3/stealthSusy2024.json` | Summer24 Stealth SUSY SHH and SYY. Private |
+| `run3/rpv2024.json` | Summer24 RPV stop->dd. Private |
+| `run2/run2Validation.json` | Run 2 UL points for reproducing JMTucker results. Central |
+| `run2/tutorial/zhLeptonTriggered.json` | The sample used in the tutorial slides. Central |
+
+Each family file sits in the folder of its run, and Kamui stops with an error if a sample's era belongs to the other run. Family and sample names still carry their year or run, because commands pick samples by name across every folder.
 
 ## Relevant Commands
 
@@ -103,7 +105,7 @@ Physics caveats per family are kept here so the configs stay readable.
 - Summer24 has exclusive ZH-Zto2L and WH-WtoLNu available. They have yet to be registered.
 
 **RPV (rpv2024)**
-- One private point from Bruno. Nothing exists in Run 3 for gluino to tbs or stop to bb, official or private.
+- Private from Bruno. Nothing exists in Run 3 for gluino to tbs or stop to bb, official or private.
 
 **Stealth SUSY (stealthSusy2024)**
 - Private from Bruno.

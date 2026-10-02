@@ -37,6 +37,21 @@ def loadJson(path):
             raise ValueError(f"{path}: {e}") from None
     return stripComments(raw)
 
+## Each config kind that differs by run keeps one folder per run, and an era reads only from its own run's folder
+RUN2_ERAS = {"2016", "2016APV", "2017", "2018"}
+RUNS = ("run2", "run3")
+
+
+def eraGroup(era):
+    """run2 or run3, the run whose config folders an era reads from."""
+    return "run2" if era in RUN2_ERAS else "run3"
+
+
+def runDir(kindDir, era):
+    """The folder of a config kind that an era reads from, so a Run 3 job can never pick up a Run 2 file. Without an era, the whole kind is searched."""
+    return os.path.join(kindDir, eraGroup(era)) if era else kindDir
+
+
 def _resolvePath(nameOrPath, searchDir):
     """Accept 'jets', 'jets.json' or an explicit path; return an existing path. searchDir may be one directory or an ordered list."""
     dirs = [searchDir] if isinstance(searchDir, str) else list(searchDir)
@@ -48,10 +63,12 @@ def _resolvePath(nameOrPath, searchDir):
     for base in dirs:
         if not os.path.isdir(base):
             continue
-        for d in [base] + [os.path.join(base, x) for x in sorted(os.listdir(base)) if os.path.isdir(os.path.join(base, x))]:
-            cand = os.path.join(d, nameOrPath + ".json")
-            if os.path.exists(cand):
-                return cand
+        ## A name found in two folders, such as run2/ and run3/, is an error, so a lookup never quietly takes the wrong one
+        found = [c for c in (os.path.join(d, nameOrPath + ".json") for d in [base] + [os.path.join(base, x) for x in sorted(os.listdir(base)) if os.path.isdir(os.path.join(base, x))]) if os.path.exists(c)]
+        if len(found) > 1:
+            raise ValueError(f"Config '{nameOrPath}' matches {', '.join(found)}; name it with its folder, e.g. '{os.path.relpath(os.path.dirname(found[0]), base)}/{nameOrPath}'")
+        if found:
+            return found[0]
     raise FileNotFoundError(f"No config '{nameOrPath}' under {', '.join(dirs)}")
 
 def loadWithIncludes(nameOrPath, searchDir, _seen=None):

@@ -1,5 +1,5 @@
 # Kamui: Run 3 Analysis Framework
-The philosophy behind this repo is to use easy-to-edit, human-readable configuration files that compartmentalize the physics we want to study. It contains a CLI called Kamui for common tasks. Each relevant subdirectory has a README.md that tracks its important design choices and closes with a Caveats section, so both the user and an AI helper can easily understand the code.
+Kamui is the framework for our Run 3 CMS DV analysis. It reads MiniAOD datasets, writes ntuples that keep only the objects and variables we choose, and applies event selections to those ntuples. The physics lives in easy-to-edit, human-readable configuration files under `config/`, one folder per topic, and the `./kamui` CLI runs each step. Each relevant subdirectory has a README.md that tracks its important design choices and closes with a Caveats section, so both the user and an AI helper can easily understand the code.
 
 **Important Note:** Even though AI is used in the development of this framework, every single commit and piece of written code MUST BE HUMAN-REVIEWED before it is merged!
 
@@ -19,9 +19,9 @@ The philosophy behind this repo is to use easy-to-edit, human-readable configura
 
 A dataset is processed in two stages, each driven by its own configuration files:
 
-1. **`ntupleProduction`** reads a DAS dataset named in `config/samples/` and writes ntuples. The presets from `config/content/` define the collections (with any predefined skim) we save. Jobs run on LPC condor or on CRAB.
+1. **`ntupleProduction`** reads a DAS dataset named in `config/samples/` and writes ntuples. The sample's content preset, in `config/content/`, decides what they keep: a set of collections, such as jets, each listing the variables to save. A preset can also skim, keeping only the events that fire chosen triggers. Jobs run on LPC condor or on CRAB.
 
-2. **`ntupleSelection`** applies an event selection from `config/selections/` to those ntuples. Because the output has the same structure as the input, the stage is repeatable with multiple selections.
+2. **`ntupleSelection`** applies an event selection from `config/selections/` to those ntuples. Its output has the same branches as its input, so another selection can run on it.
 
 An **ntuple** here is a ROOT file holding an `Events` tree with one entry per event, carrying the collections and variables a content preset names.
 

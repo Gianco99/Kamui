@@ -1,1 +1,1 @@
-{"include": ["dvFull"], "skim": {"triggers": "run2Lepton"}}
+{"include": ["dvFull"], "skim": {"triggers": "lepton"}}

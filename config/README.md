@@ -8,9 +8,11 @@ This folder holds all the configuration files the framework reads. Each subdirec
 | `content/` | Collections describe sets of physics objects. Presets combine them into what we want to include in ntuples. |
 | `triggers/` | The HLT paths we impose. |
 | `selections/` | The ordered event-level cuts. |
-| `definitions/` | Named requirement lists, such as the jet ID, that selections and the vertexer's jets share. |
+| `definitions/` | Named lists of cuts, such as the jet ID, that you write once and reuse in selections and content configs. |
 | `normalizations/` | Cross sections, luminosities, and per-sample generator weight sums to normalize yields. |
 | `sites.json` | Storage paths, redirectors, CRAB site, CMSSW release. |
+
+Samples, triggers, selections and definitions keep one folder per run, `run2/` and `run3/`, the way `content/` does. A sample's era decides which run folder each of its configs comes from, so the same file name can exist for both runs and never carries the run itself.
 ## sites.json
 
 Standalone file containing the configuration for CMSSW, EOS, Condor and CRAB.
@@ -38,7 +40,7 @@ For datasets already cached at FNAL, `root://cmsxrootd.fnal.gov/` is a faster `s
 - The files use a compact layout: short objects and lists sit on one line, and long lists put one item per line. `normalizations/generatorSums.json` keeps its own layout, since `./kamui norm --write` rewrites it.
 - `include` pulls in other configs, each with its own includes loaded first, and merges nested blocks key by key. An include loop is an error.
 - Only JSON objects merge. Lists and single values replace the included ones, so a config that names a list throws away the included list entirely.
-- A name is looked up in the search directory first, then in each subdirectory one level below it, in alphabetical order.
+- To find a config named `<name>`, Kamui looks for `<name>.json` in the folder for that kind of config first, then in each subfolder one level below it, in alphabetical order.
 - Only code in `configReaders/` may open these files, and `./kamui check` fails if any other code in `python/kamui/` does.
   - `select/normalization.py` is an exception.
 - CRAB refuses to write under another user's `/store/user` area, so it cannot use the shared `lpcdisplacedvertices` directory and has its own `crabStageoutBase`.

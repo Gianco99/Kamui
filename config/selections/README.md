@@ -1,11 +1,13 @@
 # Selection Documentation
 
-A selection JSON is an ordered list of event-level cuts that `./kamui select` applies to production ntuples, writing out an ntuple with the same branches plus a cutflow. Cuts apply in the order they are listed, and that order is also the cutflow order.
+A selection JSON is an ordered list of event-level cuts, applied in the order they are listed. `./kamui select` runs one over the ntuples a `./kamui submit` task wrote, and writes out ntuples with the same branches holding only the events that pass. It also writes a cutflow: the number of events left after each cut, in the same order. Each cut has a `type`, such as `trigger` or `object`, that says what it checks.
 
 | File | Channel |
 |---|---|
-| `run2Lepton.json` | Run 2 lepton-triggered channel: MET filters, then a single-muon or single-electron path that fired with one lepton on its plateau |
-| `run2Displaced.json` | Run 2 displacement-triggered channel: high-HT veto, lepton-channel veto, a b-jet or displaced-dijet path that fired along with offline cuts that mimic it, MET filters |
+| `run2/lepton.json` | Run 2 lepton-triggered channel: MET filters, then a single-muon or single-electron path that fired with one lepton on its plateau |
+| `run2/displaced.json` | Run 2 displacement-triggered channel: high-HT veto, lepton-channel veto, a b-jet or displaced-dijet path that fired along with offline cuts that mimic it, MET filters |
+
+Selections sit in a folder per run. A selection pass reads the file of that name from the run folder of each sample's era, so `--selection lepton` picks the Run 2 or Run 3 file to match the samples.
 ## File Structure
 
 | Key | Meaning |
@@ -39,10 +41,10 @@ Every cut carries these, whatever its type:
 
 Some details regarding these cut types:
 
-- `triggers` is the name of a config in `config/triggers/`, an explicit list of path patterns, or an object keyed by era holding either. 
+- `triggers` is the name of a config in the era's run folder of `config/triggers/`, an explicit list of path patterns, or an object keyed by era holding either. 
   - A pattern ending in `_v*` has that suffix stripped and is matched against the ntuple's branch names.
 
-- A condition's `quantity` is an event branch, such as `MET_pt`, or a count or sum over a collection: `{"collection": "Jet", "requirements": [...]}` counts the objects passing the requirements, or all of them when `requirements` is left out, and adding `"sum": "pt"` sums that variable over them. A condition takes the same eight bounds as a requirement.
+- A condition bounds one `quantity` with the same bounds a requirement uses, listed under Object Cuts. The `quantity` is an event branch, such as `MET_pt`, or a count or sum over a collection. `{"collection": "Jet", "requirements": [...]}` counts the objects passing the requirements, or every object when `requirements` is left out. Adding `"sum": "pt"` sums that variable over the same objects.
 
 - An `anyOf` alternative needs only `cuts`; `name` defaults to `alternative <n>`, and `doc` and `eras` are optional.
 
@@ -63,8 +65,8 @@ An `object` cut asks how many objects of one collection satisfy every requiremen
 - A requirement names a `variable` and bounds it with `min`, `max`, `absMin` or `absMax`, which are inclusive, or `above`, `below`, `absAbove` or `absBelow`, which are exclusive.
   - It reads the branch `<collection>_<variable>`.
   - `dxyBeamspot` and `dzPV` are computed from the track reference point: dxy with respect to the beamspot at the object's own z, following the beam tilt, and dz with respect to the first PV passing `PV_isGood`.
-- Listing the same variable twice stacks the bounds: first the common object definition, then the path's own harder threshold.
-- A requirement can also be `{"definition": "<name>"}`, a requirement list from `config/definitions/`, or `{"anyOf": [[...], [...]]}`, which an object passes by passing any one group.
+- When the same variable appears twice, both bounds apply. This lets a cut name a shared definition and then add a harder threshold of its own, such as a higher pT for one trigger path.
+- A requirement can also be `{"definition": "<name>"}`, which stands for the cuts of that definition in `config/definitions/`. It can also be `{"anyOf": [[...], [...]]}`, which an object passes when it passes every requirement in at least one group.
 - `pairRequirements` bound how far apart two passing objects are in one `variable`, using `absDiffMin` and `absDiffMax`, and pass when at least one pair does.
 
 ## Relevant Commands
@@ -78,15 +80,15 @@ See `python/kamui/README.md` for the flags and worked examples.
 ## Caveats
 
 - A trigger pattern matching no branch contributes nothing, so a `trigger` cut whose paths are all absent removes every event, and the channel with it. The cutflow's `0/N paths present` note is the only sign, and it is where a wrong era or a missing skim shows up.
-- An `anyOf` inside `requirements` lets each object pass any one group, so it equals an `anyOf` cut over separate object cuts only while `min` is 1.
-- A DV selection has to apply JMTucker's beampipe veto before its yields can match JMTucker's. JMTucker keeps only vertices inside the beampipe (`Tools/src/Geometry.cc`: radius 2.00 cm in 2016 and 2.09 cm in 2017 and 2018, centered per era in data and at the origin in MC), and Kamui's DV collection keeps them all.
-- JMTucker's vertex selector also drops every vertex whose fit covariance is not positive definite. Such a vertex gets a NaN uncertainty, and NaN fails every comparison in the selector, including the ones set to cut nothing. Kamui keeps these vertices, about one in ten thousand.
+- An `anyOf` inside `requirements` lets different objects pass through different groups, and all of them count toward `min`. An `anyOf` cut with one object cut per alternative needs `min` objects passing a single alternative, so the two give the same result only when `min` is 1.
+- A DV selection has to apply JMTucker's beampipe veto before its yields can match JMTucker's. JMTucker keeps only vertices inside the beampipe, whose radius and center differ by era (`Tools/src/Geometry.cc`), and Kamui's DV collection keeps them all.
+- JMTucker's vertex selector also drops every vertex whose fit covariance is not positive definite. Such a vertex gets a NaN uncertainty, and NaN fails every comparison in the selector, including the ones set to cut nothing. Kamui keeps these vertices.
 
 **Both Run 2 configs**
-- These must keep matching JMTucker: any change has to reproduce JMTucker's yields on the ten `run2Val` samples again.
+- These must keep matching JMTucker: any change has to reproduce JMTucker's yields again.
 
-**run2Displaced.json**
-- `leptonVeto` is `run2Lepton.json`'s `leptonPlateau` inverted. Both name the `plateauMuon` and `plateauElectron` definitions, so the object requirements move together, but the trigger lists are written in both files and the channels stay disjoint only while those match.
+**run2/displaced.json**
+- `leptonVeto` is `lepton.json`'s `leptonPlateau` inverted. Both name the `plateauMuon` and `plateauElectron` definitions, so their object cuts always match. Their trigger lists are written out in both files, so the channels stay disjoint only while you keep those lists the same.
 
-**run2Lepton.json**
+**run2/lepton.json**
 - Carries no orthogonality veto of its own, because in JMTucker the veto is only used in the displacement channel.

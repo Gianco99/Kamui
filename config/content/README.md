@@ -1,16 +1,13 @@
 # Content Documentation
 
-These JSONs decide what ends up in your ntuples.
+These JSONs decide what ends up in your ntuples. The files in `collections/` describe the objects worth storing, such as jets, and which of their variables to keep. A preset in `presets/` picks the collections a production job writes, and each sample in `config/samples/` names its preset in the `content` field. When you submit, Kamui merges the sample's preset and everything it includes into one resolved content JSON, which is the only config the job reads.
 
-`collections/` describes what kind of object is worth storing, such as jets, and which of its variables to keep.
-
-`presets/` combines those into a complete job configuration. Samples in `config/samples/` name one in their `content` field.
-
-Two styles of configuration live here, split by what they decide:
-
-- **Cut strings decide what gets stored:** A collection's `cut`, in the same CMSSW string language as `expr`.
-- **Named fields decide physics:** Producer parameters such as `seeding` and `vertexing`, and everything in `config/selections/` and `config/definitions/`. A threshold named `min` or `max` includes its bound, and one named `above` or `below` excludes it.
+- A collection's `cut` decides which objects get stored. It is written in the same CMSSW string language as a variable's `expr`.
+- Settings that change the physics results, such as `seeding` and `vertexing`, are named JSON fields, as is everything in `config/selections/` and `config/definitions/`. A threshold named `min` or `max` includes its bound, and one named `above` or `below` excludes it.
 ## Layout
+
+The files here are split into `run2/` and `run3/`, and each holds its own copy of every collection and its own presets. A sample reads its preset, and everything that preset includes, from the folder for its era, so a Run 3 sample never picks up a Run 2 file.
+
 ## Collections
 
 A collection names one thing in MiniAOD and lists the variables to keep from it.
@@ -40,8 +37,8 @@ Four groups of `type` behave differently!
 
 Each variable is a name and how to compute it:
 
-```json
-"pt": {"expr": "pt()", "type": "float", "doc": "Corrected pT [GeV]", "precision": 10}
+```text
+"pt": {"expr": "pt()", "type": "float", "doc": "Corrected pT [GeV]", "precision": <bits>}
 ```
 
 | Field | Meaning |
@@ -97,7 +94,7 @@ A preset must end up with at least one collection, whether from `include` or its
 
 | Field | Meaning |
 |---|---|
-| `triggers` (optional, default: None) | Names a file in `config/triggers/`. Leaving it out means no skim, so every event is written |
+| `triggers` (optional, default: None) | Names a file in `config/triggers/`, read from the run folder of the sample's era. Leaving it out means no skim, so every event is written |
 | `mode` (optional, default: the trigger file's, then `any`) | `any` for an OR over the paths, `all` for an AND |
 | `process` (optional, default: the trigger file's, then `HLT`) | The process the trigger bits were written under |
 
@@ -115,9 +112,9 @@ Collections:
 |---|---|
 | `core` | PVs, beamspot, PF and PUPPI MET, and rho. Also carries the file's `triggerBits` block |
 | `jets` | AK4 jets, CHS for Run 2 and PUPPI for Run 3, plus uncorrected calo jets |
-| `leptons` | Muons and electrons, with impact parameters and track reference points. Electron IDs are Fall17-94X-V2 for Run 2 and RunIIIWinter22-V1 for Run 3 |
+| `leptons` | Muons and electrons, with their IDs, impact parameters and track reference points. The electron ID version differs between Run 2 and Run 3 |
 | `vertices` | IVF secondary vertices from MiniAOD |
-| `tracks` | Tracks and lost tracks, preselected to pT > 1 GeV with at least 2 pixel and 6 strip layers for the seed track definition |
+| `tracks` | Tracks and lost tracks, preselected with the pT cut and the minimum pixel and strip layers of the seed track definition |
 | `gen` | Generator particles, generator MET, weights and pileup. All `mcOnly` |
 | `vertexing` | DV seed tracks, the jets the `sharedJets` step reads, and the DVs |
 

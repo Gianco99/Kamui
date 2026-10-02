@@ -11,9 +11,9 @@ N_expected = lumi[pb^-1] * xsec[pb] * filterEff * sum(per-event weights of passi
 - `sumGenWeight` comes from `generatorSums.json`.
 ## Cross Section Files
 
-One file per physics model, holding the cross sections its samples are normalized by.
+One file per physics model, holding the cross sections its samples are normalized by. Its top level holds one block per run, `run2` or `run3`, and a sample is normalized with the block of its era's run.
 
-**Top level**
+**Per run, under `run2` or `run3`**
 
 | Field | Meaning |
 |---|---|
@@ -51,7 +51,7 @@ Written by the Kamui CLI command `norm`, with one entry per sample name under `s
 | `sumGenWeight` (optional, default: None) | Sum of `genEventSumw`, the normalization denominator |
 | `sumGenWeight2` (optional, default: None) | Sum of `genEventSumw2`, for the statistical uncertainty |
 
-`norm` reads everything from the run-level `Runs` tree that the NanoAOD `genWeightsTable` producer writes, so another file format needs its own reader.
+`norm` reads these numbers from the `Runs` tree of the sample's NanoAOD, where the NanoAOD `genWeightsTable` producer writes them. Any other file format would need its own reader.
 ## lumi.json
 
 Integrated luminosity in inverse picobarns.
@@ -97,7 +97,7 @@ Physics caveats per model are kept here so the configs stay readable.
 
 **Exotic Higgs (exoticHiggs.json)**
 - Higgs production at MH = 125 GeV, assuming BR(H -> LLP) = 1.
-- Run 2 numbers assume a center-of-mass energy of 13 TeV. The exotic Higgs cross sections would have to be updated for Run 3's center-of-mass energy.
+- Each run's numbers sit under their own key, so a Run 2 cross section can never normalize a Run 3 sample. The `run2` block is at 13 TeV, and Run 3 still needs its own `run3` block at 13.6 TeV.
 - The Run 2 VH samples are generated with leptonic decays only, so their cross sections are just summed over the three lepton flavors.
   - `WplusH`: three times the inclusive W+H cross section times BR(W -> lv) for one lepton flavor.
   - `WminusH`: three times the inclusive W-H cross section times BR(W -> lv) for one lepton flavor.

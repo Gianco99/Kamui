@@ -1,8 +1,8 @@
 # Grid
 
-Everything that reaches outside our own machine.
+Everything that reaches outside our own machine. The datasets we analyze live on the grid, the network of computing sites that store CMS data. DAS is the catalog of those datasets and their files.
 
-`das.py`: Asks DAS what datasets and files exist, caches every answer on disk, and finds a sample's central NanoAOD, which `norm` reads its generator weight sum from.
+`das.py`: Asks DAS what datasets and files exist, and caches every answer on disk. It also finds a sample's central NanoAOD, the officially produced NanoAOD of the same dataset, because `norm` reads the generator weight sum from it.
 
 `fetch.py`: Copies raw MiniAOD from the grid to our EOS area.
 
@@ -10,7 +10,7 @@ Both need `cmsenv` and a valid grid proxy.
 
 ## Caveats
 
-- A DAS call with no cached answer needs a grid proxy with more than an hour left. Cached answers work without a proxy.
+- A DAS call with no cached answer needs a grid proxy that is not about to expire. Cached answers work without a proxy.
 - `das.py`
     - Answers are cached under `ntupleProduction/.dasCache/`, stale after `CACHE_MAX_AGE_DAYS`.
     - An empty answer that arrived with a dasgoclient warning is returned without being cached.

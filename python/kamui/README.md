@@ -2,6 +2,12 @@
 
 Kamui is the CLI for the whole analysis framework. Every stage of the analysis is meant to be driven through it, so there is one place to look for all of our analysis needs. It relies on a set of configuration files so we are never editing or hard-coding things into our scripts.
 
+These terms come up throughout:
+
+- A sample is one dataset registered in a file under `config/samples/`, with a name, an era and tags.
+- A content preset says what a sample's ntuples keep: which collections, such as jets or tracks, and which of their variables. Each sample names the preset it uses.
+- A task is one run of `submit` or `select`, named with `--task`. Kamui builds the task's jobs in a folder of that name, called the job area, and the output lands in another folder of that name.
+
  
 
 ```
@@ -144,7 +150,7 @@ Asks DAS how many files, events and gigabytes each selected sample holds, and to
 | `--refresh` (optional, default: None) | Ignore the cache and ask DAS again |
 
 ```
-./kamui query --tag validation                     The 24 Run 2 samples
+./kamui query --tag validation                     Every sample tagged validation
 ./kamui query --family exoticHiggs4d2024           A whole family
 ./kamui query --tag rpv --refresh                  Ignore the cache
 ```
@@ -220,7 +226,7 @@ Produces the ntuples. It takes the samples you selected, works out what each job
 | `--outputBase PATH` (optional, default: the backend's base in `sites.json`) | Write output under this EOS path |
 ```
 ./kamui submit --tag validation --task run2Val --dryRun                               Build the job area, submit nothing
-./kamui submit --tag validation --task run2Val --backend crab                         The 24 Run 2 samples at LPC, through CRAB
+./kamui submit --tag validation --task run2Val --backend crab                         Every sample tagged validation, through CRAB
 ./kamui submit --tag rpv --task rpvNtuples --content dvFull                           Override the preset every sample uses
 ./kamui submit --tag rpv --task big --filesPerJob 10 --memoryMB 4000                  Fewer, larger, hungrier jobs
 ./kamui submit --name ggH-2S-4D_mS15_ctau1mm_2024 --task quick --maxFiles 2           Two files only, for a fast test
@@ -264,7 +270,7 @@ See `config/selections/README.md` for how a cut is written.
 | Flag | Meaning |
 | --- | --- |
 | The five sample flags | See above |
-| **`--selection NAME`** (required, default: None) | A config in `config/selections/` |
+| **`--selection NAME`** (required, default: None) | A config in `config/selections/`, read from the run folder of the samples' era |
 | **`--task NAME`** (required, default: None) | Names this selection pass |
 | **`--inputTask NAME`** (required, default: None) | The ntuple production task to read from |
 | `--inputBase PATH` (optional, default: `stageoutBase` in `sites.json`) | EOS path the input ntuples were written under |
@@ -275,8 +281,8 @@ See `config/selections/README.md` for how a cut is written.
 
 A selection can also run on an earlier pass's output. 
 ```
-./kamui select --tag leptonTriggered --selection run2Lepton --task lepPass --inputTask run2Val                                 Run it locally
-./kamui select --tag displacementTriggered --selection run2Displaced --task dispPass --inputTask run2Val --backend condor      Send it to the cluster
+./kamui select --tag leptonTriggered --selection lepton --task lepPass --inputTask run2Val                                     Run it locally
+./kamui select --tag displacementTriggered --selection displaced --task dispPass --inputTask run2Val --backend condor          Send it to the cluster
 ```
 
 #### cutflow
@@ -302,7 +308,7 @@ The first row is `generated`, the events in the whole dataset as `norm` recorded
 
 #### cache
 
-Describes the DAS cache, or thins it out. DAS is slow, so every answer `find`, `query`, `stage`, `norm` and `submit` get back is kept on disk and reused. Prints how many responses are held, how much space they take, how old they are, and how many have passed the 30 day age limit.
+Describes the DAS cache, or thins it out. DAS is slow, so `find`, `query`, `stage`, `norm` and `submit` keep every answer DAS gives them on disk and reuse it. Prints how many responses are held, how much space they take, how old they are, and how many have expired. An answer expires once it is older than `CACHE_MAX_AGE_DAYS` in `grid/das.py`, and the next command that needs it asks DAS again.
 
 | Flag | Meaning |
 | --- | --- |
@@ -321,7 +327,7 @@ Describes the DAS cache, or thins it out. DAS is slow, so every answer `find`, `
 
 | Folder | What it does |
 | --- | --- |
-| `foundations/` | The bottom layer everything is built on |
+| `foundations/` | The bottom layer: where each file lives, and how a JSON config file is read |
 | `configReaders/` | The only folder that opens config files |
 | `grid/` | Everything that reaches outside our own machine |
 | `submit/` | Building and sending job areas |

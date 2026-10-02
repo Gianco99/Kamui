@@ -9,7 +9,7 @@ import os
 
 ## Kamui modules
 from ..foundations import paths
-from ..foundations.config import loadWithIncludes
+from ..foundations.config import RUNS, loadWithIncludes, runDir
 
 ## Every bound a requirement may carry. min and max are inclusive, above and below exclusive.
 BOUNDS = ("min", "max", "absMin", "absMax", "above", "below", "absAbove", "absBelow")
@@ -36,6 +36,12 @@ def listDefinitions(definitionDir=None):
     if not os.path.isdir(definitionDir):
         return []
     return sorted(f[:-5] for f in os.listdir(definitionDir) if f.endswith(".json"))
+
+
+def definitionFiles(definitionDir=None):
+    """Every definition as (run, folder, name), from one folder per run."""
+    definitionDir = definitionDir or paths.DEFINITIONS_DIR
+    return [(r, os.path.join(definitionDir, r), n) for r in RUNS for n in listDefinitions(os.path.join(definitionDir, r))]
 
 
 def definitionEras(name, definitionDir=None):
@@ -78,7 +84,7 @@ def _resolveOne(where, req, era, definitionDir):
         if len(req) != 1:
             raise ValueError(f"{where} has a requirement mixing 'definition' with {sorted(set(req) - {'definition'})}")
         name = req["definition"]
-        reqs = loadWithIncludes(name, definitionDir or paths.DEFINITIONS_DIR).get("requirements")
+        reqs = loadWithIncludes(name, definitionDir or runDir(paths.DEFINITIONS_DIR, era)).get("requirements")
         if isinstance(reqs, dict):
             if era is None:
                 raise ValueError(f"{where} uses definition '{name}', which is keyed by era, but no era was given")

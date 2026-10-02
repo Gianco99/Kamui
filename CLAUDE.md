@@ -32,6 +32,7 @@
 - Individual imports get no comment.
 - A leading underscore means module-internal. A `_name` is used only inside the file that defines it, and anything imported across modules carries no underscore. `check` does not enforce this, so it is on us to keep true.
 - One source of truth: a change should never need the same edit in two files. Derive the second place from the first, for example through the resolved content JSON a job receives.
+- Config kinds that differ by run keep one folder per run, `run2/` and `run3/`, and a file name never carries the run. A sample's era picks the folder.
 ## Working Here
 - Before editing files in a folder, read that folder's README.md, including its Caveats section, and treat the information presented as rules.
 - Correcting typos is encouraged.
