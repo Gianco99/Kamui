@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-"""Report the b-tag discriminators, embedded IDs and user data a MiniAOD file carries. Needs cmsenv."""
+"""
+Report the b-tag discriminators, embedded IDs and user data a MiniAOD file carries. Needs cmsenv.
+"""
 
+# Import Block
+
+## Standard Python imports
 import argparse
 import subprocess
 import sys
@@ -50,8 +55,7 @@ def main():
         "electrons": (Handle("std::vector<pat::Electron>"), "slimmedElectrons"),
         "muons": (Handle("std::vector<pat::Muon>"), "slimmedMuons"),
     }
-    ## A collection can be empty in any given event, so each one is reported from the first
-    ## event that actually has it rather than from event 1.
+    ## A collection can be empty in any event, so each is reported from the first event that has it.
     pending = dict(handles)
     for n, ev in enumerate(Events(args.file)):
         if not pending or n >= MAX_EVENTS:

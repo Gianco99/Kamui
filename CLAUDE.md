@@ -4,7 +4,7 @@
 - Do not hard-wrap lines at 80 characters or any other column. Let the editor wrap naturally.
   - The same applies to code. Do not break a statement across lines to keep it under some column width.
 - Tables and bullet lists are fine where the content is genuinely tabular or genuinely a list. Lists are preferred for the ease of human readability.
-- Prefer a pointer to a second copy. If a fact belongs somewhere else, name that file.
+- Prefer a pointer to a long second copy, but only point to a README that really explains the topic. A one-line fact needs no pointer: state it or leave it out.
 - Do not put transient facts in a Caveats section.
   - Anything describing the current contents of code goes stale the next time somebody edits that code, and the reader has no way to tell. State the rule and the reason.
 - Do not write history, such as what the code used to do, what it replaced, or why it was changed. Describe what the code does now.

@@ -1,5 +1,5 @@
 # Kamui: Run 3 Analysis Framework
-The philosophy behind this repo is to utilize easy to edit, human-readable configuration files that compartmentalize the physics we want to study. It contains a CLI called Kamui which allows users to perform common tasks. It also utilizes README.md files in relevant subdirectories to track important design choices, each closing with a Caveats section so that both the user and an AI helper can easily understand the code.
+The philosophy behind this repo is to use easy-to-edit, human-readable configuration files that compartmentalize the physics we want to study. It contains a CLI called Kamui for common tasks. Each relevant subdirectory has a README.md that tracks its important design choices and closes with a Caveats section, so both the user and an AI helper can easily understand the code.
 
 **Important Note:** Even though AI is used in the development of this framework, every single commit and piece of written code MUST BE HUMAN-REVIEWED before it is merged!
 
@@ -13,11 +13,11 @@ The philosophy behind this repo is to utilize easy to edit, human-readable confi
 | `ntupleProduction/` | Step 1: DAS datasets to ntuples |
 | `ntupleSelection/` | Step 2: Selections applied to ntuples |
 | `vertexing/` | DV reconstruction |
-| `tools/` | Standalone scripts that read what the framework produced, or what it is about to consume |
+| `tools/` | Standalone scripts that inspect the framework's inputs and outputs |
 | `CLAUDE.md` | Conventions for the AI |
 ## The Framework
 
-A dataset is processed in two stages, each driven by their own configuration files:
+A dataset is processed in two stages, each driven by its own configuration files:
 
 1. **`ntupleProduction`** reads a DAS dataset named in `config/samples/` and writes ntuples. The presets from `config/content/` define the collections (with any predefined skim) we save. Jobs run on LPC condor or on CRAB.
 
@@ -36,7 +36,7 @@ export SCRAM_ARCH=el9_amd64_gcc13
 cmsrel CMSSW_16_1_2
 ```
 
-Then build the DV plugins into it, pointing the link at your Kamui clone:
+Then build the DV plugins into it. Replace `/path/to/Kamui` with your Kamui clone:
 
 ```bash
 cd CMSSW_16_1_2/src

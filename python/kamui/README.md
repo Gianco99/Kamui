@@ -2,10 +2,7 @@
 
 Kamui is the CLI for the whole analysis framework. Every stage of the analysis is meant to be driven through it, so there is one place to look for all of our analysis needs. It relies on a set of configuration files so we are never editing or hard-coding things into our scripts.
 
-Two stages are implemented:
-
-- Sample processing, which turns CMS datasets into analysis ntuples on EOS
-- Event selection, which applies a selection config to those ntuples and writes ntuples with the same branches.
+ 
 
 ```
 ./kamui <command> [flags]
@@ -16,7 +13,7 @@ Two stages are implemented:
 
 ## Picking samples
 
-Before going into the documentation for each command, note that six commands accept the same five flags:
+Six commands pick samples with the same five flags:
 | Flag | What it matches |
 | --- | --- |
 | `--name NAME` (optional, default: None) | Exact sample name, repeatable |
@@ -31,9 +28,9 @@ The commands that take them are `list`, `query`, `stage`, `submit`, `select` and
 
 Two things to keep in mind:
 
-- An unknown `--name`, `--tag` or `--family` is always an error, on every command.
+- An unknown `--name`, `--family`, `--era` or `--tag` is always an error, on every command.
 
-- An empty selection exits on all but `list`, which reports nothing found and carries on.
+- If no sample matches, every command but `list` stops, and `list` reports nothing found.
 
 ## Commands
 
@@ -50,6 +47,7 @@ Validates the configs and the framework locally. It can be divided into config a
 | Catalog | Every sample is listed once and is well-formatted |
 | Content presets | Validated the format of each preset |
 | Selections | Validated the format of every cut |
+| Definitions | Common definitions, shared to avoid repetition, are valid for each era |
 | Triggers | Every trigger file is parseable |
 | Era isolation | Run 2 and Run 3 keep separate copies of content files |
 | Generator sums | Samples that know their total generator weight |
@@ -59,7 +57,7 @@ Validates the configs and the framework locally. It can be divided into config a
 | Check | What it means |
 | --- | --- |
 | Layering | `foundations/` does not import from the rest of the framework (avoid circular imports) |
-| Config access | `configReaders/` is the only folder containing config access scripts |
+| Config access | Only `configReaders/` opens config files |
 
 Each line is marked with a status.
 
@@ -79,7 +77,7 @@ Searches DAS for datasets matching a wildcard, regardless of whether we have the
 
 | Flag | Meaning |
 | --- | --- |
-| **`pattern`** (required, default: None) | Positional |
+| **`pattern`** (required, default: None) | Positional. The DAS wildcard to search for |
 | `--instance INSTANCE` (optional, default: `prod/global`) | `prod/global` for central datasets, `prod/phys03` for USER-created datasets |
 | `--refresh` (optional, default: None) | Bypass the DAS cache |
 
@@ -92,8 +90,6 @@ Searches DAS for datasets matching a wildcard, regardless of whether we have the
 #### norm
 
 Records the generator weight sum for normalization in `config/normalizations/generatorSums.json`. The sums are read from the sample's central NanoAOD.
-
-See `config/normalizations/README.md` for the files this writes into.
 
 | Flag | Meaning |
 | --- | --- |
@@ -125,7 +121,7 @@ Shows the samples in your config files, grouped by family. Four columns:
 | Flag | Meaning |
 | --- | --- |
 | The five sample flags | See above |
-| `--datasets` (optional, default: None) | Print the bare DAS paths instead of the table |
+| `--datasets` (optional, default: None) | Print only the bare DAS paths |
 
 ```
 ./kamui list                                       Everything
@@ -133,8 +129,8 @@ Shows the samples in your config files, grouped by family. Four columns:
 ./kamui list --family rpv2024                      Everything in one sample config file
 ./kamui list --era 2018                            Everything in one era
 ./kamui list --tag validation                      One tag (a sample can carry several!)
-./kamui list --match 'ggH-*ctau10mm*'              Glob on the sample name
-./kamui list --tag rpv --era 2018                  Combining different paths
+./kamui list --match 'ggH-*ctau10mm*'              Wildcard on the sample name
+./kamui list --tag rpv --era 2018                  Combining flags
 ./kamui list --tag validation --datasets           Just the DAS paths
 ```
 
@@ -160,7 +156,7 @@ Copies raw MiniAOD from the grid to our EOS area, for local tests. It copies the
 | Flag | Meaning |
 | --- | --- |
 | The five sample flags | See above |
-| `--maxFiles N` (optional, default: None) | Cap on files copied |
+| `--maxFiles N` (optional, default: None) | Copy at most this many files per sample |
 | `--dryRun` (optional, default: None) | Print what would be copied, copy nothing |
 | `--refresh` (optional, default: None) | Bypass the DAS cache |
 
@@ -176,7 +172,7 @@ Copies raw MiniAOD from the grid to our EOS area, for local tests. It copies the
 
 Shows what a content preset would write into your ntuples, without running anything.
 
-See `config/content/README.md` for how a collection or preset is written, and `config/triggers/README.md` for the channel a `skim` names.
+See `config/content/README.md` for how a collection or preset is written.
 
 One row per collection:
 
@@ -188,13 +184,13 @@ One row per collection:
 
 | Flag | Meaning |
 | --- | --- |
-| `preset` (optional, default: None) | Positional. The preset or collection to resolve. Omit it to list them |
-| `--data` (optional, default: None) | Resolve as data, which drops the `mcOnly` collections |
-| `--era NAME` (optional, default: `Summer24`) | Era whose content set to resolve against |
-| `--write PATH` (optional, default: None) | Write the resolved JSON to this path |
+| `preset` (optional, default: None) | Positional. The preset or collection to show. Omit it to list the presets |
+| `--data` (optional, default: None) | Show the data version, which drops the `mcOnly` collections |
+| `--era NAME` (optional, default: `Summer24`) | The era, which picks the Run 2 or Run 3 content files and any values set per era |
+| `--write PATH` (optional, default: None) | Write the JSON a job would receive to this path |
 ```
 ./kamui content                                    The presets run2 and run3 define
-./kamui content dvSignal                           What a preset resolves to
+./kamui content dvSignal                           What one preset would write
 ./kamui content jets                               A single collection on its own
 ./kamui content dvSignal --data                    The generator collections disappear
 ./kamui content dvLepton --era 2018                A Run 2 preset
@@ -209,8 +205,6 @@ See `ntupleProduction/README.md` for more details on job submission. This sectio
 
 Produces the ntuples. It takes the samples you selected, works out what each job should write, builds a job area on disk, and sends it to condor or to CRAB.
 
-See `config/content/README.md` for what a preset decides to save.
-
 | Flag | Meaning |
 | --- | --- |
 | The five sample flags | See above |
@@ -223,7 +217,7 @@ See `config/content/README.md` for what a preset decides to save.
 | `--dryRun` (optional, default: None) | Write the job area, submit nothing |
 | `--refresh` (optional, default: None) | Bypass the DAS cache |
 | `--overwrite` (optional, default: None) | Overwrite an existing job area without asking |
-| `--outputBase PATH` (optional, default: the site stageout base) | Write output under this EOS path |
+| `--outputBase PATH` (optional, default: the backend's base in `sites.json`) | Write output under this EOS path |
 ```
 ./kamui submit --tag validation --task run2Val --dryRun                               Build the job area, submit nothing
 ./kamui submit --tag validation --task run2Val --backend crab                         The 24 Run 2 samples at LPC, through CRAB
@@ -235,7 +229,7 @@ See `config/content/README.md` for what a preset decides to save.
 
 #### status
 
-Reports how a submitted production task is doing. It reads the job area, sees which backend produced it, and asks that backend.
+Reports how a submitted production task is doing. It reads the job area to find whether condor or CRAB ran the task, and asks that one.
 
 | Flag | Meaning |
 | --- | --- |
@@ -273,13 +267,13 @@ See `config/selections/README.md` for how a cut is written.
 | **`--selection NAME`** (required, default: None) | A config in `config/selections/` |
 | **`--task NAME`** (required, default: None) | Names this selection pass |
 | **`--inputTask NAME`** (required, default: None) | The ntuple production task to read from |
-| `--inputBase PATH` (optional, default: the site stageout base) | EOS base holding the input ntuples |
-| `--outputBase PATH` (optional, default: the site stageout base) | Where to write the selected ntuples |
+| `--inputBase PATH` (optional, default: `stageoutBase` in `sites.json`) | EOS path the input ntuples were written under |
+| `--outputBase PATH` (optional, default: `stageoutBase` in `sites.json`) | Where to write the selected ntuples |
 | `--backend BACKEND` (optional, default: `local`) | `local` or `condor` |
 | `--filesPerJob N` (optional, default: 5) | Input files per job on condor |
 | `--dryRun` (optional, default: None) | Write the job area, submit nothing |
 
-Output carries the same branches as input, so a selection can be applied to an earlier pass's output.
+A selection can also run on an earlier pass's output. 
 ```
 ./kamui select --tag leptonTriggered --selection run2Lepton --task lepPass --inputTask run2Val                                 Run it locally
 ./kamui select --tag displacementTriggered --selection run2Displaced --task dispPass --inputTask run2Val --backend condor      Send it to the cluster
@@ -294,7 +288,7 @@ Prints the cutflow a local `select` task recorded. Per cut, it quotes:
 - The step efficiency
 - The cumulative efficiency
 
-The first row is `generated`, the events in the whole dataset as `norm` recorded them. A sample with no recorded sum has no such row and the table starts at the ntuple.
+The first row is `generated`, the events in the whole dataset as `norm` recorded them. A sample with no recorded sum has no such row, so its table starts at `input`, the events in the ntuples.
 
 | Flag | Meaning |
 | --- | --- |
@@ -308,7 +302,7 @@ The first row is `generated`, the events in the whole dataset as `norm` recorded
 
 #### cache
 
-Describes the DAS cache, or thins it out. DAS is slow, so every answer `find`, `query`, `norm` and `submit` get back is kept on disk and reused. Prints how many responses are held, how much space they take, how old they are, and how many have passed the 30 day age limit.
+Describes the DAS cache, or thins it out. DAS is slow, so every answer `find`, `query`, `stage`, `norm` and `submit` get back is kept on disk and reused. Prints how many responses are held, how much space they take, how old they are, and how many have passed the 30 day age limit.
 
 | Flag | Meaning |
 | --- | --- |
@@ -323,7 +317,7 @@ Describes the DAS cache, or thins it out. DAS is slow, so every answer `find`, `
 
 ## The Code Behind It
 
-`cli.py` is the driver. Each subfolder has its own `README.md` and `CLAUDE.md`:
+`cli.py` is the driver.
 
 | Folder | What it does |
 | --- | --- |
@@ -333,3 +327,10 @@ Describes the DAS cache, or thins it out. DAS is slow, so every answer `find`, `
 | `submit/` | Building and sending job areas |
 | `select/` | Applying a selection to ntuples |
 | `helpers/` | Extras |
+
+## Caveats
+
+- The physics lives in the configuration files, and this code only executes what they say.
+- A new analysis stage belongs here, as new commands.
+- `cli.py` stays thin: it parses, calls a module, and prints. The behavior belongs in the modules so they can be imported without the CLI.
+- `--help` lists the commands in the order `cli.py` adds them, so keep that order the same as this README's.

@@ -7,5 +7,5 @@ Small things that are not part of the analysis.
 ## Caveats
 
 - `banner.py` writes to stderr, so it stays out of piped output.
-- Non-UTF-8 environments turn up on LPC, so the braille art is drawn inside a `UnicodeEncodeError` guard.
-- The banner is drawn only for help output: `main()` scans raw `argv` before `parse_args` and draws when the arguments are empty or carry `-h`/`--help`. Real work never prints it.
+- Some LPC sessions are not UTF-8, so the banner is skipped, with no error, when the braille art cannot be printed.
+- The banner is drawn only for help output: `main()` checks the arguments before parsing them, and draws it when there are none or one is `-h`/`--help`. Real work never prints it.

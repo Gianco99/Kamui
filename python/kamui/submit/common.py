@@ -28,10 +28,7 @@ TASK_NAME_OK = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,95}")
 def checkTaskName(taskName):
     """Reject a task name that would escape the job area, the EOS path, or the shell."""
     if not TASK_NAME_OK.fullmatch(taskName or ""):
-        raise ValueError(
-            f"bad task name {taskName!r}. Use letters, digits, dot, dash and underscore, "
-            "starting with a letter or digit, at most 96 characters."
-        )
+        raise ValueError(f"Bad task name {taskName!r}. Use letters, digits, dot, dash and underscore, starting with a letter or digit, at most 96 characters.")
     return taskName
 
 
@@ -66,20 +63,17 @@ def resolveTaskDir(taskName, assumeYes=False):
     if not os.path.isdir(d) or not os.listdir(d):
         return taskDir(taskName), taskName
 
-    print(f"task '{taskName}' already has a job area at {d}")
+    print(f"Task '{taskName}' already has a job area at {d}")
     if assumeYes:
         answer = "y"
     elif sys.stdin.isatty():
-        answer = input("  overwrite it, losing the record of what was submitted? [y/N] ").strip().lower()
+        answer = input("  Overwrite it, losing the record of what was submitted? [y/N] ").strip().lower()
     else:
         # Nothing is attached to answer, and silently overwriting a real submission's record is the one outcome to avoid.
         answer = "n"
     if answer.startswith("y"):
         if os.path.isdir(os.path.join(d, "crab")):
-            raise ValueError(
-                f"task '{taskName}' has a CRAB work area at {os.path.join(d, 'crab')}, so its jobs may still be running. "
-                "Use a different --task, or remove that directory yourself once the task is finished."
-            )
+            raise ValueError(f"Task '{taskName}' has a CRAB work area at {os.path.join(d, 'crab')}, so its jobs may still be running. Use a different --task, or remove that directory yourself once the task is finished.")
         record = os.path.join(d, "task.json")
         if os.path.isfile(record):
             try:
@@ -88,17 +82,14 @@ def resolveTaskDir(taskName, assumeYes=False):
             except (OSError, ValueError):
                 cluster = None
             if cluster:
-                raise ValueError(
-                    f"task '{taskName}' was submitted to condor cluster {cluster}, so its jobs may still be running. "
-                    "Use a different --task, or remove that directory yourself once the task is finished."
-                )
-        print(f"  overwriting {d}")
+                raise ValueError(f"Task '{taskName}' was submitted to condor cluster {cluster}, so its jobs may still be running. Use a different --task, or remove that directory yourself once the task is finished.")
+        print(f"  Overwriting {d}")
         try:
             for entry in os.listdir(d):         # Clear the contents so stale configs cannot be submitted alongside the new ones.
                 full = os.path.join(d, entry)
                 shutil.rmtree(full) if os.path.isdir(full) and not os.path.islink(full) else os.remove(full)
         except OSError as e:
-            raise ValueError(f"could not clear {d}: {e}")
+            raise ValueError(f"Could not clear {d}: {e}")
         return taskDir(taskName), taskName
 
     n = 2
@@ -111,7 +102,7 @@ def resolveTaskDir(taskName, assumeYes=False):
             stem = stem[:-1]
     newName = f"{stem}_{n}"
     checkTaskName(newName)
-    print(f"  writing to {newName} instead")
+    print(f"  Writing to {newName} instead")
     return taskDir(newName), newName
 
 
@@ -140,13 +131,13 @@ def writeResolvedContent(d, presetName, isMC, era):
     ## A preset resolves against its era's content set
     out = os.path.join(d, f"{stem}.{suffix}.{era}.json")
     if os.path.exists(out) and _contentBody(json.load(open(out))) != _contentBody(resolved):
-        raise ValueError(f"two different content presets both resolve to '{stem}'; rename one or use their plain names")
+        raise ValueError(f"Two different content presets both resolve to '{stem}'; rename one or use their plain names")
     with open(out, "w") as f:
         json.dump(resolved, f, indent=2)
     return out
 
 
-# Which commit produced a task. Ntuples outlive the working tree they came from, so a task that cannot be traced back to a revision cannot be explained later.
+# Which commit produced a task, since ntuples outlive the working tree they came from.
 def _provenance():
     def git(*a):
         try:
@@ -190,7 +181,6 @@ def writeTaskRecord(d, record, samples=None, sites=None, resolvedContent=None):
     os.replace(tmp, out)
 
 
-# Put the record next to the ntuples on EOS. The job area is gitignored local scratch; EOS is where the outputs actually live.
 def outputBase(sites, backend, override=None):
     if override:
         return override.rstrip("/")
@@ -198,6 +188,7 @@ def outputBase(sites, backend, override=None):
     return sites[key].rstrip("/")
 
 
+# Put the record next to the ntuples on EOS, since the job area is gitignored scratch.
 def publishRecord(d, sites, taskName, base=None):
     base = (base or sites["stageoutBase"]).rstrip("/")
     dest = "/".join([sites["eosRedirector"].rstrip("/"), base, "ntuples", taskName])
@@ -208,12 +199,12 @@ def publishRecord(d, sites, taskName, base=None):
         subprocess.run(["xrdfs", sites["eosRedirector"].rstrip("/"), "mkdir", "-p", "/".join([base, "ntuples", taskName])], capture_output=True, text=True, timeout=120)
         r = subprocess.run(["xrdcp", "-f", src, dest + "/task.json"], capture_output=True, text=True, timeout=300)
     except (OSError, subprocess.SubprocessError) as e:
-        print(f"  warning: could not publish task.json to EOS ({e})")
+        print(f"  Warning: could not publish task.json to EOS ({e})")
         return False
     if r.returncode != 0:
-        print(f"  warning: could not publish task.json to EOS: {r.stderr.strip().splitlines()[-1:] or r.returncode}")
+        print(f"  Warning: could not publish task.json to EOS: {r.stderr.strip().splitlines()[-1:] or r.returncode}")
         return False
-    print(f"  wrote provenance to {dest}/task.json")
+    print(f"  Wrote provenance to {dest}/task.json")
     return True
 
 

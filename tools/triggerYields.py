@@ -4,12 +4,15 @@ Count how many events pass a channel's trigger OR, per sample, per path.
 
 This is the number we compare against JMTucker.
 
-Needs cmsenv (uses ROOT). No grid proxy needed for files already on our EOS.
+Needs cmsenv (uses ROOT) and no grid proxy for files already on our EOS.
 
   python3 tools/triggerYields.py --task run2val
   python3 tools/triggerYields.py --files out.root --triggers run2Lepton
 """
 
+# Import Block
+
+## Standard Python imports
 import argparse
 import json
 import os
@@ -17,13 +20,13 @@ import re
 import subprocess
 import sys
 
-sys.path.insert(0, os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "python"))
-from kamui.foundations import paths                                        # noqa: E402
-from kamui.configReaders.catalog import loadCatalog  # noqa: E402
-from kamui.foundations.config import loadWithIncludes                      # noqa: E402
-from kamui.configReaders.content import resolveContent                       # noqa: E402
-from kamui.configReaders.sites import loadSites                      # noqa: E402
+## Kamui modules
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "python"))
+from kamui.foundations import paths
+from kamui.configReaders.catalog import loadCatalog
+from kamui.foundations.config import loadWithIncludes
+from kamui.configReaders.content import resolveContent
+from kamui.configReaders.sites import loadSites
 
 
 def branchName(path):
@@ -43,12 +46,11 @@ def yieldsFor(files, paths_):
     """Return (nTotal, nPass, {path: nFires})."""
     import ROOT
 
-    # TChain.Add silently accepts a path that does not exist, which would otherwise
-    # surface as a believable-looking zero yield. Check each file first.
+    # TChain.Add silently accepts a missing path, which would surface as a believable zero yield.
     chain = ROOT.TChain("Events")
     good, dead = [], []
     for f in files:
-        try:                              # newer ROOT raises instead of returning null
+        try:  # TFile.Open raises OSError on an unreadable file
             tf = ROOT.TFile.Open(f)
         except OSError:
             tf = None
@@ -72,7 +74,7 @@ def yieldsFor(files, paths_):
     for p in paths_:
         b = branchName(p)
         if b not in have:
-            perPath[b] = None                      # not in this file's menu at all
+            perPath[b] = None  # Not in this file's menu
             continue
         perPath[b] = chain.GetEntries(b)
         terms.append(b)
@@ -86,10 +88,9 @@ def yieldsFor(files, paths_):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--task", metavar="NAME", help="Task name under ntupleProduction/jobs/")
-    ap.add_argument("--files", nargs="+", metavar="FILE", help="Explicit ntuple files, in place of a task")
+    ap.add_argument("--files", nargs="+", metavar="FILE", help="Ntuple files to read; --task is ignored when these are given")
     ap.add_argument("--triggers", metavar="NAME", help="Trigger config name; required with --files")
     ap.add_argument("--sample", action="append", metavar="NAME", help="Restrict to these samples")
     ap.add_argument("--perPath", action="store_true", help="Print the per-path breakdown")
@@ -107,12 +108,12 @@ def main():
         jobs.append(("(files)", args.triggers, trig["paths"], args.files))
     else:
         if not args.task:
-            sys.exit("give --task or --files")
+            sys.exit("Give --task or --files")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,95}", args.task):
-            sys.exit(f"bad task name {args.task!r}")
+            sys.exit(f"Bad task name {args.task!r}")
         rec = os.path.join(paths.JOBS_DIR, args.task, "task.json")
         if not os.path.exists(rec):
-            sys.exit(f"no task '{args.task}' under {paths.JOBS_DIR}")
+            sys.exit(f"No task '{args.task}' under {paths.JOBS_DIR}")
         with open(rec) as f:
             info = json.load(f)
         sites = loadSites()
@@ -121,7 +122,7 @@ def main():
         for name in wanted:
             s = catalog.get(name)
             if s is None:
-                print(f"  {name}: not in the catalog any more, skipping")
+                print(f"  {name}: not in the catalog, skipping")
                 continue
             skim = resolveContent(s["content"], isMC=bool(s["isMC"]), era=s["era"])["skim"]
             if not skim.get("hltPaths"):

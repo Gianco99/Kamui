@@ -8,11 +8,11 @@ Everything that turns a config file into something the code can use.
 
 `selections.py`: Reads the selection configs that drive `select`.
 
-`requirements.py`: The per-object requirement grammar that selections, definitions and the vertexer's jets share.
+`requirements.py`: Reads the per-object requirements, written the same way in selections, definitions and the vertexer's jets.
 
 `sites.py`: Reads `sites.json`, expanding the environment variables in it.
 
-See `config/README.md` for the file formats, and `python/kamui/README.md` for the commands that drive all of this.
+See `config/README.md` for the file formats.
 
 ## Caveats
 
@@ -20,14 +20,14 @@ See `config/README.md` for the file formats, and `python/kamui/README.md` for th
     - `select/normalization.py` is the exception, reading and writing `generatorSums.json`.
     - `check` enforces this with a hand-kept list of `paths` names in `_cmdCheck`, so a new config directory has to be added to it.
 - `catalog.py`
-    - `--family`, `--era` and `--tag` resolve case-insensitively, `--name` is exact, `--match` is a glob.
+    - `--family`, `--era` and `--tag` ignore case, `--name` must match exactly, and `--match` takes a wildcard.
 - `content.py`
-    - `KIND_TO_PLUGIN` maps a physics-facing `type` onto the CMSSW plugin that builds that table.
-    - Content resolves against one era group, so a preset name has to exist in both trees.
-    - A vertexJet requirement is translated to C++ through the `Jet` collection of `jets.json`, so it can only name a variable that collection defines.
+    - `KIND_TO_PLUGIN` maps each collection's `type`, like `patJet`, to the CMSSW plugin that builds its table.
+    - Run 2 and Run 3 samples read separate content files, so a preset both use needs a copy in each.
+    - A `vertexJet` requirement can only name a variable that the `Jet` collection in `jets.json` defines, since its C++ cut is built from that collection.
 - `selections.py`
-    - With `era=None` an era-keyed threshold, trigger list or flag list raises.
-      - `anyOf` is the exception: its era filter is skipped.
-    - `CUT_TYPES` and the engine's `_cutMask` must be kept in step.
+    - With no era given, a threshold, trigger list or flag list set per era raises an error.
+      - `anyOf` is the exception: with no era, it keeps every alternative.
+    - `CUT_TYPES` and `_cutMask` in `select/engine.py` must be kept in step.
 - `sites.py`
-    - Variables expand on the submitting machine. On a worker node `$USER` is the batch account and the output would go somewhere wrong.
+    - Variables are filled in on the machine you submit from. On a worker node `$USER` is the batch account, so the output would go somewhere wrong.

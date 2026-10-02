@@ -7,11 +7,11 @@ The first stage of the analysis: a DAS dataset in, ntuples out.
 | Path | What it is |
 | --- | --- |
 | `cmssw/ntuple_cfg.py` | The `cmsRun` configuration |
-| `cmssw/ntupleTables.py` | Turns a resolved content JSON into CMSSW table producers |
+| `cmssw/ntupleTables.py` | Turns the content JSON a job receives into CMSSW table producers |
 | `jobs/<task>/` | Generated job areas, one per task. Gitignored |
 | `.dasCache/` | Cached DAS responses. Gitignored |
 
-The submission code is in `python/kamui/submit/`, and the configs it reads are in `config/`.
+The submission code is in `python/kamui/submit/`.
 
 ## Choosing A Backend
 
@@ -20,14 +20,14 @@ The submission code is in `python/kamui/submit/`, and the configs it reads are i
 
 ## Running One Job By Hand
 
-Before submitting to a cluster, it is worth running things locally to make sure they work. Flatten a preset, then run the same `cmsRun` command the workers run. An example for the `dvSignal` preset:
+Before submitting to a cluster, it is worth running things locally to make sure they work. Write out the preset as a job receives it, then run the same `cmsRun` command the workers run. An example for the `dvSignal` preset:
 
 ```
 ./kamui content dvSignal --era Summer24 --write /tmp/dvSignal.json
 cmsRun ntupleProduction/cmssw/ntuple_cfg.py content=/tmp/dvSignal.json isMC=True inputFiles=root://cmseos.fnal.gov//store/.../file.root outputFile=test.root maxEvents=1000
 ```
 
-Note: Content with the vertexing collections also needs `globalTag=`, the era's tag from `config/sites.json`. See `config/content/README.md` for what a preset declares.
+Note: Content with the vertexing collections also needs `globalTag=`, the era's tag from `config/sites.json`.
 ## What A Job Area Contains
 
 `jobs/<task>/`:
@@ -35,10 +35,10 @@ Note: Content with the vertexing collections also needs `globalTag=`, the era's 
 | File | Backend | What it is |
 | --- | --- | --- |
 | `task.json` | both | The provenance record. Condor also records the cluster, the schedd and one entry per retry |
-| `<preset>.<mc\|data>.<era>.json` | both | The flattened content, what the `cmsRun` job receives. One per preset, flavor and era |
+| `<preset>.<mc\|data>.<era>.json` | both | The preset written out in full, as the `cmsRun` job receives it. One per preset, MC or data, and era |
 | `crabConfig_<sample>.py` | CRAB | One per sample |
 | `crab/crab_<task>__<sample>/` | CRAB | The work area `crab status` and `crab resubmit` are pointed at |
-| `fileLists.json` | condor | Sample name to the list of input files each job index gets |
+| `fileLists.json` | condor | For each sample, the input files each job reads |
 | `jobList.txt` | condor | One `sample,index,script` row per job |
 | `runJob_<preset>_<mc\|data>_<era>.sh` | condor | The script a worker runs. One per content file above |
 | `submit.jdl` | condor | What `condor_submit` is given |
@@ -46,7 +46,7 @@ Note: Content with the vertexing collections also needs `globalTag=`, the era's 
 
 ## Where The Output Lands
 
-`config/sites.json` holds the two bases, and `--outputBase` overwrites either. CRAB has its own.
+`config/sites.json` holds one output base for condor and a separate one for CRAB, and `--outputBase` overrides either.
 
 | | condor | CRAB |
 | --- | --- | --- |
@@ -57,22 +57,22 @@ Note: Content with the vertexing collections also needs `globalTag=`, the era's 
 `task.json` is copied to EOS at submit, so someone inspecting the output ROOT files can still find out where they came from:
 
 - The commit and branch
-- Whether that tree was dirty
+- Whether the repo had uncommitted changes
 - Who submitted it and when
 - The CMSSW release
 - The dataset and era behind every sample
-- The fully resolved content
+- The full content the jobs received
 
 ## Relevant Commands
 
 - Use `submit` to produce ntuples, `status` to watch a task, and `resubmit` to retry what failed.
 - Run `check` before submitting. It validates every config offline and needs no proxy.
-- Use `tools/inspectMiniAOD.py` to see what a MiniAOD file embeds before writing a preset against a new campaign.
+- Before writing a preset for a new campaign, use `tools/inspectMiniAOD.py` to see what its MiniAOD files carry.
 
 See `python/kamui/README.md` for the flags and worked examples.
 
 ## Caveats
  
-- The gen-weight table is picked out by substring: `normNames` matches `"genweight"` against a module name built from the collection key.
-- The CMSSW release in `config/sites.json` is what condor builds. Do not bump it without checking. CRAB ignores it and ships the release you submit from.
-- The schedd is recorded at submit time. LPC spreads a submission across schedds and `condor_q` asks the default one, so a task submitted elsewhere reads as finished. A `task.json` with no `schedd` key falls back to the default.
+- Any collection whose key contains `genweight`, ignoring case, runs outside the skim so it sees every event. This is how the gen-weight table is picked out.
+- Condor jobs set up the CMSSW release named in `config/sites.json`. Do not bump it without checking. CRAB ignores it and uses the release you submit from.
+- The schedd is recorded at submit time so kamui asks the right one later. LPC spreads a submission across schedds and `condor_q` asks the default one, so a task submitted elsewhere would otherwise read as finished. A `task.json` with no `schedd` key falls back to the default.

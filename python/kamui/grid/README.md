@@ -2,21 +2,21 @@
 
 Everything that reaches outside our own machine.
 
-`das.py`: Asks DAS what datasets and files exist, caches every answer on disk, and works out the central NanoAOD twin a sample's generator weight sum comes from.
+`das.py`: Asks DAS what datasets and files exist, caches every answer on disk, and finds a sample's central NanoAOD, which `norm` reads its generator weight sum from.
 
 `fetch.py`: Copies raw MiniAOD from the grid to our EOS area.
 
-Both need `cmsenv` and a valid grid proxy. See `python/kamui/README.md` for the commands that drive them.
+Both need `cmsenv` and a valid grid proxy.
 
 ## Caveats
 
-- A grid proxy with more than an hour left is needed for any DAS call that misses the cache, and the check happens after the cache read.
+- A DAS call with no cached answer needs a grid proxy with more than an hour left. Cached answers work without a proxy.
 - `das.py`
     - Answers are cached under `ntupleProduction/.dasCache/`, stale after `CACHE_MAX_AGE_DAYS`.
     - An empty answer that arrived with a dasgoclient warning is returned without being cached.
-    - DAS answers a name it does not know with a summary of zeros and null dates, so `datasetSummary` decides a dataset exists from `max_ldate` or a non-zero `nfiles`.
-    - `nanoSibling` sorts its matches as plain strings, which puts `NanoAODv9` above `NanoAODv12`.
+    - DAS answers a name it does not know with a summary of zeros and null dates, so kamui counts a dataset as found only if its summary has a date or at least one file.
+    - If several NanoAOD versions match, the last in string order wins, so `NanoAODv9` is picked over `NanoAODv12`.
 - `fetch.py`
     - A file already on EOS is matched by name alone, so a truncated file left by an interrupted copy is skipped forever.
-    - The first number `stage` returns counts files present: a skip and a dry run both increment it.
-    - `xrdcp` runs with no timeout.
+    - `stage` counts a file as in place when it copies it, finds it already on EOS, or lists it in a dry run.
+    - `xrdcp` runs with no timeout, so a stuck copy can hang `stage`.

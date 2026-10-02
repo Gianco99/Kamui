@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Kamui - the CLI for the analysis framework.
+Kamui is the CLI for the analysis framework.
 See python/kamui/README.md for what each command does and the flags they take.
 """
 
@@ -22,28 +22,24 @@ from .configReaders.content import eraGroup, listPresets, listTriggerConfigs, re
 from .submit import condor as condorBackend, crab as crabBackend
 from .select import batch as selectBatch, io as selectBackend, normalization
 from .select.engine import applySelection
+from .configReaders.requirements import definitionEras, listDefinitions, resolveRequirements
 from .configReaders.selections import listSelections, resolveSelection, selectionEras
 from .configReaders.sites import loadSites
 from .submit.common import runTool, taskDir
 
 # Sample Selection Helper Functions
-## These come first because other functions later on depend on them to work.
+## These come first because the commands below use them.
 
 def _addSelection(p):
-    """
-    Gives a sample-related command defined in main() the five sample selection flags.
-    Sample convention documented in Kamui/config/samples/README.md
-    """
+    """Gives a sample command the five sample selection flags. The sample convention is in config/samples/README.md."""
     p.add_argument("--name", metavar="NAME", action="append", help="Exact sample name")
     p.add_argument("--family", metavar="NAME", help="Family file name, e.g. exoticHiggs4d2024")
-    p.add_argument("--era", metavar="NAME", help="Data-taking period, e.g. Summer24, Summer23, 2018, ...")
-    p.add_argument("--tag", metavar="NAME", help="Tag from the sample config, e.g. signal / stealthSusy")
+    p.add_argument("--era", metavar="NAME", help="Data-taking period, e.g. Summer24")
+    p.add_argument("--tag", metavar="NAME", help="Tag from the sample config, e.g. signal")
     p.add_argument("--match", metavar="PATTERN", help="Wildcard on the sample name, e.g. 'ggH*ctau10mm*'")
 
 def _pick(args, required=True):
-    """
-    Turns whatever the user passed into an actual list of samples.
-    """
+    """Turns the sample selection flags into a list of samples."""
     cat = loadCatalog()
     sel = select(cat, names=args.name, family=args.family, era=args.era, tag=args.tag, pattern=args.match)
     if required and not sel:
@@ -95,12 +91,11 @@ def _cmdContent(args):
     skim = resolved["skim"]
     if skim:
         npath = len(skim.get("hltPaths", []))
-        print(f"  skim: {skim['triggers']} ({npath} path{'' if npath == 1 else 's'}, "
-              f"mode {skim.get('mode', 'any')}, process {skim.get('process', 'HLT')})")
+        print(f"  skim: {skim['triggers']} ({npath} path{'' if npath == 1 else 's'}, mode {skim.get('mode', 'any')}, process {skim.get('process', 'HLT')})")
     if args.write:
         with open(args.write, "w") as f:
             json.dump(resolved, f, indent=2)
-        print(f"  wrote {args.write}")
+        print(f"  Wrote {args.write}")
 
 
 def _cmdQuery(args):
@@ -112,8 +107,7 @@ def _cmdQuery(args):
     missing = []
     for s in sel:
         info = das.datasetSummary(s["dataset"], s["dasInstance"], refresh=args.refresh)
-        ## DAS answering with nothing means it does not know the name, which usually means a
-        ## typo in the config. Printing zeros there would read as a dataset that is merely empty.
+        ## An unknown name usually means a config typo, and printing zeros would read as an empty dataset.
         if not info["found"]:
             print(f"{s['name']:<{w}} {'-':>7} {'-':>12} {'-':>9}   Not found in DAS")
             missing.append(s["name"])
@@ -159,15 +153,15 @@ def _cmdSubmit(args):
         sys.exit(f"--filesPerJob must be at least 1, got {args.filesPerJob}")
     if args.maxFiles is not None and args.maxFiles < 1:
         sys.exit(f"--maxFiles must be at least 1, got {args.maxFiles}")
-    if args.content:                       # override the per-sample preset
+    if args.content:
         for s in sel:
             s["content"] = args.content
     print(f"Task '{args.task}' : {len(sel)} sample(s), backend={args.backend}")
 
     if args.backend == "crab":
         cfgs, task, base = crabBackend.prepare(sel, args.task, unitsPerJob=args.filesPerJob, maxMemoryMB=args.memoryMB, assumeYes=args.overwrite, base=args.outputBase)
-        print(f"  wrote {len(cfgs)} crab config(s) under {taskDir(task, create=False)}")
-        print(f"  output goes to {base}/ntuples/{task}")
+        print(f"  Wrote {len(cfgs)} crab config(s) under {taskDir(task, create=False)}")
+        print(f"  Output goes to {base}/ntuples/{task}")
         crabBackend.submit(cfgs, dryRun=args.dryRun, taskName=task, base=base)
     else:
         fileLists = {}
@@ -178,10 +172,10 @@ def _cmdSubmit(args):
             fileLists[s["name"]] = lfns
             print(f"  {s['name']:<48} {len(lfns):>5} file(s)")
         d, nJobs, task, base = condorBackend.prepare(sel, args.task, fileLists, filesPerJob=args.filesPerJob, memoryMB=args.memoryMB, assumeYes=args.overwrite, base=args.outputBase)
-        print(f"  wrote {nJobs} job(s) under {d}")
-        print(f"  output goes to {base}/ntuples/{task}")
+        print(f"  Wrote {nJobs} job(s) under {d}")
+        print(f"  Output goes to {base}/ntuples/{task}")
         if not nJobs:
-            sys.exit("  no jobs to submit; every selected sample came back with no input files")
+            sys.exit("  No jobs to submit; every selected sample came back with no input files")
         condorBackend.submit(task, dryRun=args.dryRun, base=base)
 
 
@@ -194,7 +188,7 @@ def _cmdSelect(args):
     for s in sel:
         inputs = selectBackend.findInputs(args.inputTask, s["name"], args.inputBase)
         if not inputs:
-            print(f"  {s['name']:<44} no input ntuples found, skipping")
+            print(f"  {s['name']:<44} No input ntuples found, skipping")
             continue
         fileLists[s["name"]] = inputs
     if not fileLists:
@@ -210,19 +204,17 @@ def _cmdSelect(args):
             if s["name"] not in fileLists:
                 continue
             outDir = os.path.join(paths.SELECTION_OUT_DIR, args.task, s["name"])
-            flow = applySelection(fileLists[s["name"]], resolvedSelections[s["era"]],
-                                  os.path.join(outDir, f"{s['name']}_selected.root"))
+            flow = applySelection(fileLists[s["name"]], resolvedSelections[s["era"]], os.path.join(outDir, f"{s['name']}_selected.root"))
             flows[s["name"]] = selectBackend.withGenerated(flow, normalization.generatedEvents(s["name"]))
             print(f"  {s['name']:<44} {flow[0]['kept']:>8,} -> {flow[-1]['kept']:>8,}  ({100 * flow[-1]['kept'] / flow[0]['kept'] if flow[0]['kept'] else 0:.1f}%)")
         selectBackend.writeCutflow(args.task, args.selection, flows)
-        print(f"  cutflow written under {os.path.join(paths.SELECTION_OUT_DIR, args.task)}")
+        print(f"  Cutflow written under {os.path.join(paths.SELECTION_OUT_DIR, args.task)}")
         return
 
     samples = [s for s in sel if s["name"] in fileLists]
-    d, nJobs = selectBatch.prepare(samples, args.task, fileLists, resolvedSelections,
-                                   filesPerJob=args.filesPerJob, base=args.outputBase)
-    print(f"  wrote {nJobs} job(s) under {d}")
-    print(f"  output goes to {(args.outputBase or loadSites()['stageoutBase']).rstrip('/')}/selected/{args.task}")
+    d, nJobs = selectBatch.prepare(samples, args.task, fileLists, resolvedSelections, filesPerJob=args.filesPerJob, base=args.outputBase)
+    print(f"  Wrote {nJobs} job(s) under {d}")
+    print(f"  Output goes to {(args.outputBase or loadSites()['stageoutBase']).rstrip('/')}/selected/{args.task}")
     selectBatch.submit(args.task, dryRun=args.dryRun)
 
 
@@ -236,9 +228,7 @@ def _cmdNorm(args):
     if not sel:
         sys.exit("No MC samples matched the selection")
 
-    ## The sums come from the sample's central NanoAOD, which covers the whole dataset and owes
-    ## nothing to anything we produced. DAS cannot serve them: a weight sum is a property of the
-    ## event payload, so it is recorded nowhere central except inside the files themselves.
+    ## DAS has no weight sums, so they are read from the central NanoAOD, which covers the whole dataset.
     for s in sel:
         nano = das.nanoSibling(s["dataset"], s["dasInstance"], refresh=args.refresh)
         if not nano:
@@ -262,7 +252,7 @@ def _cmdCutflow(args):
 
 
 def _cmdStatus(args):
-    """Show the current tasks status and configuration."""
+    """Show the current task's status and configuration."""
     d = taskDir(args.task, create=False)
     rec = os.path.join(d, "task.json")
     if not os.path.exists(rec):
@@ -289,13 +279,13 @@ def _cmdStatus(args):
         schedd = info.get("schedd")
         cmd = ["condor_q", "-nobatch"] + (["-name", schedd] if schedd else []) + ([str(cluster)] if cluster else [])
         if not cluster:
-            print("\n(no cluster id recorded; showing every job you have queued)")
+            print("\n(No cluster id recorded; showing every job you have queued)")
         for retry in info.get("retries", []):
             print(f"Retry {retry['retry']}: {retry['nJobs']} job(s) at {retry.get('submittedAt')}, logs in {retry['logDir']}")
         try:
             runTool(cmd)
         except OSError as e:
-            print(f"\ncould not run condor_q: {e}")
+            print(f"\nCould not run condor_q: {e}")
 
 
 def _cmdResubmit(args):
@@ -313,13 +303,13 @@ def _cmdResubmit(args):
     if info.get("backend") == "crab":
         # CRAB knows which of its own jobs failed, and writes their output to the same place.
         n = crabBackend.resubmit(args.task, dryRun=args.dryRun)
-        print(f"  asked crab to resubmit failed jobs in {n} project(s)")
+        print(f"  Asked crab to resubmit failed jobs in {n} project(s)")
         return
 
     missing, nPresent, nExpected = condorBackend.missingJobs(args.task)
     print(f"Outputs  {nPresent}/{nExpected} present on EOS")
     if not missing:
-        print("  nothing to resubmit")
+        print("  Nothing to resubmit")
         return
     print(f"Missing  {len(missing)} job(s):")
     for row in missing[:20]:
@@ -333,11 +323,11 @@ def _cmdResubmit(args):
     if queued:
         print(f"  {queued} job(s) from this task are still queued or running.")
         if not args.forceResubmit:
-            sys.exit("  refusing to resubmit while they run. Wait, or pass --forceResubmit to submit anyway.")
+            sys.exit("  Refusing to resubmit while they run. Wait, or pass --forceResubmit to submit anyway.")
 
     n, nJobs, code = condorBackend.resubmit(args.task, dryRun=args.dryRun, rows=missing)
     if code == 0 and not args.dryRun:
-        print(f"  retry {n} submitted: {nJobs} job(s), logs in logs/retry{n}, output to the same directory")
+        print(f"  Retry {n} submitted: {nJobs} job(s), logs in logs/retry{n}, output to the same directory")
     elif code != 0:
         sys.exit(f"  condor_submit failed with code {code}")
 
@@ -361,8 +351,7 @@ def _queuedJobs(info):
 def _cmdCheck(args):
     """Offline validation of every config file."""
     problems = []
-    ## Each entry is one named check, so the report says what was verified rather than only a count.
-    ## A check is "warn" when it is incomplete rather than wrong, which must not fail the run.
+    ## One entry per named check; a "warn" is an incomplete check and does not fail the run.
     report = []
 
     def note(label, state, text):
@@ -373,14 +362,12 @@ def _cmdCheck(args):
     dupes = len(cat) - len({s["name"] for s in cat})
     for s in cat:
         if not s["dataset"].startswith("/") or s["dataset"].count("/") != 3:
-            problems.append(f"sample '{s['name']}' has a malformed dataset path")
+            problems.append(f"Sample '{s['name']}' has a malformed dataset path")
     if dupes:
         problems.append(f"{dupes} duplicate sample name(s)")
-    note("Catalog", "pass" if not bad and not dupes else "fail",
-         f"Every sample is listed once and is well-formatted ({len(cat)} samples in {len({s.get('family') for s in cat})} families)")
+    note("Catalog", "pass" if not bad and not dupes else "fail", f"Every sample is listed once and is well-formatted ({len(cat)} samples in {len({s.get('family') for s in cat})} families)")
 
-    ## Resolving a preset means expanding its include chain, dropping the collections that do not
-    ## apply, and naming a CMSSW plugin for every one that does. That is what a job receives.
+    ## Resolving a preset builds exactly what a job receives.
     groups = listPresets()
     nOk = nTried = 0
     byEra = {}
@@ -396,11 +383,10 @@ def _cmdCheck(args):
                 resolveContent(preset, isMC=False, era=era)
                 nOk += 1
             except Exception as e:                                    # noqa: BLE001
-                problems.append(f"content preset '{group}/{preset}': {e}")
+                problems.append(f"Content preset '{group}/{preset}': {e}")
     note("Content presets", "pass" if nOk == nTried else "fail", f"Validated the format of each preset ({nOk}/{nTried})")
 
-    ## Resolving a selection means collapsing every era-keyed threshold, trigger list and flag list
-    ## to one value, and checking every cut type and quantity name the config uses.
+    ## Resolving a selection collapses every era-keyed value and checks every cut type and quantity name.
     nSel = nSelTried = 0
     for name in listSelections():
         for era in (selectionEras(name) or [None]):
@@ -409,8 +395,21 @@ def _cmdCheck(args):
                 resolveSelection(name, era=era)
                 nSel += 1
             except Exception as e:                                    # noqa: BLE001
-                problems.append(f"selection '{name}' for era '{era}': {e}")
+                problems.append(f"Selection '{name}' for era '{era}': {e}")
     note("Selections", "pass" if nSel == nSelTried else "fail", f"Validated the format of every cut ({nSel}/{nSelTried})")
+
+    ## A definition resolves for each era it is keyed by, or for every selection era when it has none.
+    selectionEraSet = sorted({e for n in listSelections() for e in selectionEras(n)})
+    nDef = nDefTried = 0
+    for name in listDefinitions():
+        for era in (definitionEras(name) or selectionEraSet):
+            nDefTried += 1
+            try:
+                resolveRequirements(f"definition '{name}'", [{"definition": name}], era)
+                nDef += 1
+            except Exception as e:                                    # noqa: BLE001
+                problems.append(f"Definition '{name}' for era '{era}': {e}")
+    note("Definitions", "pass" if nDef == nDefTried else "fail", f"Every definition resolves for each era ({nDef}/{nDefTried})")
 
     nTrig = len(listTriggerConfigs())
     trigProblems = validateTriggers()
@@ -423,9 +422,9 @@ def _cmdCheck(args):
 
     for s in cat:
         if s["content"] not in byEra.get(eraGroup(s["era"]), set()):
-            problems.append(f"sample '{s['name']}' is {s['era']} ({eraGroup(s['era'])}) but wants content preset '{s['content']}', which that era does not define")
+            problems.append(f"Sample '{s['name']}' is {s['era']} ({eraGroup(s['era'])}) but wants content preset '{s['content']}', which that era does not define")
 
-    ## foundations/ is a layer, not just a folder: nothing in it may import from above
+    ## foundations/ is a layer: nothing in it may import from above.
     layerProblems = []
     foundDir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "foundations")
     for f in sorted(x for x in os.listdir(foundDir) if x.endswith(".py")):
@@ -435,7 +434,6 @@ def _cmdCheck(args):
     problems += layerProblems
     note("Layering", "pass" if not layerProblems else "fail", "foundations/ does not import from the rest of the framework")
 
-
     ## configReaders/ owns the config files: nothing outside it may open one directly
     accessProblems = []
     pkgDir = os.path.dirname(os.path.abspath(__file__))
@@ -444,7 +442,7 @@ def _cmdCheck(args):
             continue
         for f in sorted(x for x in files if x.endswith(".py")):
             for line in open(os.path.join(root, f)):
-                if any("paths." + d in line for d in ("CONFIG_DIR", "SAMPLES_DIR", "CONTENT_DIR", "TRIGGERS_DIR", "SITES_FILE")):
+                if any("paths." + d in line for d in ("CONFIG_DIR", "SAMPLES_DIR", "CONTENT_DIR", "TRIGGERS_DIR", "SITES_FILE", "DEFINITIONS_DIR")):
                     accessProblems.append(f"{os.path.relpath(os.path.join(root, f), pkgDir)} reads a config directory directly; that belongs in configReaders/")
     problems += accessProblems
     note("Config access", "pass" if not accessProblems else "fail", "configReaders/ is the only folder containing config access scripts")
@@ -462,7 +460,7 @@ def _cmdCheck(args):
     for k in missingKeys:
         problems.append(f"sites.json is missing '{k}'")
     for f in missingCfg:
-        problems.append(f"missing cmssw/{f}")
+        problems.append(f"Missing cmssw/{f}")
     for era in badTags:
         problems.append(f"sites.json globalTags['{era}'] needs an 'mc' and a 'data' tag")
     note("Sites and CMSSW", "pass" if not missingKeys and not missingCfg and not badTags else "fail", "Validated sites.json and the CMSSW job script configurations")
@@ -492,8 +490,8 @@ def _cmdCache(args):
     st = das.cacheStats()
     print(f"{st['n']} cached DAS response{'' if st['n'] == 1 else 's'}, {st['bytes'] / 1e6:.1f} MB in {st['dir']}")
     if st["n"] and st["newestDays"] is not None:
-        print(f"  age      {st['newestDays']:.1f} to {st['oldestDays']:.1f} days")
-        print(f"  expired  {st['nStale']} (older than {das.CACHE_MAX_AGE_DAYS} days, ignored on read)")
+        print(f"  Age      {st['newestDays']:.1f} to {st['oldestDays']:.1f} days")
+        print(f"  Expired  {st['nStale']} (older than {das.CACHE_MAX_AGE_DAYS} days, ignored on read)")
 
 
 # Parser!
@@ -503,8 +501,7 @@ class _Formatter(argparse.RawDescriptionHelpFormatter):
     def add_usage(self, usage, actions, groups, prefix=None):
         return
 
-    ## argparse sizes the command column from the subparsers metavar, which we blank, and then prints
-    ## the command names one level deeper than it measured. Without this the longer names wrap.
+    ## argparse measures command names at the parent indent but prints them one level deeper, so the column is widened to the longest name.
     def add_argument(self, action):
         super().add_argument(action)
         if action.nargs == argparse.PARSER:
@@ -519,7 +516,7 @@ class _Formatter(argparse.RawDescriptionHelpFormatter):
         return text
 
 
-## A command run with nothing to act on gets the help rather than an error from deep inside the command.
+## A command run with nothing to act on shows its help.
 class _CommandParser(argparse.ArgumentParser):
     def error(self, message):
         print(f"Hey, you can't run this command alone! {message[0].upper()}{message[1:]}\n")
@@ -533,7 +530,7 @@ def _titles(q):
     return q
 
 
-## -h still works; it is hidden because a reader who got here already found it.
+## -h is hidden from the help because a reader who got here already found it.
 def _addCmd(sub, name, help, description):
     q = sub.add_parser(name, help=help, description=description, formatter_class=_Formatter, add_help=False)
     q.add_argument("-h", "--help", action="help", help=argparse.SUPPRESS)
@@ -587,7 +584,7 @@ def main(argv=None):
     q.add_argument("--dryRun", action="store_true", help="Write the job area, submit nothing")
     q.add_argument("--refresh", action="store_true", help="Bypass the DAS cache")
     q.add_argument("--overwrite", action="store_true", help="Overwrite an existing job area without asking")
-    q.add_argument("--outputBase", metavar="PATH", help="Write output under this EOS path instead of the site default")
+    q.add_argument("--outputBase", metavar="PATH", help="Write output under this EOS path (default: the backend's base in sites.json)")
     q.set_defaults(func=_cmdSubmit)
 
     q = _addCmd(sub, "resubmit", help="Rerun failed jobs", description=_cmdResubmit.__doc__)
@@ -645,8 +642,7 @@ def main(argv=None):
     try:
         return args.func(args)
     except (KeyError, FileNotFoundError, PermissionError, ValueError, RuntimeError, das.DasError) as e:
-        # Config, storage and DAS problems are user errors - say what is wrong and stop.
-        # Anything else still raises.
+        # Config, storage and DAS problems are user errors: say what is wrong and stop. Anything else raises.
         sys.exit(f"Error: {e}")
 
 
