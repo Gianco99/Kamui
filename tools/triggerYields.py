@@ -24,6 +24,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "python"))
 from kamui.foundations import paths
 from kamui.configReaders.catalog import loadCatalog
+from kamui.submit.common import recordedOutputDir
 from kamui.foundations.config import loadWithIncludes
 from kamui.configReaders.content import resolveContent
 from kamui.configReaders.sites import loadSites
@@ -128,7 +129,7 @@ def main():
             if not skim.get("hltPaths"):
                 print(f"  {name}: content preset '{s['content']}' declares no trigger skim, skipping")
                 continue
-            files = listEos(sites, f"{info.get('outLFNDirBase') or info['outDirBase']}/{name}")
+            files = listEos(sites, f"{recordedOutputDir(info)}/{name}")
             jobs.append((name, skim.get("triggers", "?"), skim["hltPaths"], files))
 
     hdr = f"{'sample':<42} {'channel':<16} {'files':>5} {'total':>9} {'pass':>9} {'eff':>8}"

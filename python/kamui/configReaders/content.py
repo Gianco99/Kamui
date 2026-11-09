@@ -9,7 +9,7 @@ import os
 
 ## Kamui modules
 from ..foundations import paths
-from ..foundations.config import RUNS, eraGroup, loadJson, loadWithIncludes, runDir
+from ..foundations.config import RUNS, eraGroup, isNameList, loadJson, loadWithIncludes, runDir
 from .requirements import cutString, resolveRequirements
 
 # CMSSW plugin language
@@ -108,21 +108,53 @@ def resolveContent(name, contentDir=None, isMC=True, era="Summer24"):
         "isMC":        isMC,
         "needsConditions": any(c["kind"] in CONDITIONS_KINDS for c in collections.values()),
         "collections": collections,
-        "triggerBits": cfg.get("triggerBits", {}),
+        "triggerBits": _checkTriggerBits(name, cfg["triggerBits"]) if "triggerBits" in cfg else {},
         "skim":        _resolveSkim(cfg.get("skim", {}), era),
     }
 
 
+## Every key a triggerBits block may carry
+TRIGGER_BITS_FIELDS = {"processes"}
+
+
+def _checkTriggerBits(name, bits):
+    """The processes whose trigger decisions a job keeps. The list is looped over in the job, so a single string would be read letter by letter."""
+    where = f"Content config '{name}': triggerBits"
+    if not isinstance(bits, dict) or set(bits) != TRIGGER_BITS_FIELDS:
+        raise ValueError(f"{where} must be an object holding only {sorted(TRIGGER_BITS_FIELDS)}")
+    if not isNameList(bits["processes"]):
+        raise ValueError(f"{where} has processes {bits['processes']!r}; it must be a non-empty list of process names, such as [\"HLT\", \"PAT\"]")
+    return {"processes": list(bits["processes"])}
+
+
+## Every key a trigger config may carry once its includes are merged
+TRIGGER_FIELDS = {"paths", "mode", "process"}
+
+## How a trigger config combines its paths: any is an OR, all an AND
+TRIGGER_MODES = ("any", "all")
+
+
+def loadTriggerConfig(name, era=None, triggerDir=None):
+    """A trigger config with its includes merged and every field checked, as paths, mode and process with the defaults filled in. It is read from the era's run folder unless triggerDir names one."""
+    searchDir = triggerDir or runDir(paths.TRIGGERS_DIR, era)
+    trig = loadWithIncludes(name, searchDir)
+    where = f"Trigger config '{name}' in {os.path.relpath(searchDir, paths.CONFIG_DIR)}"
+    unknown = sorted(set(trig) - TRIGGER_FIELDS)
+    if unknown:
+        raise ValueError(f"{where} has unknown key(s) {unknown}; valid keys are {sorted(TRIGGER_FIELDS | {'include'})}")
+    if not isNameList(trig.get("paths")):
+        raise ValueError(f"{where} needs 'paths', a non-empty list of HLT path patterns")
+    mode = trig.get("mode", "any")
+    if mode not in TRIGGER_MODES:
+        raise ValueError(f"{where} has mode {mode!r}; it must be 'any' or 'all'")
+    process = trig.get("process", "HLT")
+    if not isinstance(process, str) or not process:
+        raise ValueError(f"{where} has process {process!r}; it must be a process name such as 'HLT'")
+    return {"paths": list(trig["paths"]), "mode": mode, "process": process}
+
+
 ## Every key a skim block may carry
 SKIM_FIELDS = {"triggers", "mode", "process"}
-
-
-def loadTriggerPaths(name, era=None):
-    """The HLT path patterns a trigger config defines, read from the era's run folder."""
-    trig = loadWithIncludes(name, runDir(paths.TRIGGERS_DIR, era))
-    if "paths" not in trig:
-        raise ValueError(f"Trigger config '{name}' defines no 'paths'")
-    return list(trig["paths"])
 
 
 def _resolveSkim(skim, era):
@@ -137,18 +169,21 @@ def _resolveSkim(skim, era):
     name = skim.get("triggers")
     if not name:
         return {}
-    trig = loadWithIncludes(name, runDir(paths.TRIGGERS_DIR, era))
-    if "paths" not in trig:
-        raise ValueError(f"Trigger config '{name}' defines no 'paths'")
+    if not isinstance(name, str):
+        raise ValueError(f"Skim triggers {name!r} must name one trigger config")
+    trig = loadTriggerConfig(name, era)
     out = dict(skim)
-    mode = skim.get("mode", trig.get("mode", "any"))
-    if mode not in ("any", "all"):
+    mode = skim.get("mode", trig["mode"])
+    if mode not in TRIGGER_MODES:
         raise ValueError(f"Skim mode '{mode}' is not 'any' or 'all'")
+    process = skim.get("process", trig["process"])
+    if not isinstance(process, str) or not process:
+        raise ValueError(f"Skim process {process!r} must be a process name such as 'HLT'")
     out.update({
         "triggers":  name,
         "hltPaths":  trig["paths"],
         "mode":      mode,
-        "process":   skim.get("process", trig.get("process", "HLT")),
+        "process":   process,
     })
     return out
 
@@ -166,6 +201,10 @@ def _translate(cname, c, era, isMC):
     kind = c.get("type")
     if kind not in KIND_TO_PLUGIN:
         raise ValueError(f"Collection '{cname}': unknown type '{kind}'. Known types: {', '.join(sorted(KIND_TO_PLUGIN))}")
+    ## Only the producer-only kinds choose their objects with requirements and re-apply JECs, so on any other kind the two keys would be ignored
+    for k in ("jec", "requirements"):
+        if k in c and kind not in PRODUCER_ONLY_KINDS:
+            raise ValueError(f"Collection '{cname}': '{k}' has no meaning on a '{kind}' collection, since only a {' or '.join(sorted(PRODUCER_ONLY_KINDS))} collection reads it")
 
     out = {
         "plugin":    KIND_TO_PLUGIN[kind],
@@ -204,7 +243,7 @@ def _translate(cname, c, era, isMC):
         for k in ("cut", "maxLen", "singleton"):
             if k in c:
                 raise ValueError(f"Collection '{cname}': '{k}' has no meaning on a 'dv' collection, since SeedTrack_dvIdx indexes every vertex it writes")
-        out["vertexing"] = _checkVertexing(cname, c.get("vertexing"))
+        out["vertexing"] = _checkVertexing(cname, c.get("vertexing"), era, isMC)
     elif "vertexing" in c:
         raise ValueError(f"Collection '{cname}': 'vertexing' has no meaning on a '{kind}' collection")
     if kind == "seedTrack":
@@ -233,8 +272,12 @@ def _translate(cname, c, era, isMC):
 
 ## Every key a seeding block may carry
 SEEDING_REQUIRED = {"beamSpot", "primaryVertices", "goodPv", "ptAbove", "nSigmaDxyBsAbove", "minPixelLayers", "minStripLayers", "maxFirstPixelLayer"}
-SEEDING_FIELDS = SEEDING_REQUIRED | {"dxyErrScale", "trackDrop"}
+SEEDING_FIELDS = SEEDING_REQUIRED | {"trackErrScale", "trackDrop"}
 TRACK_DROP_FIELDS = {"coefficient", "absDxyBsCap"}
+
+## The three uncertainty curves trackErrScale holds for each detector region, and the scale that leaves a track unchanged
+TRACK_ERR_PARTS = ("dxy", "dsz", "dxyDsz")
+NO_TRACK_ERR_SCALE = {"barrelAbsEtaBelow": 0.0, **{region: {part: {"form": "none", "p": []} for part in TRACK_ERR_PARTS} for region in ("barrel", "endcap")}}
 
 
 def _resolveSeeding(cname, seeding, era, isMC):
@@ -248,9 +291,13 @@ def _resolveSeeding(cname, seeding, era, isMC):
         raise ValueError(f"Collection '{cname}': seeding is missing {missing}")
 
     out = {k: seeding[k] for k in sorted(SEEDING_REQUIRED)}
-    out["dxyErrScale"] = {"form": "none", "barrelAbsEtaBelow": 0.0, "barrel": [], "endcap": []}
-    if isMC and "dxyErrScale" in seeding:
-        out["dxyErrScale"] = _forEra(cname, "dxyErrScale", seeding["dxyErrScale"], era)
+    out["trackErrScale"] = NO_TRACK_ERR_SCALE
+    if isMC and "trackErrScale" in seeding:
+        scale = _forEra(cname, "trackErrScale", seeding["trackErrScale"], era)
+        for region in ("barrel", "endcap"):
+            if set(scale.get(region, {})) != set(TRACK_ERR_PARTS):
+                raise ValueError(f"Collection '{cname}': trackErrScale.{era}.{region} needs exactly {list(TRACK_ERR_PARTS)}")
+        out["trackErrScale"] = scale
     out["trackDrop"] = {"coefficient": 0.0, "absDxyBsCap": 0.0}
     if isMC and "trackDrop" in seeding:
         drop = seeding["trackDrop"]
@@ -286,18 +333,19 @@ def _jetVariableExprs(era):
 
 
 ## Every key the vertexing blocks may carry
-VERTEXING_FIELDS = {"beamSpot", "jets", "minTracks", "maxChi2PerDof", "kalman", "sharedTracks", "zRefit", "mergeNearby", "sharedJets"}
+VERTEXING_FIELDS = {"beamSpot", "jets", "minTracks", "maxChi2PerDof", "kalman", "sharedTracks", "zRefit", "mergeNearby", "sharedJets", "beampipe"}
 VERTEXING_BLOCKS = {
     "kalman":       {"maxDistance", "maxIterations", "smoothing"},
     "sharedTracks": {"mergeBelowSigma", "keepBelowSigma", "tieBelowSigma"},
     "zRefit":       {"maxShiftSigma"},
     "mergeNearby":  {"deltaPhiBelow", "distance2dBelow", "dbvAbove"},
     "sharedJets":   {"maxDeltaPhi"},
+    "beampipe":     {"radius", "dataCenter", "mcCenter"},
 }
 
 
-def _checkVertexing(cname, vertexing):
-    """The vertexer parameters, with every block complete."""
+def _checkVertexing(cname, vertexing, era, isMC):
+    """The vertexer parameters, with every block complete and the beampipe resolved for this era."""
     if not isinstance(vertexing, dict):
         raise ValueError(f"Collection '{cname}': a dv collection needs a 'vertexing' block")
     unknown = sorted(set(vertexing) - VERTEXING_FIELDS)
@@ -313,7 +361,9 @@ def _checkVertexing(cname, vertexing):
         missing = sorted(fields - set(vertexing[block]))
         if missing:
             raise ValueError(f"Collection '{cname}': vertexing.{block} is missing {missing}")
-    return vertexing
+    beampipe = vertexing["beampipe"]
+    center = beampipe["mcCenter"] if isMC else _forEra(cname, "beampipe.dataCenter", beampipe["dataCenter"], era)
+    return dict(vertexing, beampipe={"radius": _forEra(cname, "beampipe.radius", beampipe["radius"], era), "center": center})
 
 
 def _forEra(cname, key, byEra, era):
@@ -392,39 +442,12 @@ def listTriggerConfigs():
 
 
 def validateTriggers():
-    """Check every trigger config parses and declares paths. Returns a list of problems, empty if all are fine."""
+    """Check every trigger config loads through loadTriggerConfig, from its own run folder. Returns a list of problems, empty if all are fine."""
     problems = []
-    for name in listTriggerConfigs():
+    for label in listTriggerConfigs():
+        run, name = label.split("/", 1)
         try:
-            trig = loadWithIncludes(name, paths.TRIGGERS_DIR)
+            loadTriggerConfig(name, triggerDir=os.path.join(paths.TRIGGERS_DIR, run))
         except Exception as e:
-            problems.append(f"Trigger config '{name}': {e}")
-            continue
-        if not trig.get("paths"):
-            problems.append(f"Trigger config '{name}' declares no paths")
-    return problems
-
-
-## Collections that are meant to differ between the two era sets
-ERA_SPECIFIC_COLLECTIONS = {"leptons", "jets", "vertexing"}
-
-
-def validateEraCopies(contentDir=None):
-    """Each era carries its own copy of every collection. Report copies that drifted, or era-specific ones that did not."""
-    contentDir = contentDir or paths.CONTENT_DIR
-    problems = []
-    colls = listCollections(contentDir)
-    if set(colls) != {"run2", "run3"}:
-        return [f"Expected content sets run2 and run3, found {sorted(colls)}"]
-    for name in sorted(set(colls["run2"]) | set(colls["run3"])):
-        a = os.path.join(contentDir, "run2", "collections", name + ".json")
-        b = os.path.join(contentDir, "run3", "collections", name + ".json")
-        if not (os.path.exists(a) and os.path.exists(b)):
-            problems.append(f"Collection '{name}' exists in only one era set")
-            continue
-        same = loadJson(a) == loadJson(b)
-        if name in ERA_SPECIFIC_COLLECTIONS and same:
-            problems.append(f"Collection '{name}' is meant to differ by era but both copies are identical")
-        if name not in ERA_SPECIFIC_COLLECTIONS and not same:
-            problems.append(f"Collection '{name}' differs between run2 and run3; add it to ERA_SPECIFIC_COLLECTIONS if deliberate, otherwise the copies have drifted")
+            problems.append(str(e))
     return problems

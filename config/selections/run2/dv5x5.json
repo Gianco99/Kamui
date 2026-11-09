@@ -1,0 +1,7 @@
+{
+  "_doc": "Two or more tight DVs with 5 or more tracks. This is the signal region, so it never runs on data.",
+  "blind": true,
+  "cuts": [
+    {"name": "dv5x5", "type": "quantity", "conditions": [{"quantity": {"collection": "DV", "requirements": [{"definition": "tightDV"}, {"variable": "nTracks", "min": 5}]}, "min": 2}]}
+  ]
+}

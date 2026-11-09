@@ -11,14 +11,14 @@ N_expected = lumi[pb^-1] * xsec[pb] * filterEff * sum(per-event weights of passi
 - `sumGenWeight` comes from `generatorSums.json`.
 ## Cross Section Files
 
-One file per physics model, holding the cross sections its samples are normalized by. Its top level holds one block per run, `run2` or `run3`, and a sample is normalized with the block of its era's run.
+One file per physics model, holding the cross sections its samples are normalized by. Its top level holds one block per run, `run2` or `run3`, and a sample is normalized with the block of its era's run. Every JSON here other than `lumi.json` and `generatorSums.json` is read as a cross section file.
 
 **Per run, under `run2` or `run3`**
 
 | Field | Meaning |
 |---|---|
 | **`processes`** (required, default: None) | Cross section per production mode, keyed by process name |
-| `filterEfficiencies` (optional, default: None) | Generator filter efficiency per sample family |
+| `filterEfficiencies` (optional, default: None) | Generator filter efficiency, keyed by signal model |
 
 **Per process, under `processes`**
 
@@ -27,7 +27,7 @@ One file per physics model, holding the cross sections its samples are normalize
 | **`xsec`** (required, default: None) | Cross section in picobarns |
 | **`source`** (required, default: None) | Where the number came from |
 
-**Per family, under `filterEfficiencies`**
+**Per model, under `filterEfficiencies`**
 
 | Field | Meaning |
 |---|---|
@@ -61,7 +61,7 @@ Integrated luminosity in inverse picobarns.
 | Field | Meaning |
 |---|---|
 | **`eras`** (required, default: None) | Luminosity per era, keyed by name |
-| `channels` (optional, default: None) | Per-channel overrides, keyed by channel then era |
+| `channels` (optional, default: None) | Per-channel overrides, keyed by channel and then by an era that `eras` lists |
 
 **Per era, under `eras` and under a channel**
 
@@ -85,6 +85,7 @@ Run 2 entries are taken from JMTucker `AnalysisConstants.h`.
 ## Relevant Commands
 
 - Use `norm` to register entries into `generatorSums.json`. 
+- Run `check` after editing anything here. It fails on a file that is not well-formatted.
 
 See `python/kamui/README.md` for the flags and worked examples.
 

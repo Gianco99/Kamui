@@ -1,0 +1,10 @@
+{
+  "_doc": "A DV good enough for the analysis regions: inside the beampipe, well separated from the beamspot and precisely measured, with enough mass and track pT.",
+  "requirements": [
+    {"variable": "insideBeampipe", "min": 1},
+    {"variable": "dBV", "min": 0.01},
+    {"variable": "dBVErr", "below": 0.005},
+    {"variable": "mass", "min": 5.5},
+    {"variable": "sumPt", "min": 10}
+  ]
+}

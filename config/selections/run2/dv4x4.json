@@ -1,0 +1,6 @@
+{
+  "_doc": "Two or more tight DVs with 4 tracks.",
+  "cuts": [
+    {"name": "dv4x4", "type": "quantity", "conditions": [{"quantity": {"collection": "DV", "requirements": [{"definition": "tightDV"}, {"variable": "nTracks", "min": 4, "max": 4}]}, "min": 2}]}
+  ]
+}

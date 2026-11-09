@@ -13,7 +13,7 @@ import os
 import re
 import shutil
 import subprocess
-import sys
+import tarfile
 
 ## Kamui modules
 from ..foundations import paths
@@ -53,57 +53,77 @@ def taskDir(taskName, create=True):
     return d
 
 
+def outputDir(base, taskName, stage="ntuples"):
+    """Where a task writes on EOS: `<base>/<stage>/<task>`."""
+    return "/".join([base.rstrip("/"), stage, taskName])
+
+
+def recordedOutputDir(record):
+    """The EOS output directory a task record names. Older records name it outDirBase (condor) or outLFNDirBase (CRAB)."""
+    return record.get("outputDir") or record.get("outDirBase") or record.get("outLFNDirBase")
+
+
+def eosListing(redirector, directory):
+    """Basenames present in an EOS directory, empty if it does not exist yet."""
+    try:
+        r = subprocess.run(["xrdfs", redirector, "ls", directory], capture_output=True, text=True, timeout=300)
+    except (OSError, subprocess.SubprocessError) as e:
+        raise RuntimeError(f"Could not list {directory}: {e}")
+    if r.returncode != 0:
+        ## Only a missing directory means no outputs; treating any other error as empty would resubmit finished jobs.
+        if "no such file or directory" in r.stderr.lower():
+            return set()
+        raise RuntimeError(f"Could not list {directory}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode}")
+    return {os.path.basename(line) for line in r.stdout.split() if line.strip()}
+
+
+# select reads a task's EOS folder by name, so jobs written into a used one would be read together with the earlier output.
+def checkOutputUnused(sites, directory, taskName):
+    """Refuse an EOS output directory that already holds anything."""
+    try:
+        found = eosListing(sites["eosRedirector"].rstrip("/"), directory)
+    except RuntimeError as e:
+        raise RuntimeError(f"Could not check that the task's EOS output directory is unused. {e}")
+    if found:
+        raise ValueError(f"{directory} on EOS already holds output from an earlier task named '{taskName}', and new output would mix with it. Choose a new --task.")
+
+
+def _refuseSubmitted(d, taskName):
+    """Refuse a job area whose crab/ directory or task.json shows that its jobs were sent."""
+    try:
+        record = readTaskRecord(d)
+    except FileNotFoundError:
+        record = {}
+    except (OSError, ValueError) as e:
+        raise ValueError(f"Could not read {os.path.join(d, 'task.json')} ({e}), so kamui cannot tell whether task '{taskName}' was submitted. Use a different --task.")
+    if os.path.isdir(os.path.join(d, "crab")):
+        retry = f" To retry the samples whose crab submit failed, run ./kamui resubmit --task {taskName}." if record.get("failedSubmissions") else ""
+        raise ValueError(f"Task '{taskName}' has a CRAB work area at {os.path.join(d, 'crab')}, so its jobs may still be running. Use a different --task.{retry}")
+    if record.get("condorCluster"):
+        raise ValueError(f"Task '{taskName}' was submitted to condor cluster {record['condorCluster']}, so its jobs may still be running. Use a different --task.")
+
+
 # A task area holds the record of what was submitted, so overwriting one destroys the provenance of jobs that may still be running.
-def resolveTaskDir(taskName, assumeYes=False):
-    """Pick the directory for a new task, asking before reusing an occupied one. Returns (path, name)."""
+def resolveTaskDir(taskName, sites, eosDir):
+    """The job area for a new task. Refuses a task that was submitted or whose EOS output directory holds files, and reuses an area that was never submitted, such as one a dry run left."""
     checkTaskName(taskName)
     d = os.path.join(paths.JOBS_DIR, taskName)
     if os.path.islink(d):
         raise ValueError(f"{d} is a symlink, so writing there would leave the job area. Remove it first.")
-    if not os.path.isdir(d) or not os.listdir(d):
-        return taskDir(taskName), taskName
-
-    print(f"Task '{taskName}' already has a job area at {d}")
-    if assumeYes:
-        answer = "y"
-    elif sys.stdin.isatty():
-        answer = input("  Overwrite it, losing the record of what was submitted? [y/N] ").strip().lower()
-    else:
-        # Nothing is attached to answer, and silently overwriting a real submission's record is the one outcome to avoid.
-        answer = "n"
-    if answer.startswith("y"):
-        if os.path.isdir(os.path.join(d, "crab")):
-            raise ValueError(f"Task '{taskName}' has a CRAB work area at {os.path.join(d, 'crab')}, so its jobs may still be running. Use a different --task, or remove that directory yourself once the task is finished.")
-        record = os.path.join(d, "task.json")
-        if os.path.isfile(record):
-            try:
-                with open(record) as f:
-                    cluster = json.load(f).get("condorCluster")
-            except (OSError, ValueError):
-                cluster = None
-            if cluster:
-                raise ValueError(f"Task '{taskName}' was submitted to condor cluster {cluster}, so its jobs may still be running. Use a different --task, or remove that directory yourself once the task is finished.")
-        print(f"  Overwriting {d}")
+    reuse = os.path.isdir(d) and bool(os.listdir(d))
+    ## Every check runs before anything is cleared, so a refused task loses nothing
+    if reuse:
+        _refuseSubmitted(d, taskName)
+    checkOutputUnused(sites, eosDir, taskName)
+    if reuse:
+        print(f"  Reusing the job area {d}, since its task was never submitted")
         try:
             for entry in os.listdir(d):         # Clear the contents so stale configs cannot be submitted alongside the new ones.
                 full = os.path.join(d, entry)
                 shutil.rmtree(full) if os.path.isdir(full) and not os.path.islink(full) else os.remove(full)
         except OSError as e:
             raise ValueError(f"Could not clear {d}: {e}")
-        return taskDir(taskName), taskName
-
-    n = 2
-    stem = taskName
-    while len(f"{stem}_{n}") > 96:
-        stem = stem[:-1]
-    while os.path.isdir(os.path.join(paths.JOBS_DIR, f"{stem}_{n}")):
-        n += 1
-        while len(f"{stem}_{n}") > 96:
-            stem = stem[:-1]
-    newName = f"{stem}_{n}"
-    checkTaskName(newName)
-    print(f"  Writing to {newName} instead")
-    return taskDir(newName), newName
+    return taskDir(taskName)
 
 
 def _contentBody(resolved):
@@ -174,11 +194,29 @@ def writeTaskRecord(d, record, samples=None, sites=None, resolvedContent=None):
         } for s in samples]
     if resolvedContent:
         record["resolvedContent"] = {os.path.basename(v): json.load(open(v)) for v in sorted(set(resolvedContent))}
+    _saveRecord(d, record)
+
+
+def _saveRecord(d, record):
+    """Write task.json through a temporary file, so a failure partway cannot destroy the record."""
     out = os.path.join(d, "task.json")
     tmp = out + ".tmp"
     with open(tmp, "w") as f:
         json.dump(record, f, indent=2)
     os.replace(tmp, out)
+
+
+def readTaskRecord(d):
+    """The task.json of a job area."""
+    with open(os.path.join(d, "task.json")) as f:
+        return json.load(f)
+
+
+def updateTaskRecord(d, fields):
+    """Set fields in a job area's task.json, keeping everything else it records."""
+    record = readTaskRecord(d)
+    record.update(fields)
+    _saveRecord(d, record)
 
 
 def outputBase(sites, backend, override=None):
@@ -188,15 +226,16 @@ def outputBase(sites, backend, override=None):
     return sites[key].rstrip("/")
 
 
-# Put the record next to the ntuples on EOS, since the job area is gitignored scratch.
-def publishRecord(d, sites, taskName, base=None):
-    base = (base or sites["stageoutBase"]).rstrip("/")
-    dest = "/".join([sites["eosRedirector"].rstrip("/"), base, "ntuples", taskName])
+# Put the record next to the output on EOS, since the job area is gitignored scratch.
+def publishRecord(d, sites, taskName, base=None, stage="ntuples"):
+    """Copy a job area's task.json to `<base>/<stage>/<task>` on EOS. Returns whether the copy worked."""
+    directory = outputDir(base or sites["stageoutBase"], taskName, stage)
+    dest = sites["eosRedirector"].rstrip("/") + "/" + directory
     src = os.path.join(d, "task.json")
     if not os.path.isfile(src):
         return False
     try:
-        subprocess.run(["xrdfs", sites["eosRedirector"].rstrip("/"), "mkdir", "-p", "/".join([base, "ntuples", taskName])], capture_output=True, text=True, timeout=120)
+        subprocess.run(["xrdfs", sites["eosRedirector"].rstrip("/"), "mkdir", "-p", directory], capture_output=True, text=True, timeout=120)
         r = subprocess.run(["xrdcp", "-f", src, dest + "/task.json"], capture_output=True, text=True, timeout=300)
     except (OSError, subprocess.SubprocessError) as e:
         print(f"  Warning: could not publish task.json to EOS ({e})")
@@ -206,6 +245,56 @@ def publishRecord(d, sites, taskName, base=None):
         return False
     print(f"  Wrote provenance to {dest}/task.json")
     return True
+
+
+## The parts of a CMSSW area that jobs need, the same ones CRAB ships: compiled libraries with their plugin caches, and the python CMSSW generates for them
+AREA_PARTS = ("lib", "python", "cfipython")
+## Source files whose change needs a new scram b
+BUILD_SOURCES = (".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".xml")
+## The condor job's copy of the compiled code
+AREA_TARBALL = "cmsswArea.tar.gz"
+## The ntuple code a job runs, from ntupleProduction/cmssw/
+NTUPLE_CODE = ("ntuple_cfg.py", "ntupleTables.py")
+
+
+# Jobs run the plugins compiled in the CMSSW area kamui runs from, so a source edited after the last scram b would go out as the old build without anyone noticing.
+def checkLocalArea(cmsswVersion=None, scramArch=None):
+    """The CMSSW area kamui runs from. Refuses when there is none, when it differs from the release the jobs run, or when a source is newer than its compiled libraries."""
+    base = os.environ.get("CMSSW_BASE")
+    if not base or not os.path.isdir(base):
+        raise RuntimeError("No CMSSW area: run kamui from the cmsenv shell of the CMSSW area that holds the vertexing build")
+    if cmsswVersion and (os.environ.get("CMSSW_VERSION"), os.environ.get("SCRAM_ARCH")) != (cmsswVersion, scramArch):
+        raise RuntimeError(f"The jobs run {cmsswVersion} ({scramArch}) from config/sites.json, but kamui runs in {os.environ.get('CMSSW_VERSION')} ({os.environ.get('SCRAM_ARCH')}), so the compiled plugins would not fit. Run kamui from a {cmsswVersion} area.")
+    libDir = os.path.join(base, "lib", os.environ.get("SCRAM_ARCH", ""))
+    libs = [os.path.join(libDir, f) for f in os.listdir(libDir) if f.endswith(".so")] if os.path.isdir(libDir) else []
+    sources = []
+    for root, dirs, files in os.walk(os.path.join(base, "src"), followlinks=True):
+        dirs[:] = [x for x in dirs if not x.startswith(".")]
+        sources += [os.path.join(root, f) for f in files if f.endswith(BUILD_SOURCES)]
+    if sources and not libs:
+        raise RuntimeError(f"The code in {base}/src was never built: run scram b there first")
+    if sources:
+        newest = max(sources, key=os.path.getmtime)
+        if os.path.getmtime(newest) > min(os.path.getmtime(x) for x in libs):
+            raise RuntimeError(f"{newest} changed after the last build, so the jobs would run the old code: run scram b in {base}/src first")
+    return base
+
+
+def packLocalArea(d, base):
+    """Pack the compiled code of a CMSSW area into the job area, for condor workers that start from a fresh release. Returns the tarball path."""
+    out = os.path.join(d, AREA_TARBALL)
+    with tarfile.open(out, "w:gz") as tar:
+        for part in AREA_PARTS:
+            p = os.path.join(base, part)
+            if os.path.isdir(p):
+                tar.add(p, arcname=part, filter=lambda t: None if "__pycache__" in t.name else t)
+    return out
+
+
+# Condor sends a job its inputs only when it starts, and resubmit sends jobs again later, so every job of a task runs these copies taken at submit.
+def copyNtupleCode(d):
+    """Copy the ntuple code into the job area. Returns the paths of the copies, in NTUPLE_CODE order."""
+    return [shutil.copy2(os.path.join(paths.CMSSW_DIR, f), d) for f in NTUPLE_CODE]
 
 
 def chunk(items, n):

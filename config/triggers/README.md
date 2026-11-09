@@ -12,11 +12,11 @@ Each JSON file here is one trigger channel: the set of HLT paths that define one
 | Key | Meaning |
 |---|---|
 | **`paths`** (required, default: None) | The HLT path patterns. A trailing `_v*` matches any version of the path |
-| `include` (optional, default: None) | Another trigger config to build on. Naming `paths` replaces the inherited list |
+| `include` (optional, default: None) | A list of trigger config names to build on. Naming `paths` replaces the inherited list |
 | `mode` (optional, default: `any`) | `any` for an OR over `paths`, `all` for an AND |
 | `process` (optional, default: `HLT`) | The process name the trigger bits were written under |
 
-Kamui silently ignores unknown keys in a trigger config, so double-check spelling!
+Kamui stops with an error on any other key, on a `paths` that is not a non-empty list of path patterns, and on a `mode` other than `any` or `all`.
 ## Where These Are Used
 
 A content preset's `skim` block names a trigger JSON by its file name, read from the run folder of the sample's era, and only events firing it reach the ntuple:
@@ -30,4 +30,4 @@ A selection's `trigger` cut can name one of these files as well. The Run 2 selec
 ## Caveats
 
 - Path order inspired by JMTucker's, from `MFVNeutralino/python/TriggerFilter_cfi.py`.
-- `mode` and `process` only affect the production skim. A selection cut reads just `paths`, so `mode: "all"` would mean AND in production but OR in selection.
+- A selection's `trigger` cut keeps an event when any of its paths fired, so it refuses a trigger file whose `mode` is `all`. `process` only affects the production skim.

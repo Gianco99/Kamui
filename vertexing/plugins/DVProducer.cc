@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <memory>
 #include <set>
+#include <string>
 #include <vector>
 
 #include "DataFormats/BeamSpot/interface/BeamSpot.h"
@@ -31,6 +33,15 @@ typedef std::set<reco::TrackRef> TrackSet;
 typedef std::vector<reco::TrackRef> TrackVec;
 typedef std::vector<reco::Vertex>::iterator VertexIter;
 
+// What the selection stage cuts on for one DV
+struct SelectionQuantities {
+  float dBV;
+  float dBVErr;
+  float mass;
+  float sumPt;
+  bool insideBeampipe;
+};
+
 class DVProducer : public edm::global::EDProducer<> {
 public:
   explicit DVProducer(const edm::ParameterSet&);
@@ -45,8 +56,12 @@ private:
   bool fitVertex(KalmanVertexFitter&, std::vector<reco::TransientTrack>&, reco::Vertex&) const;
   int matchedJet(const reco::Track&, const pat::JetCollection&) const;
   std::vector<std::vector<size_t>> loneSharedJetTracks(const std::vector<std::vector<size_t>>&, const std::vector<std::vector<size_t>>&, size_t, size_t) const;
+  SelectionQuantities selectionQuantities(const reco::Vertex&, const reco::TrackCollection&, const reco::BeamSpot&, const reco::Vertex&, KalmanVertexFitter&, const TransientTrackBuilder&) const;
+  template <typename T>
+  void putPerVertex(edm::Event&, const edm::OrphanHandle<reco::VertexCollection>&, const std::vector<T>&, const std::string&) const;
 
   const edm::EDGetTokenT<reco::TrackCollection> seedTracksToken_;
+  const edm::EDGetTokenT<reco::TrackCollection> rescaledSeedTracksToken_;
   const edm::EDGetTokenT<reco::BeamSpot> beamSpotToken_;
   const edm::EDGetTokenT<pat::JetCollection> jetsToken_;
   const edm::ESGetToken<TransientTrackBuilder, TransientTrackRecord> ttBuilderToken_;
@@ -61,6 +76,8 @@ private:
   const double mergeNearbyDistance2dBelow_;
   const double mergeNearbyDbvAbove_;
   const double sharedJetsMaxDeltaPhi_;
+  const double beampipeRadius_;
+  const std::vector<double> beampipeCenter_;
 
   const VertexDistanceXY vertexDist2d_;
   const VertexDistance3D vertexDist3d_;
@@ -68,6 +85,7 @@ private:
 
 DVProducer::DVProducer(const edm::ParameterSet& cfg)
     : seedTracksToken_(consumes(cfg.getParameter<edm::InputTag>("seedTracks"))),
+      rescaledSeedTracksToken_(consumes(cfg.getParameter<edm::InputTag>("rescaledSeedTracks"))),
       beamSpotToken_(consumes(cfg.getParameter<edm::InputTag>("beamSpot"))),
       jetsToken_(consumes(cfg.getParameter<edm::InputTag>("jets"))),
       ttBuilderToken_(esConsumes(edm::ESInputTag("", "TransientTrackBuilder"))),
@@ -81,9 +99,16 @@ DVProducer::DVProducer(const edm::ParameterSet& cfg)
       mergeNearbyDeltaPhiBelow_(cfg.getParameter<edm::ParameterSet>("mergeNearby").getParameter<double>("deltaPhiBelow")),
       mergeNearbyDistance2dBelow_(cfg.getParameter<edm::ParameterSet>("mergeNearby").getParameter<double>("distance2dBelow")),
       mergeNearbyDbvAbove_(cfg.getParameter<edm::ParameterSet>("mergeNearby").getParameter<double>("dbvAbove")),
-      sharedJetsMaxDeltaPhi_(cfg.getParameter<edm::ParameterSet>("sharedJets").getParameter<double>("maxDeltaPhi")) {
+      sharedJetsMaxDeltaPhi_(cfg.getParameter<edm::ParameterSet>("sharedJets").getParameter<double>("maxDeltaPhi")),
+      beampipeRadius_(cfg.getParameter<edm::ParameterSet>("beampipe").getParameter<double>("radius")),
+      beampipeCenter_(cfg.getParameter<edm::ParameterSet>("beampipe").getParameter<std::vector<double>>("center")) {
+  if (beampipeCenter_.size() != 2)
+    throw cms::Exception("DVProducer") << "beampipe.center needs exactly two numbers, x and y";
   produces<reco::VertexCollection>();
   produces<edm::ValueMap<int>>("trackVertexIdx");
+  for (const char* label : {"dBV", "dBVErr", "mass", "sumPt"})
+    produces<edm::ValueMap<float>>(label);
+  produces<edm::ValueMap<bool>>("insideBeampipe");
 }
 
 TrackSet DVProducer::vertexTrackSet(const reco::Vertex& v) const {
@@ -115,6 +140,45 @@ bool DVProducer::fitVertex(KalmanVertexFitter& fitter, std::vector<reco::Transie
     return false;
   out = reco::Vertex(tv);
   return true;
+}
+
+// Sylvester's criterion on a DV's 3x3 position covariance
+static bool positiveDefinite(const reco::Vertex::CovarianceMatrix& c) {
+  const double det = c(0, 0) * (c(1, 1) * c(2, 2) - c(1, 2) * c(1, 2)) - c(0, 1) * (c(0, 1) * c(2, 2) - c(1, 2) * c(0, 2)) + c(0, 2) * (c(0, 1) * c(1, 2) - c(1, 1) * c(0, 2));
+  return c(0, 0) > 0 && c(0, 0) * c(1, 1) - c(0, 1) * c(0, 1) > 0 && det > 0;
+}
+
+// dBVErr refits the DV's tracks with the MC track uncertainty scale applied, the same fit in data. A failed refit leaves it at 0, and a DV whose own position covariance is not positive definite gets NaN, so it fails any cut on it.
+SelectionQuantities DVProducer::selectionQuantities(const reco::Vertex& vtx, const reco::TrackCollection& rescaledSeedTracks, const reco::BeamSpot& beamSpot, const reco::Vertex& beamSpotVertex, KalmanVertexFitter& fitter, const TransientTrackBuilder& ttBuilder) const {
+  SelectionQuantities q;
+  q.dBV = std::hypot(vtx.x() - beamSpot.x(vtx.z()), vtx.y() - beamSpot.y(vtx.z()));
+  q.mass = vtx.p4().mass();
+  q.insideBeampipe = std::hypot(vtx.x() - beampipeCenter_[0], vtx.y() - beampipeCenter_[1]) < beampipeRadius_;
+
+  q.sumPt = 0;
+  std::vector<reco::TransientTrack> rescaledTtks;
+  for (auto it = vtx.tracks_begin(), ite = vtx.tracks_end(); it != ite; ++it) {
+    const reco::TrackRef tk = it->castTo<reco::TrackRef>();
+    q.sumPt += float(tk->pt());
+    rescaledTtks.push_back(ttBuilder.build(rescaledSeedTracks.at(tk.key())));
+  }
+
+  q.dBVErr = 0;
+  const reco::Vertex refit(TransientVertex(fitter.vertex(rescaledTtks)));
+  if (refit.isValid())
+    q.dBVErr = vertexDist2d_.distance(refit, beamSpotVertex).error();
+  if (!positiveDefinite(vtx.covariance()))
+    q.dBVErr = std::numeric_limits<float>::quiet_NaN();
+  return q;
+}
+
+template <typename T>
+void DVProducer::putPerVertex(edm::Event& event, const edm::OrphanHandle<reco::VertexCollection>& vertices, const std::vector<T>& values, const std::string& label) const {
+  auto map = std::make_unique<edm::ValueMap<T>>();
+  typename edm::ValueMap<T>::Filler filler(*map);
+  filler.insert(vertices, values.begin(), values.end());
+  filler.fill();
+  event.put(std::move(map), label);
 }
 
 int DVProducer::matchedJet(const reco::Track& tk, const pat::JetCollection& jets) const {
@@ -445,7 +509,25 @@ void DVProducer::produce(edm::StreamID, edm::Event& event, const edm::EventSetup
     kept->push_back(vtx);
   }
 
-  event.put(std::move(kept));
+  const reco::TrackCollection& rescaledSeedTracks = event.get(rescaledSeedTracksToken_);
+  std::vector<float> dBV, dBVErr, mass, sumPt;
+  std::vector<bool> insideBeampipe;
+  for (const reco::Vertex& vtx : *kept) {
+    const SelectionQuantities q = selectionQuantities(vtx, rescaledSeedTracks, beamSpot, beamSpotVertex, fitter, ttBuilder);
+    dBV.push_back(q.dBV);
+    dBVErr.push_back(q.dBVErr);
+    mass.push_back(q.mass);
+    sumPt.push_back(q.sumPt);
+    insideBeampipe.push_back(q.insideBeampipe);
+  }
+
+  const edm::OrphanHandle<reco::VertexCollection> keptHandle = event.put(std::move(kept));
+  putPerVertex(event, keptHandle, dBV, "dBV");
+  putPerVertex(event, keptHandle, dBVErr, "dBVErr");
+  putPerVertex(event, keptHandle, mass, "mass");
+  putPerVertex(event, keptHandle, sumPt, "sumPt");
+  putPerVertex(event, keptHandle, insideBeampipe, "insideBeampipe");
+
   auto idxMap = std::make_unique<edm::ValueMap<int>>();
   edm::ValueMap<int>::Filler filler(*idxMap);
   filler.insert(seedTracks, trackVertexIdx.begin(), trackVertexIdx.end());

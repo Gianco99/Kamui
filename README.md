@@ -14,6 +14,7 @@ Kamui is the framework for our Run 3 CMS DV analysis. It reads MiniAOD datasets,
 | `ntupleSelection/` | Step 2: Selections applied to ntuples |
 | `vertexing/` | DV reconstruction |
 | `tools/` | Standalone scripts that inspect the framework's inputs and outputs |
+| `Bugs/` | Known JMTucker bugs, one file each with where it lives, whether Kamui reproduces it on purpose, and the fix. The `template*` files are bugs in Alec's background-template code, kept in its standalone rewrite until that moves into Kamui |
 | `CLAUDE.md` | Conventions for the AI |
 ## The Framework
 
@@ -21,7 +22,7 @@ A dataset is processed in two stages, each driven by its own configuration files
 
 1. **`ntupleProduction`** reads a DAS dataset named in `config/samples/` and writes ntuples. The sample's content preset, in `config/content/`, decides what they keep: a set of collections, such as jets, each listing the variables to save. A preset can also skim, keeping only the events that fire chosen triggers. Jobs run on LPC condor or on CRAB.
 
-2. **`ntupleSelection`** applies an event selection from `config/selections/` to those ntuples. Its output has the same branches as its input, so another selection can run on it.
+2. **`ntupleSelection`** applies an event selection from `config/selections/` to those ntuples. Its output has the same branches as its input. Several selections can run in one pass, one after another, such as `--selection lepton,dv3x4`.
 
 An **ntuple** here is a ROOT file holding an `Events` tree with one entry per event, carrying the collections and variables a content preset names.
 

@@ -18,23 +18,21 @@
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/Utilities/interface/Exception.h"
 
-class DxyErrScale {
+class ErrScaleCurve {
 public:
-  explicit DxyErrScale(const edm::ParameterSet&);
-  double rescaledDxyErr(const reco::Track&) const;
+  explicit ErrScaleCurve(const edm::ParameterSet&);
+  double at(double pt) const;
 
 private:
-  enum class Form { none, constant, subtractScaledExp, subtractShiftedExp };
+  enum class Form { none, constant, subtractScaledExp, subtractShiftedExp, subtractScaledExpPlusLinear };
 
   static Form parseForm(const std::string&);
 
   const Form form_;
-  const double barrelAbsEtaBelow_;
-  const std::vector<double> barrel_;
-  const std::vector<double> endcap_;
+  const std::vector<double> p_;
 };
 
-DxyErrScale::Form DxyErrScale::parseForm(const std::string& form) {
+ErrScaleCurve::Form ErrScaleCurve::parseForm(const std::string& form) {
   if (form == "none")
     return Form::none;
   if (form == "p0")
@@ -43,36 +41,68 @@ DxyErrScale::Form DxyErrScale::parseForm(const std::string& form) {
     return Form::subtractScaledExp;
   if (form == "p0-exp(-p1*x+p2)")
     return Form::subtractShiftedExp;
-  throw cms::Exception("SeedTrackProducer") << "Unknown dxyErrScale form '" << form << "'";
+  if (form == "p0-p2*exp(-p1*x)+p3*x")
+    return Form::subtractScaledExpPlusLinear;
+  throw cms::Exception("SeedTrackProducer") << "Unknown trackErrScale form '" << form << "'";
 }
 
-DxyErrScale::DxyErrScale(const edm::ParameterSet& cfg)
-    : form_(parseForm(cfg.getParameter<std::string>("form"))),
-      barrelAbsEtaBelow_(cfg.getParameter<double>("barrelAbsEtaBelow")),
-      barrel_(cfg.getParameter<std::vector<double>>("barrel")),
-      endcap_(cfg.getParameter<std::vector<double>>("endcap")) {
-  const size_t nParams = form_ == Form::none ? 0 : form_ == Form::constant ? 1 : 3;
-  if (barrel_.size() != nParams || endcap_.size() != nParams)
-    throw cms::Exception("SeedTrackProducer") << "dxyErrScale needs " << nParams << " parameters each for barrel and endcap";
+ErrScaleCurve::ErrScaleCurve(const edm::ParameterSet& cfg) : form_(parseForm(cfg.getParameter<std::string>("form"))), p_(cfg.getParameter<std::vector<double>>("p")) {
+  const size_t nParams = form_ == Form::none ? 0 : form_ == Form::constant ? 1 : form_ == Form::subtractScaledExpPlusLinear ? 4 : 3;
+  if (p_.size() != nParams)
+    throw cms::Exception("SeedTrackProducer") << "trackErrScale form '" << cfg.getParameter<std::string>("form") << "' needs " << nParams << " parameters";
 }
 
-double DxyErrScale::rescaledDxyErr(const reco::Track& tk) const {
-  if (form_ == Form::none)
-    return tk.dxyError();
+double ErrScaleCurve::at(double x) const {
+  switch (form_) {
+    case Form::none:
+      return 1;
+    case Form::constant:
+      return p_[0];
+    case Form::subtractScaledExp:
+      return p_[0] - p_[2] * exp(-p_[1] * x);
+    case Form::subtractShiftedExp:
+      return p_[0] - exp(-p_[1] * x + p_[2]);
+    case Form::subtractScaledExpPlusLinear:
+      return p_[0] - p_[2] * exp(-p_[1] * x) + p_[3] * x;
+  }
+  return 1;
+}
 
-  const std::vector<double>& p = std::fabs(tk.eta()) < barrelAbsEtaBelow_ ? barrel_ : endcap_;
-  const double x = tk.pt();
-  double scale;
-  if (form_ == Form::constant)
-    scale = p[0];
-  else if (form_ == Form::subtractScaledExp)
-    scale = p[0] - p[2] * exp(-p[1] * x);
-  else
-    scale = p[0] - exp(-p[1] * x + p[2]);
+// Scales a track's dxy and dsz uncertainties by curves in its pT, separately in the barrel and the endcap
+class TrackErrScale {
+public:
+  explicit TrackErrScale(const edm::ParameterSet&);
+  reco::Track rescaled(const reco::Track&) const;
 
+private:
+  struct Region {
+    explicit Region(const edm::ParameterSet& cfg) : dxy(cfg.getParameter<edm::ParameterSet>("dxy")), dsz(cfg.getParameter<edm::ParameterSet>("dsz")), dxyDsz(cfg.getParameter<edm::ParameterSet>("dxyDsz")) {}
+    const ErrScaleCurve dxy, dsz, dxyDsz;
+  };
+
+  const double barrelAbsEtaBelow_;
+  const Region barrel_;
+  const Region endcap_;
+};
+
+TrackErrScale::TrackErrScale(const edm::ParameterSet& cfg)
+    : barrelAbsEtaBelow_(cfg.getParameter<double>("barrelAbsEtaBelow")), barrel_(cfg.getParameter<edm::ParameterSet>("barrel")), endcap_(cfg.getParameter<edm::ParameterSet>("endcap")) {}
+
+reco::Track TrackErrScale::rescaled(const reco::Track& tk) const {
+  const Region& region = std::fabs(tk.eta()) < barrelAbsEtaBelow_ ? barrel_ : endcap_;
+  const double dxy = region.dxy.at(tk.pt());
+  const double dsz = region.dsz.at(tk.pt());
+  const int iDxy = reco::TrackBase::i_dxy;
+  const int iDsz = reco::TrackBase::i_dsz;
+
+  // The dxy and dsz rows of the symmetric covariance scale by the curve, their diagonal entries by its square, and the dxy-dsz entry also by the correlation curve
   reco::TrackBase::CovarianceMatrix cov = tk.covariance();
-  cov(reco::TrackBase::i_dxy, reco::TrackBase::i_dxy) *= pow(scale, 2);
-  return reco::Track(tk.chi2(), tk.ndof(), tk.referencePoint(), tk.momentum(), tk.charge(), cov, tk.algo()).dxyError();
+  for (int i = 0; i < reco::TrackBase::dimension; ++i)
+    cov(i, iDxy) *= i == iDxy ? pow(dxy, 2) : dxy;
+  for (int i = 0; i < reco::TrackBase::dimension; ++i)
+    cov(i, iDsz) *= i == iDsz ? pow(dsz, 2) : dsz;
+  cov(iDxy, iDsz) *= region.dxyDsz.at(tk.pt());
+  return reco::Track(tk.chi2(), tk.ndof(), tk.referencePoint(), tk.momentum(), tk.charge(), cov, tk.algo());
 }
 
 class SeedTrackProducer : public edm::global::EDProducer<> {
@@ -82,7 +112,7 @@ public:
 
 private:
   const reco::Vertex* firstGoodPv(const reco::VertexCollection&) const;
-  bool isSeed(const reco::Track&, const reco::BeamSpot&) const;
+  bool isSeed(const reco::Track&, double dxyErr, const reco::BeamSpot&) const;
   bool isDropped(const reco::Track&, const reco::BeamSpot&, std::mt19937_64&) const;
 
   const edm::EDGetTokenT<pat::PackedCandidateCollection> candidatesToken_;
@@ -96,7 +126,7 @@ private:
   const int minPixelLayers_;
   const int minStripLayers_;
   const int maxFirstPixelLayer_;
-  const DxyErrScale dxyErrScale_;
+  const TrackErrScale trackErrScale_;
   const double trackDropCoefficient_;
   const double trackDropAbsDxyBsCap_;
 };
@@ -113,10 +143,11 @@ SeedTrackProducer::SeedTrackProducer(const edm::ParameterSet& cfg)
       minPixelLayers_(cfg.getParameter<int>("minPixelLayers")),
       minStripLayers_(cfg.getParameter<int>("minStripLayers")),
       maxFirstPixelLayer_(cfg.getParameter<int>("maxFirstPixelLayer")),
-      dxyErrScale_(cfg.getParameter<edm::ParameterSet>("dxyErrScale")),
+      trackErrScale_(cfg.getParameter<edm::ParameterSet>("trackErrScale")),
       trackDropCoefficient_(cfg.getParameter<edm::ParameterSet>("trackDrop").getParameter<double>("coefficient")),
       trackDropAbsDxyBsCap_(cfg.getParameter<edm::ParameterSet>("trackDrop").getParameter<double>("absDxyBsCap")) {
   produces<reco::TrackCollection>();
+  produces<reco::TrackCollection>("rescaled");
   produces<edm::ValueMap<int>>("candIdx");
 }
 
@@ -127,7 +158,7 @@ const reco::Vertex* SeedTrackProducer::firstGoodPv(const reco::VertexCollection&
   return nullptr;
 }
 
-bool SeedTrackProducer::isSeed(const reco::Track& tk, const reco::BeamSpot& beamSpot) const {
+bool SeedTrackProducer::isSeed(const reco::Track& tk, double dxyErr, const reco::BeamSpot& beamSpot) const {
   const reco::HitPattern& hp = tk.hitPattern();
 
   int firstPixelLayer = 5;
@@ -137,7 +168,7 @@ bool SeedTrackProducer::isSeed(const reco::Track& tk, const reco::BeamSpot& beam
       break;
     }
 
-  return tk.pt() > ptAbove_ && std::fabs(tk.dxy(beamSpot) / dxyErrScale_.rescaledDxyErr(tk)) > nSigmaDxyBsAbove_ && hp.pixelLayersWithMeasurement() >= minPixelLayers_ && hp.stripLayersWithMeasurement() >= minStripLayers_ && (firstPixelLayer <= maxFirstPixelLayer_ || (firstPixelLayer == 2 && hp.numberOfLostHits(reco::HitPattern::MISSING_INNER_HITS) == 0));
+  return tk.pt() > ptAbove_ && std::fabs(tk.dxy(beamSpot) / dxyErr) > nSigmaDxyBsAbove_ && hp.pixelLayersWithMeasurement() >= minPixelLayers_ && hp.stripLayersWithMeasurement() >= minStripLayers_ && (firstPixelLayer <= maxFirstPixelLayer_ || (firstPixelLayer == 2 && hp.numberOfLostHits(reco::HitPattern::MISSING_INNER_HITS) == 0));
 }
 
 bool SeedTrackProducer::isDropped(const reco::Track& tk, const reco::BeamSpot& beamSpot, std::mt19937_64& engine) const {
@@ -153,6 +184,7 @@ void SeedTrackProducer::produce(edm::StreamID, edm::Event& event, const edm::Eve
   std::mt19937_64 engine(seed);
 
   auto seeds = std::make_unique<reco::TrackCollection>();
+  auto rescaledSeeds = std::make_unique<reco::TrackCollection>();
   std::vector<int> candIdx;
 
   if (pv)
@@ -160,13 +192,16 @@ void SeedTrackProducer::produce(edm::StreamID, edm::Event& event, const edm::Eve
       const pat::PackedCandidate& cand = candidates[i];
       if (cand.charge() == 0 || !cand.hasTrackDetails() || (trackDropCoefficient_ > 0 && isDropped(cand.pseudoTrack(), beamSpot, engine)))
         continue;
-      if (isSeed(cand.pseudoTrack(), beamSpot)) {
+      const reco::Track rescaled = trackErrScale_.rescaled(cand.pseudoTrack());
+      if (isSeed(cand.pseudoTrack(), rescaled.dxyError(), beamSpot)) {
         seeds->push_back(cand.pseudoTrack());
+        rescaledSeeds->push_back(rescaled);
         candIdx.push_back(i);
       }
     }
 
   const edm::OrphanHandle<reco::TrackCollection> handle = event.put(std::move(seeds));
+  event.put(std::move(rescaledSeeds), "rescaled");
   auto candIdxMap = std::make_unique<edm::ValueMap<int>>();
   edm::ValueMap<int>::Filler filler(*candIdxMap);
   filler.insert(handle, candIdx.begin(), candIdx.end());

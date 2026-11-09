@@ -26,6 +26,7 @@ SELECTIONS_DIR = os.path.join(CONFIG_DIR, "selections")
 DEFINITIONS_DIR = os.path.join(CONFIG_DIR, "definitions")
 NORM_DIR       = os.path.join(CONFIG_DIR, "normalizations")
 LUMI_FILE      = os.path.join(NORM_DIR, "lumi.json")
+GENERATOR_SUMS_FILE = os.path.join(NORM_DIR, "generatorSums.json")
 
 CMSSW_DIR    = os.path.join(PRODUCTION_DIR, "cmssw")       # cmsRun cfg and table builder
 JOBS_DIR     = os.path.join(PRODUCTION_DIR, "jobs")        # Generated job areas (gitignored)

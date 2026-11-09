@@ -12,12 +12,28 @@
         "minPixelLayers": 2,
         "minStripLayers": 6,
         "maxFirstPixelLayer": 1,
-        "dxyErrScale": {
-          "_doc": "Scales the MC track dxy uncertainty versus pT to match data, for the nSigmaDxyBsAbove significance cut.",
-          "2016APV": {"form": "p0-p2*exp(-p1*x)", "barrelAbsEtaBelow": 1.5, "barrel": [0.90391, 0.896, -0.1585], "endcap": [0.89441, 0.3372, -0.13827]},
-          "2016": {"form": "p0", "barrelAbsEtaBelow": 1.5, "barrel": [0.981341], "endcap": [0.998868]},
-          "2017": {"form": "p0-exp(-p1*x+p2)", "barrelAbsEtaBelow": 1.5, "barrel": [1.17509, 0.771, -1.263], "endcap": [1.3108, 0.2508, -0.9690]},
-          "2018": {"form": "p0-exp(-p1*x+p2)", "barrelAbsEtaBelow": 1.5, "barrel": [1.09967, 1.582, -0.842], "endcap": [1.1875, 0.3201, -1.4224]}
+        "trackErrScale": {
+          "_doc": "Scales the MC track dxy and dsz uncertainties versus pT to match data, for the nSigmaDxyBsAbove cut and the DV uncertainty refit.",
+          "2016APV": {
+            "barrelAbsEtaBelow": 1.5,
+            "barrel": {"dxy": {"form": "p0-p2*exp(-p1*x)", "p": [0.90391, 0.896, -0.1585]}, "dsz": {"form": "p0-p2*exp(-p1*x)", "p": [0.90834, 0.7094, -0.1133]}, "dxyDsz": {"form": "p0-p2*exp(-p1*x)", "p": [0.7946, 0.294, 0.0963]}},
+            "endcap": {"dxy": {"form": "p0-p2*exp(-p1*x)", "p": [0.89441, 0.3372, -0.13827]}, "dsz": {"form": "p0-p2*exp(-p1*x)", "p": [0.89631, 0.1800, -0.11508]}, "dxyDsz": {"form": "p0-p2*exp(-p1*x)+p3*x", "p": [0.73781, 3.41, -6.0, 0.002034]}}
+          },
+          "2016": {
+            "barrelAbsEtaBelow": 1.5,
+            "barrel": {"dxy": {"form": "p0", "p": [0.981341]}, "dsz": {"form": "p0-exp(-p1*x+p2)", "p": [1.8725, -0.0005732, -0.1141]}, "dxyDsz": {"form": "p0-p2*exp(-p1*x)", "p": [0.93580, 2.026, 0.350]}},
+            "endcap": {"dxy": {"form": "p0", "p": [0.998868]}, "dsz": {"form": "p0-exp(-p1*x+p2)", "p": [1.2526, -0.001625, -1.3885]}, "dxyDsz": {"form": "p0-p2*exp(-p1*x)", "p": [0.9649, 0.080, -0.0512]}}
+          },
+          "2017": {
+            "barrelAbsEtaBelow": 1.5,
+            "barrel": {"dxy": {"form": "p0-exp(-p1*x+p2)", "p": [1.17509, 0.771, -1.263]}, "dsz": {"form": "p0-exp(-p1*x+p2)", "p": [1.15733, 1.274, -1.257]}, "dxyDsz": {"form": "p0-p2*exp(-p1*x)", "p": [1.2828, 3.05, -6.1]}},
+            "endcap": {"dxy": {"form": "p0-exp(-p1*x+p2)", "p": [1.3108, 0.2508, -0.9690]}, "dsz": {"form": "p0-exp(-p1*x+p2)", "p": [1.2758, 0.1959, -1.1719]}, "dxyDsz": {"form": "p0-p2*exp(-p1*x)", "p": [1.526, 0.285, -0.375]}}
+          },
+          "2018": {
+            "barrelAbsEtaBelow": 1.5,
+            "barrel": {"dxy": {"form": "p0-exp(-p1*x+p2)", "p": [1.09967, 1.582, -0.842]}, "dsz": {"form": "p0-exp(-p1*x+p2)", "p": [1.11861, 3.14, 0.91]}, "dxyDsz": {"form": "p0-p2*exp(-p1*x)", "p": [1.0866, 0.595, -0.2691]}},
+            "endcap": {"dxy": {"form": "p0-exp(-p1*x+p2)", "p": [1.1875, 0.3201, -1.4224]}, "dsz": {"form": "p0-exp(-p1*x+p2)", "p": [1.06183, 0.402, -2.5405]}, "dxyDsz": {"form": "p0-p2*exp(-p1*x)", "p": [1.259, 0.097, -0.197]}}
+          }
         },
         "trackDrop": {
           "_doc": "Drops MC tracks at random, more often the farther they are from the beamspot, to match the displaced track efficiency in data.",
@@ -58,7 +74,13 @@
         "sharedTracks": {"_doc": "When two vertices share a track, they merge if they are close, and otherwise the track stays only in the vertex it fits best.", "mergeBelowSigma": 4, "keepBelowSigma": 5, "tieBelowSigma": 1.5},
         "zRefit": {"_doc": "A track whose removal moves the vertex in z by more than maxShiftSigma standard deviations is dropped.", "maxShiftSigma": 3},
         "mergeNearby": {"deltaPhiBelow": 0.5, "distance2dBelow": 0.03, "dbvAbove": 0.01},
-        "sharedJets": {"_doc": "When two vertices share a jet, a vertex's only track in that jet is dropped if its phi differs from the vertex's phi by more than maxDeltaPhi.", "maxDeltaPhi": 1.5707963267948966}
+        "sharedJets": {"_doc": "When two vertices share a jet, a vertex's only track in that jet is dropped if its phi differs from the vertex's phi by more than maxDeltaPhi.", "maxDeltaPhi": 1.5707963267948966},
+        "beampipe": {
+          "_doc": "A DV is inside the beampipe when its x-y distance from the beampipe center is below radius. Data centers each era on the measured beampipe position, MC on mcCenter.",
+          "radius": {"2016APV": 2.00, "2016": 2.00, "2017": 2.09, "2018": 2.09},
+          "dataCenter": {"2016APV": [0.124, 0.07], "2016": [0.124, 0.07], "2017": [0.113, -0.180], "2018": [0.171, -0.175]},
+          "mcCenter": [0, 0]
+        }
       },
       "variables": {
         "x": {"expr": "x()", "type": "float", "doc": "DV x [cm]", "precision": -1},

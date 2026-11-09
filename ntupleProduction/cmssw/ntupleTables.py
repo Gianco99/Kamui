@@ -67,7 +67,7 @@ def _objectTable(name, c):
 def _seedTrackModules(name, c, producerName):
     """The seed-track producer and its table."""
     s = c["seeding"]
-    pv, scale, drop = s["goodPv"], s["dxyErrScale"], s["trackDrop"]
+    pv, scale, drop = s["goodPv"], s["trackErrScale"], s["trackDrop"]
     producer = cms.EDProducer(
         "SeedTrackProducer",
         src=cms.InputTag(c["src"]),
@@ -83,11 +83,10 @@ def _seedTrackModules(name, c, producerName):
         minPixelLayers=cms.int32(s["minPixelLayers"]),
         minStripLayers=cms.int32(s["minStripLayers"]),
         maxFirstPixelLayer=cms.int32(s["maxFirstPixelLayer"]),
-        dxyErrScale=cms.PSet(
-            form=cms.string(scale["form"]),
+        trackErrScale=cms.PSet(
             barrelAbsEtaBelow=cms.double(scale["barrelAbsEtaBelow"]),
-            barrel=cms.vdouble(*scale["barrel"]),
-            endcap=cms.vdouble(*scale["endcap"]),
+            barrel=_errScaleRegion(scale["barrel"]),
+            endcap=_errScaleRegion(scale["endcap"]),
         ),
         trackDrop=cms.PSet(
             coefficient=cms.double(drop["coefficient"]),
@@ -137,12 +136,29 @@ def _inputLabel(content, name):
     return stem + "Producer" if c.get("writesTable", True) else stem
 
 
+def _errScaleRegion(region):
+    """One detector region of trackErrScale: a curve in pT for each of dxy, dsz and their correlation."""
+    return cms.PSet(**{part: cms.PSet(form=cms.string(curve["form"]), p=cms.vdouble(*curve["p"])) for part, curve in region.items()})
+
+
+## The quantities DVProducer computes for every DV it keeps, written as DV branches: (type, doc)
+DV_SELECTION_QUANTITIES = {
+    "dBV": ("float", "2D distance from the beamspot at the DV's z [cm]"),
+    "dBVErr": ("float", "Uncertainty on the 2D distance from the beamspot, from a refit of the DV's tracks with the MC track uncertainty scale applied. NaN when the DV's position covariance is not positive definite [cm]"),
+    "mass": ("float", "Invariant mass of the DV's tracks, taken as pions [GeV]"),
+    "sumPt": ("float", "Scalar sum of the DV's track pT [GeV]"),
+    "insideBeampipe": ("bool", "DV lies inside the beampipe"),
+}
+
+
 def _dvModules(content, name, c, producerName):
     """The vertexer and the table of the vertices it keeps."""
     v = c["vertexing"]
+    seedLabel = _inputLabel(content, c["src"])
     producer = cms.EDProducer(
         "DVProducer",
-        seedTracks=cms.InputTag(_inputLabel(content, c["src"])),
+        seedTracks=cms.InputTag(seedLabel),
+        rescaledSeedTracks=cms.InputTag(seedLabel, "rescaled"),
         beamSpot=cms.InputTag(v["beamSpot"]),
         jets=cms.InputTag(_inputLabel(content, v["jets"])),
         minTracks=cms.int32(v["minTracks"]),
@@ -156,8 +172,11 @@ def _dvModules(content, name, c, producerName):
         zRefit=cms.PSet(**{k: cms.double(x) for k, x in v["zRefit"].items()}),
         mergeNearby=cms.PSet(**{k: cms.double(x) for k, x in v["mergeNearby"].items()}),
         sharedJets=cms.PSet(**{k: cms.double(x) for k, x in v["sharedJets"].items()}),
+        beampipe=cms.PSet(radius=cms.double(v["beampipe"]["radius"]), center=cms.vdouble(*v["beampipe"]["center"])),
     )
-    return producer, _objectTable(name, dict(c, src=producerName))
+    table = _objectTable(name, dict(c, src=producerName))
+    table.externalVariables = cms.PSet(**{q: _extVar({"src": producerName + ":" + q, "type": t, "doc": doc}) for q, (t, doc) in DV_SELECTION_QUANTITIES.items()})
+    return producer, table
 
 
 def buildTables(content):

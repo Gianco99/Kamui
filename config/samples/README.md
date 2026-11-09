@@ -15,7 +15,7 @@ Below are all the supported fields one can add to the JSON file.
 | `grids` (optional, default: None) | A list of grids, each generating samples from templates and axes |
 | `overrides` (optional, default: None) | Fields to override on individual samples, keyed by sample name |
 
-A file needs at least one of `samples` or `grids` to define samples.
+A file has to define at least one sample, through `samples` or `grids`. Kamui stops with an error naming the file when it defines none, or when a key at the top level, in a grid or on a sample is missing from these tables.
 
 **Grid level**
 
@@ -23,7 +23,7 @@ A file needs at least one of `samples` or `grids` to define samples.
 |---|---|
 | **`name`** (required, default: None) | Template for the sample name, with `{placeholders}` |
 | **`dataset`** (required, default: None) | Template for the DAS path |
-| `axes` (optional, default: None) | The values substituted into the placeholders |
+| `axes` (optional, default: None) | The values substituted into the placeholders, as an object of non-empty lists. Every placeholder in `name` and `dataset` needs an axis that fills it |
 | `skip` (optional, default: None) | Generated sample names to drop |
 
 A grid may also carry any sample field from the table below, applying it to every point it generates.
@@ -36,12 +36,12 @@ A grid may also carry any sample field from the table below, applying it to ever
 | **`dataset`** (required, default: None) | The full DAS dataset path. |
 | **`era`** (required, default: None) | Data-taking period. It picks the content folder the sample's preset comes from, `run2/` or `run3/`, and the selection thresholds the sample uses. |
 | `dasInstance` (optional, default: `prod/global`) | `prod/global` for central datasets, `prod/phys03` for USER-created datasets. |
-| `isMC` (optional, default: `true`) | `false` for data. `true` for MC. |
+| **`isMC`** (required, default: None) | `true` for MC, `false` for data, written without quotes. Kamui stops with an error when it disagrees with a central dataset's tier: `MINIAODSIM` holds MC and `MINIAOD` holds data. |
 | `family` (optional, default: the file's `family` key, then the file name) | The name for selecting this file's samples with `--family`. |
 | `content` (optional, default: `dvBase`) | The content preset defining the branches to write. |
-| `tags` (optional, default: `[]`) | Free-form labels, for selecting samples with `--tag`. A sample may carry several. |
+| `tags` (optional, default: `[]`) | A list of free-form labels for selecting samples with `--tag`. |
 | `unitsPerJob` (optional, default: None) | A positive integer, the input files per job for this sample. `--filesPerJob` in the CLI overrides it. |
-| `lumiMask` (optional, default: None) | A lumi mask JSON, such as the golden JSON, restricting processing to the lumi sections it lists. Data only. CRAB applies it and condor ignores it. |
+| `lumiMask` (optional, default: None) | A lumi mask JSON, such as the golden JSON, restricting processing to the lumi sections it lists. Data only. CRAB applies it, and `submit` refuses a sample that has one on condor. |
 ## Writing a JSON Sample Family File
 
 A family lists samples one of two ways: 

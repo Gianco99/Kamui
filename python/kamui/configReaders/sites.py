@@ -5,12 +5,11 @@ Reads sites.json: where things are stored, which release to use, which site to s
 # Import Block
 
 ## Standard Python imports
-import json
 import os
 
 ## Kamui modules
 from ..foundations import paths
-from ..foundations.config import stripComments
+from ..foundations.config import loadJson
 
 
 def _expand(value, where):
@@ -41,6 +40,5 @@ def globalTag(era, isMC, sites=None):
 
 def loadSites(path=None):
     """Load config/sites.json, expanding environment variables."""
-    with open(path or paths.SITES_FILE) as f:
-        cfg = stripComments(json.load(f))
+    cfg = loadJson(path or paths.SITES_FILE)
     return {k: _expand(v, k) for k, v in cfg.items()}

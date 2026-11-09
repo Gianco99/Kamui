@@ -12,4 +12,9 @@ import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "python")) # Lets kamui work from anywhere.
 from kamui.cli import main
 
-sys.exit(main())
+try:
+    sys.exit(main())
+except BrokenPipeError:
+    ## A reader such as head that stops early closes the pipe, so the rest of the output goes nowhere
+    os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+    sys.exit(1)

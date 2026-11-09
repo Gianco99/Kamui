@@ -8,6 +8,8 @@ Applies a resolved selection to an ntuple and writes an ntuple with the same bra
 import fnmatch
 import operator
 import os
+import re
+import shutil
 import subprocess
 import tempfile
 
@@ -15,6 +17,9 @@ import tempfile
 import awkward as ak
 import numpy as np
 import uproot
+
+## Kamui modules
+from ..configReaders.selections import CUT_TYPES
 
 ## How each bound compares: whether it reads the absolute value, and the comparison it makes
 COMPARISONS = {
@@ -28,6 +33,21 @@ COMPARISONS = {
     "absBelow": (True,  operator.lt),
 }
 SYMBOLS = {operator.ge: ">=", operator.le: "<=", operator.gt: ">", operator.lt: "<"}
+
+## The counts inside a cutflow note that add up over jobs: the events an anyOf alternative keeps, and the input files
+_ADDITIVE = re.compile(r"(?<= keeps )\d+|^\d+(?= file\(s\)$)")
+
+
+class MissingCollections(ValueError):
+    """The ntuple lacks collections the selection reads."""
+
+    def __init__(self, collections):
+        self.collections = list(collections)
+        super().__init__(f"Selection needs collection(s) {', '.join(self.collections)}, which the ntuple does not have")
+
+
+class NoTriggerPath(ValueError):
+    """A trigger cut matched none of its paths."""
 
 
 def triggerMask(events, patterns, branches):
@@ -60,46 +80,63 @@ def cutMask(cut, events, branches):
 
 
 def _cutMask(cut, events, branches):
-    kind = cut["type"]
+    apply = CUT_MASKS.get(cut["type"])
+    if apply is None:
+        raise ValueError(f"Cut '{cut['name']}' has unknown type '{cut['type']}'")
+    return apply(cut, events, branches)
 
-    if kind == "trigger":
-        paths = cut["hltPaths"]
-        mask, matched = triggerMask(events, paths, branches)
-        return mask, f"{len(matched)}/{len(paths)} paths present"
 
-    if kind == "object":
-        ## The event is kept when enough objects satisfy the requirements. Nothing is removed from the ntuple.
-        return _legMask(cut, events, branches)
+# A path can be missing from part of an era's menu, so one unmatched pattern is normal. A cut matching none of its patterns can never fire, which only a wrong era or a misspelled list explains.
+def _triggerCut(cut, events, branches):
+    """Events where any of the cut's HLT paths fired."""
+    paths = cut["hltPaths"]
+    mask, matched = triggerMask(events, paths, branches)
+    if not matched:
+        raise NoTriggerPath(f"Cut '{cut['name']}' matches none of its trigger paths {paths} in the ntuple, so it can never fire. Check the era and the trigger list.")
+    return mask, f"{len(matched)}/{len(paths)} paths present"
 
-    if kind == "flags":
-        ## Every named flag must be true, and a flag absent from the file is skipped and reported as MISSING
-        missing = [f for f in cut["flags"] if f not in branches]
-        mask = np.ones(len(events), dtype=bool)
-        for f in cut["flags"]:
-            if f in branches:
-                mask &= np.asarray(events[f])
-        note = f"{len(cut['flags']) - len(missing)}/{len(cut['flags'])} flags present"
-        if missing:
-            note += f", MISSING {missing}"
-        return mask, note
 
-    if kind == "quantity":
-        return _conditionMask(cut, events, branches), _bounds(cut)
+def _flagsCut(cut, events, branches):
+    """Events where every named flag is true. A flag the ntuple lacks would otherwise pass every event, so it is an error."""
+    missing = [f for f in cut["flags"] if f not in branches]
+    if missing:
+        raise ValueError(f"Cut '{cut['name']}' needs flag(s) {missing}, which the ntuple does not have. Check the spelling and the era.")
+    mask = np.ones(len(events), dtype=bool)
+    for f in cut["flags"]:
+        mask &= np.asarray(events[f])
+    return mask, f"{len(cut['flags'])}/{len(cut['flags'])} flags present"
 
-    if kind == "anyOf":
-        ## Each alternative is a list of cuts that must all hold, which lets a channel accept several triggers, each with its own offline emulation
-        mask = np.zeros(len(events), dtype=bool)
-        notes = []
-        for option in cut["anyOf"]:
-            optionMask = np.ones(len(events), dtype=bool)
-            for sub in option["cuts"]:
+
+def _quantityCut(cut, events, branches):
+    """Events where every condition on an event quantity holds."""
+    return _conditionMask(cut, events, branches), _bounds(cut)
+
+
+def _anyOfCut(cut, events, branches):
+    """
+    Events passing at least one alternative, each a list of cuts that must all hold. This lets a channel accept several triggers, each with its own offline emulation.
+
+    A trigger path missing from the ntuple counts as not fired inside an alternative, since part of an era can run without that path. The cut fails only when every alternative is missing a path.
+    """
+    mask = np.zeros(len(events), dtype=bool)
+    notes = []
+    absent = 0
+    for option in cut["anyOf"]:
+        optionMask = np.ones(len(events), dtype=bool)
+        missingPath = False
+        for sub in option["cuts"]:
+            try:
                 subMask, _ = cutMask(sub, events, branches)
-                optionMask &= subMask
-            mask |= optionMask
-            notes.append(f"{option['name']} keeps {int(optionMask.sum())}")
-        return mask, " OR ".join(notes) if notes else "no alternative applies to this era"
-
-    raise ValueError(f"Cut '{cut['name']}' has unknown type '{kind}'")
+            except NoTriggerPath:
+                subMask = np.full(len(events), bool(sub.get("invert")))
+                missingPath = True
+            optionMask &= subMask
+        absent += missingPath
+        mask |= optionMask
+        notes.append(f"{option['name']} keeps {int(optionMask.sum())}")
+    if absent and absent == len(cut["anyOf"]):
+        raise NoTriggerPath(f"Cut '{cut['name']}': no alternative has its trigger path in the ntuple, so it can never fire. Check the era and the trigger lists.")
+    return mask, " OR ".join(notes) if notes else "no alternative applies to this era"
 
 
 def _primaryVertex(events):
@@ -132,13 +169,17 @@ def _trackIP(coll, events, wrt):
     return (-(vx - bx) * py + (vy - by) * px) / pt
 
 
+## Per-object variables computed from stored branches, each with the collections it reads besides its own
+DERIVED_VARIABLES = {
+    "dzPV":        (lambda coll, events: _trackIP(coll, events, "PV"), ("PV",)),
+    "dxyBeamspot": (lambda coll, events: _trackIP(coll, events, "BS"), ("BeamSpot",)),
+}
+
+
 def _derived(coll, variable, events):
-    """Per-object quantities computed from stored branches."""
-    if variable == "dzPV":
-        return _trackIP(coll, events, "PV")
-    if variable == "dxyBeamspot":
-        return _trackIP(coll, events, "BS")
-    return None
+    """A computed per-object variable, or None when the variable is a stored branch."""
+    entry = DERIVED_VARIABLES.get(variable)
+    return entry[0](coll, events) if entry else None
 
 
 def _oneRequirement(req, coll, events, branches, ones):
@@ -179,7 +220,7 @@ def _objectMask(leg, events, branches):
     coll = leg["collection"]
     first = next((b for b in branches if b.startswith(coll + "_")), None)
     if first is None:
-        raise ValueError(f"Selection needs collection '{coll}', which the ntuple does not have")
+        raise MissingCollections([coll])
     ones = ak.ones_like(events[first], dtype=bool)
     keep = ones
     for req in leg["requirements"]:
@@ -277,12 +318,54 @@ def _bounds(cut):
     return " and ".join(_boundsText(_quantityText(cond["quantity"]), cond) for cond in cut["conditions"])
 
 
+## The function applying each cut type. Its keys must be the CUT_TYPES the readers accept, so a new cut type needs a function here too.
+CUT_MASKS = {
+    "trigger":  _triggerCut,
+    "flags":    _flagsCut,
+    "quantity": _quantityCut,
+    "object":   _legMask,
+    "anyOf":    _anyOfCut,
+}
+if set(CUT_MASKS) != set(CUT_TYPES):
+    raise RuntimeError(f"Cut types {sorted(set(CUT_MASKS) ^ set(CUT_TYPES))} are in only one of CUT_TYPES (configReaders/selections.py) and CUT_MASKS (select/engine.py)")
+
+
+def collectionsUsed(selection):
+    """Every collection a resolved selection reads, so a pass can refuse ntuples lacking one before reading them."""
+    found = set()
+
+    def walk(node):
+        if isinstance(node, dict):
+            if isinstance(node.get("collection"), str):
+                found.add(node["collection"])
+            if node.get("variable") in DERIVED_VARIABLES:
+                found.update(DERIVED_VARIABLES[node["variable"]][1])
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(selection["cuts"])
+    return sorted(found)
+
+
+def mergeNotes(notes):
+    """The note for one cut over several jobs. The counts in an anyOf or input note are summed, and any other note is kept when every job agrees."""
+    texts = {tuple(_ADDITIVE.split(n)) for n in notes}
+    if len(texts) != 1:
+        return "Differs between jobs: " + " | ".join(sorted(set(notes)))
+    text = texts.pop()
+    sums = [sum(column) for column in zip(*([int(c) for c in _ADDITIVE.findall(n)] for n in notes))]
+    return "".join(piece + (str(sums[i]) if i < len(sums) else "") for i, piece in enumerate(text))
+
+
 def applySelection(inputPaths, selection, outputPath, treeName="Events"):
     """Apply every cut in order, write the surviving events, and return the cutflow."""
-    events, branches = _readAll(inputPaths, treeName)
+    events, branches = _readAll(inputPaths, treeName, collectionsUsed(selection))
     total = len(events)
 
-    flow = [{"cut": "input", "type": "", "doc": "Events in the production ntuples, after the trigger skim they were written with", "detail": f"{len(inputPaths)} file(s)",
+    flow = [{"cut": "input", "type": "", "doc": "Events in the production ntuples, after any trigger skim they were written with", "detail": f"{len(inputPaths)} file(s)",
              "kept": total, "removed": 0, "efficiency": 1.0, "cumulative": 1.0}]
     keep = np.ones(total, dtype=bool)
 
@@ -318,28 +401,27 @@ def _localCopy(path, scratch):
     return dest, True
 
 
-def _readAll(inputPaths, treeName):
-    """Read every input file into one array. Returns (events, branchNames)."""
+# Each read gets its own scratch directory, since a shared one breaks for a second user on the node and lets parallel passes over the same task delete each other's copies.
+def _readAll(inputPaths, treeName, collections=()):
+    """Read every input file into one array. Returns (events, branchNames). Raises MissingCollections from the first file's branches, before reading the rest."""
     parts = []
     branches = None
-    scratch = os.path.join(tempfile.gettempdir(), "kamuiSelectInputs")
-    fetched = []
+    scratch = tempfile.mkdtemp(prefix="kamuiSelect")
     try:
         for p in inputPaths:
             local, isCopy = _localCopy(p, scratch)
-            if isCopy:
-                fetched.append(local)
             with uproot.open(local) as f:
                 tree = f[treeName]
                 if branches is None:
                     branches = [k for k in tree.keys()]
+                    missing = [c for c in collections if not any(b.startswith(c + "_") for b in branches)]
+                    if missing:
+                        raise MissingCollections(missing)
                 parts.append(tree.arrays())
+            if isCopy:
+                os.remove(local)
     finally:
-        for f in fetched:
-            try:
-                os.remove(f)
-            except OSError:
-                pass
+        shutil.rmtree(scratch, ignore_errors=True)
     if not parts:
         raise ValueError("No input files")
     return (parts[0] if len(parts) == 1 else ak.concatenate(parts)), branches

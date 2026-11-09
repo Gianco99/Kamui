@@ -19,8 +19,10 @@ The shape of a definition file, and a selection cut that uses one:
 | `tightLepVeto.json` | The TightLepVeto PF jet ID, with one list per era |
 | `analysisJet.json` | The jets the analysis counts, built on `tightLepVeto` |
 | `deepJetLoose.json` | DeepJet loose b-tag working point, per era |
+| `deepJetTight.json` | DeepJet tight b-tag working point, per era |
 | `plateauMuon.json` | A muon on the plateau of the single-muon trigger, with ID, isolation and impact parameters |
 | `plateauElectron.json` | An electron on the plateau of the single-electron trigger, with ID and impact parameters |
+| `tightDV.json` | A DV good enough for the analysis regions: inside the beampipe, far enough from the beamspot, precisely measured, with enough mass and track pT |
 
 See `config/selections/README.md` for the full cut syntax.
 

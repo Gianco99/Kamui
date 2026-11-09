@@ -15,7 +15,7 @@ from ..foundations import paths
 
 
 def sumsFile():
-    return os.path.join(paths.NORM_DIR, "generatorSums.json")
+    return paths.GENERATOR_SUMS_FILE
 
 
 def loadSums():
@@ -70,7 +70,7 @@ def record(sampleName, measured=None, genEvents=None, write=True):
     if not write:
         return entry
 
-    os.makedirs(paths.NORM_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(sumsFile()), exist_ok=True)
     tmp = sumsFile() + ".tmp"
     with open(tmp, "w") as f:
         json.dump(data, f, indent=2)

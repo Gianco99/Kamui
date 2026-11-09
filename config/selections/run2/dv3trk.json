@@ -1,0 +1,6 @@
+{
+  "_doc": "Exactly one tight DV with 3 tracks.",
+  "cuts": [
+    {"name": "dv3trk", "type": "quantity", "conditions": [{"quantity": {"collection": "DV", "requirements": [{"definition": "tightDV"}, {"variable": "nTracks", "min": 3, "max": 3}]}, "min": 1, "max": 1}]}
+  ]
+}

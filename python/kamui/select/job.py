@@ -25,7 +25,7 @@ def main(argv=None):
 
     flow = applySelection(inputs, selection, outputPath)
 
-    ## The cutflow travels back with the output. Nothing merges these yet.
+    ## The cutflow travels back with the output, and `cutflow` sums the jobs' files
     with open(outputPath + ".cutflow.json", "w") as f:
         json.dump(flow, f, indent=2)
 

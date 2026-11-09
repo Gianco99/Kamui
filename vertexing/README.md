@@ -12,6 +12,7 @@ A seed track is a charged `packedPFCandidates` entry that carries full track inf
 - Events without a good PV get no seed tracks.
 - In MC, `trackDrop` drops each candidate track at random before the seed cuts, with a probability growing with its distance to the beamspot.
 - `SeedTrack_candIdx` is each track's index in `packedPFCandidates`.
+- In MC, `trackErrScale` corrects each track's uncertainties before the significance cut. A corrected copy of every seed track is kept for the `DV_dBVErr` refit.
 
 ## Vertices
 
@@ -33,6 +34,11 @@ Output:
 
 - The `DV` collection keeps the vertices with at least `minTracks` tracks.
 - `SeedTrack_dvIdx` is the vertex each seed track ended up in, and -1 for tracks in none. 
+- Every kept DV also gets the quantities the analysis selection cuts on:
+  - `DV_dBV`: its 2D distance from the beamspot, taken at the DV's z.
+  - `DV_dBVErr`: the uncertainty on `DV_dBV`, from refitting the DV with the corrected seed-track copies. In data the copies are the tracks themselves.
+  - `DV_mass` and `DV_sumPt`: the invariant mass of its tracks, taken as pions, and their scalar pT sum.
+  - `DV_insideBeampipe`: whether it lies inside the `beampipe` circle.
 - Vertices outside the beampipe are kept here, since that cut belongs to the selection stage. 
 
 ## Constants
@@ -43,17 +49,7 @@ Cuts hard-coded in `plugins/DVProducer.cc`:
 
 ## Known JMTucker Bugs
 
-When porting the vertexing code from JMTucker, bugs were identified. For the sake of consistency with the original framework, these bugs are also ported and will be addressed after full validation of the framework is completed.
-
-- A negative fit chi2 passes every chi2 cut, so a fit that failed badly is accepted.
-- Seeding keeps a fit strictly below `maxChi2PerDof`, while every later fit passes at or below it.
-- `zRefit` treats a negative refit chi2 as a reason to drop the track.
-- `zRefit` never checks that the refit is valid. A failed fit comes back at the origin, reads as a shift of hundreds of sigma, and replaces the vertex, which the next steps then drop.
-- The `zRefit` significance divides the z shift by the square root of the difference of two nearly equal z variances, so a tiny numerical difference in the fits can move it across `maxShiftSigma`.
-- Track-jet matching compares phi without wrapping.
-- A shared-jet refit that fails leaves an empty vertex, which the next sweep drops.
-- `sharedJets` tests all of a vertex's lone tracks against the vertex's phi from before its first refit in this step, so later refits never update that phi.
-- `mergeNearby` keeps the first vertex's original track list after a merge, so a second merge in the same sweep fits the stale set.
+Kamui reproduces the bugs found in JMTucker's vertexing that change its output, so the two match exactly until the framework is fully validated. Each has a file in `Bugs/` at the repo root saying where it lives in both frameworks and how to fix it.
 
 ## Caveats
 
@@ -61,5 +57,5 @@ When porting the vertexing code from JMTucker, bugs were identified. For the sak
   - Because every event has its own seed, the drops in different jobs are independent.
   - JMTucker seeds its engine once per job and keeps drawing from it event after event, so its drops cannot be replayed.
 - Seed tracks keep their `packedPFCandidates` order. Every fit takes its tracks in that order too, since `plugins/DVProducer.cc` gathers them in a `std::set<reco::TrackRef>`, which sorts them by seed-track index. The Kalman fit is order sensitive!
-- `DxyErrScale` scales only the dxy diagonal of the covariance.
+- Two odd `DV_dBVErr` values copy JMTucker: 0 when the refit fails, which passes any upper cut, and NaN when the DV's covariance is broken (not positive definite), which fails every cut. See `Bugs/`.
 - A plugin name must be unique across all of CMSSW, the release included. Before naming a new one, grep `$CMSSW_RELEASE_BASE/lib/$SCRAM_ARCH/.edmplugincache` for it.

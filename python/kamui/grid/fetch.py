@@ -1,11 +1,12 @@
 """
-Copies raw MiniAOD from the grid to our EOS area.
+Copies MiniAOD from the grid to our EOS area.
 """
 
 # Import Block
 
 ## Standard Python imports
 import os
+import re
 import subprocess
 
 ## Kamui modules
@@ -17,19 +18,30 @@ def _eosDir(sites, sampleName):
     return "/".join([sites["stageoutBase"].rstrip("/"), sites["miniaodDir"], sampleName])
 
 
+## A line of `xrdfs ls -l`: the size comes right before the date and time, and the path is last
+LONG_LISTING = re.compile(r"\s(\d+)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+(\S+)$")
+
+
+# A copy that died partway can leave an empty file under the right name, so only a file with bytes in it counts as staged.
 def _listStaged(sites, sampleName):
+    """Paths of the sample's files on EOS that are not empty."""
     try:
-        r = subprocess.run(["xrdfs", sites["eosRedirector"].rstrip("/"), "ls", _eosDir(sites, sampleName)], capture_output=True, text=True, timeout=120)
+        r = subprocess.run(["xrdfs", sites["eosRedirector"].rstrip("/"), "ls", "-l", _eosDir(sites, sampleName)], capture_output=True, text=True, timeout=120)
     except (OSError, subprocess.SubprocessError) as e:
         print(f"  Warning: could not list EOS ({e}); assuming nothing is staged")
         return []
     if r.returncode != 0:
         return []
-    return [l.strip() for l in r.stdout.splitlines() if l.strip()]
+    staged = []
+    for line in r.stdout.splitlines():
+        m = LONG_LISTING.search(line.strip())
+        if m and int(m.group(1)) > 0:
+            staged.append(m.group(2))
+    return staged
 
 
 def stage(sample, sites=None, maxFiles=None, dryRun=False, refresh=False):
-    """Copy files for one sample, capped at maxFiles when given. Returns (nPresent, nFailed), where nPresent counts files copied, already on EOS, or listed in a dry run."""
+    """Copy files for one sample, capped at maxFiles when given. Returns (nPresent, nFailed), where nPresent counts files copied, already on EOS and not empty, or listed in a dry run."""
     sites = sites or loadSites()
     dest = _eosDir(sites, sample["name"])
     eosRed = sites["eosRedirector"].rstrip("/")

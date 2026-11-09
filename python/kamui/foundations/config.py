@@ -37,6 +37,10 @@ def loadJson(path):
             raise ValueError(f"{path}: {e}") from None
     return stripComments(raw)
 
+def isNameList(value):
+    """Whether a config value is a non-empty list of non-empty strings, such as a list of eras, paths or process names."""
+    return isinstance(value, list) and bool(value) and all(isinstance(v, str) and v for v in value)
+
 ## Each config kind that differs by run keeps one folder per run, and an era reads only from its own run's folder
 RUN2_ERAS = {"2016", "2016APV", "2017", "2018"}
 RUNS = ("run2", "run3")
@@ -65,6 +69,9 @@ def _resolvePath(nameOrPath, searchDir):
             continue
         ## A name found in two folders, such as run2/ and run3/, is an error, so a lookup never quietly takes the wrong one
         found = [c for c in (os.path.join(d, nameOrPath + ".json") for d in [base] + [os.path.join(base, x) for x in sorted(os.listdir(base)) if os.path.isdir(os.path.join(base, x))]) if os.path.exists(c)]
+        ## A name both runs define is found twice only by a lookup given no era, since an era reads its own run's folder alone
+        if len({os.path.relpath(c, base).split(os.sep)[0] for c in found} & set(RUNS)) > 1:
+            raise ValueError(f"Config '{nameOrPath}' exists in more than one run folder ({', '.join(found)}), and this lookup has no era to pick the run")
         if len(found) > 1:
             raise ValueError(f"Config '{nameOrPath}' matches {', '.join(found)}; name it with its folder, e.g. '{os.path.relpath(os.path.dirname(found[0]), base)}/{nameOrPath}'")
         if found:
@@ -81,8 +88,13 @@ def loadWithIncludes(nameOrPath, searchDir, _seen=None):
     _seen = _seen + [real]
 
     cfg = loadJson(path)
+    if not isinstance(cfg, dict):
+        raise ValueError(f"{path}: the top level must be an object")
+    includes = cfg.pop("include", [])
+    if not isinstance(includes, list) or not all(isinstance(inc, str) and inc for inc in includes):
+        raise ValueError(f"{path}: include must be a list of config names, such as [\"dvBase\"]")
     merged = {}
-    for inc in cfg.pop("include", []):
+    for inc in includes:
         merged = deepMerge(merged, loadWithIncludes(inc, searchDir, _seen))
     merged = deepMerge(merged, cfg)
     return merged
