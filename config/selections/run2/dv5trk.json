@@ -1,6 +1,5 @@
 {
-  "_doc": "Exactly one tight DV with 5 or more tracks.",
   "cuts": [
-    {"name": "dv5trk", "type": "quantity", "conditions": [{"quantity": {"collection": "DV", "requirements": [{"definition": "tightDV"}, {"variable": "nTracks", "min": 5}]}, "min": 1, "max": 1}]}
+    {"name": "dv5trk", "doc": "Exactly one tight DV with 5 or more tracks.", "type": "quantity", "conditions": [{"quantity": {"collection": "DV", "requirements": [{"definition": "tightDV"}, {"variable": "nTracks", "min": 5}]}, "min": 1, "max": 1}]}
   ]
 }

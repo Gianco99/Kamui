@@ -1,6 +1,5 @@
 {
-  "_doc": "Two or more tight DVs with 3 tracks.",
   "cuts": [
-    {"name": "dv3x3", "type": "quantity", "conditions": [{"quantity": {"collection": "DV", "requirements": [{"definition": "tightDV"}, {"variable": "nTracks", "min": 3, "max": 3}]}, "min": 2}]}
+    {"name": "dv3x3", "doc": "Two or more tight DVs with 3 tracks.", "type": "quantity", "conditions": [{"quantity": {"collection": "DV", "requirements": [{"definition": "tightDV"}, {"variable": "nTracks", "min": 3, "max": 3}]}, "min": 2}]}
   ]
 }

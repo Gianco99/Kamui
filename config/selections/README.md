@@ -92,7 +92,7 @@ See `python/kamui/README.md` for the flags and worked examples.
 
 - A path the ntuple lacks makes only its own `anyOf` alternative keep no events, and the pass goes on. So a misspelled path in one alternative shows up only as that alternative's count in the cutflow note, and inside an inverted `anyOf` such as `leptonVeto` the veto quietly stops removing those events.
 - An `anyOf` inside `requirements` lets different objects pass through different groups, and all of them count toward `min`. An `anyOf` cut with one object cut per alternative needs `min` objects passing a single alternative, so the two give the same result only when `min` is 1.
-- Kamui keeps every DV, even those outside the beampipe. A DV cut of your own needs `tightDV` or an `insideBeampipe` requirement, or it counts beampipe DVs JMTucker never had.
+- Kamui keeps every DV, even those outside the beampipe or with a broken covariance. A DV cut of your own needs `tightDV`, or both an `insideBeampipe` requirement and a `dBVErr` bound, or it counts DVs JMTucker never had.
 - The two-DV regions can overlap, like JMTucker's: an event with tight DVs of 5, 6 and 4 tracks is in both `dv4x5` and `dv5x5`.
 - `dv4x5` copies JMTucker's bug of counting only DVs with exactly 5 tracks, so an event whose tight DVs have 4 and 6 tracks lands in no two-DV region. See `Bugs/fiveTrackCappedAtFive.md`.
 

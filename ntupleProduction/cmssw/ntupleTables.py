@@ -144,7 +144,7 @@ def _errScaleRegion(region):
 ## The quantities DVProducer computes for every DV it keeps, written as DV branches: (type, doc)
 DV_SELECTION_QUANTITIES = {
     "dBV": ("float", "2D distance from the beamspot at the DV's z [cm]"),
-    "dBVErr": ("float", "Uncertainty on the 2D distance from the beamspot, from a refit of the DV's tracks with the MC track uncertainty scale applied. NaN when the DV's position covariance is not positive definite [cm]"),
+    "dBVErr": ("float", "Uncertainty on the 2D distance from the beamspot, from a refit of the DV's tracks, with the track uncertainty scale applied in MC. 0 when the refit fails, NaN when the DV's position covariance is not positive definite [cm]"),
     "mass": ("float", "Invariant mass of the DV's tracks, taken as pions [GeV]"),
     "sumPt": ("float", "Scalar sum of the DV's track pT [GeV]"),
     "insideBeampipe": ("bool", "DV lies inside the beampipe"),

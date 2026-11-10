@@ -120,6 +120,7 @@ Collections:
 | `gen` | Generator particles, generator MET, weights and pileup. All `mcOnly` |
 | `vertexing` | DV seed tracks, the jets the `sharedJets` step reads, and the DVs |
 
+- The Run 3 `vertexing` has no `beampipe` block yet, so it does not resolve and `check` skips it.
 - The `trackErrScale` and `trackDrop` numbers come from the Run 2 analysis, which measured both by comparing data with MC. Run 3 has no such measurement yet, so the Run 3 seeding applies neither correction.
 - `tightLepVeto`, the jet ID, has no Run 3 eras yet, so the Run 3 `VertexJet` uses only the pT and eta cuts of `analysisJet`.
 

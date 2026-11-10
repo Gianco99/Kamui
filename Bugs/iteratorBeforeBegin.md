@@ -1,5 +1,5 @@
 # Several vertex loops move the iterator before begin(), which is undefined behavior that happens to work for vector iterators.
 
 - **JMTucker:** `MFVNeutralino/plugins/Vertexer.cc:780, 1035, 1520, 1529, 1620, 1736, 1940`. The sharedTracks arbitration resets with `v[0] = vertices->begin() - 1` (1035) and steps back with `erase(v[0]) - 1` (780), zRefit steps back with `--v[0]` (1520) and `erase(v[0]) - 1` (1529), and mergeNearby (1620, 1736) and the sharedJets cleanup (1940) do the same. Whenever v[0] is the first vertex, the iterator points before `begin()` until the loop's `++v[0]` brings it back.
-- **Kamui:** `vertexing/plugins/DVProducer.cc:252, 354, 375, 383, 421, 488`. Same control flow, kept on purpose to match JMTucker. The standalone background-template rewrite has the sharedTracks and mergeNearby cases (`~/nobackup/work/BackgroundTemplateRebuild/rewrite/2v_from_jets.cc:588, 664, 696`).
+- **Kamui:** `vertexing/plugins/DVProducer.cc:258, 360, 381, 389, 427, 494`. Same control flow, kept on purpose to match JMTucker. The standalone background-template rewrite has the sharedTracks and mergeNearby cases (`2v_from_jets.cc:588, 664, 696`).
 - **Fix:** Loop over an index that restarts at 0, or advance the iterator only when nothing was erased or reset, so it never moves before `begin()`.

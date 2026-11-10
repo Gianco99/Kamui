@@ -12,7 +12,7 @@ A seed track is a charged `packedPFCandidates` entry that carries full track inf
 - Events without a good PV get no seed tracks.
 - In MC, `trackDrop` drops each candidate track at random before the seed cuts, with a probability growing with its distance to the beamspot.
 - `SeedTrack_candIdx` is each track's index in `packedPFCandidates`.
-- In MC, `trackErrScale` corrects each track's uncertainties before the significance cut. A corrected copy of every seed track is kept for the `DV_dBVErr` refit.
+- In MC, `trackErrScale` corrects each track's uncertainties before the significance cut. A corrected copy of every seed track is kept for the `DV_dBVErr` refit, and the `SeedTrack` branches hold the uncorrected tracks.
 
 ## Vertices
 
@@ -57,5 +57,5 @@ Kamui reproduces the bugs found in JMTucker's vertexing that change its output, 
   - Because every event has its own seed, the drops in different jobs are independent.
   - JMTucker seeds its engine once per job and keeps drawing from it event after event, so its drops cannot be replayed.
 - Seed tracks keep their `packedPFCandidates` order. Every fit takes its tracks in that order too, since `plugins/DVProducer.cc` gathers them in a `std::set<reco::TrackRef>`, which sorts them by seed-track index. The Kalman fit is order sensitive!
-- Two odd `DV_dBVErr` values copy JMTucker: 0 when the refit fails, which passes any upper cut, and NaN when the DV's covariance is broken (not positive definite), which fails every cut. See `Bugs/`.
+- Two odd `DV_dBVErr` values copy JMTucker: 0 when the refit fails, which passes any upper cut, and NaN when the DV's covariance is broken (not positive definite), which fails any cut on `DV_dBVErr`. See `Bugs/`.
 - A plugin name must be unique across all of CMSSW, the release included. Before naming a new one, grep `$CMSSW_RELEASE_BASE/lib/$SCRAM_ARCH/.edmplugincache` for it.

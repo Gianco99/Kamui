@@ -14,7 +14,7 @@ Kamui is the framework for our Run 3 CMS DV analysis. It reads MiniAOD datasets,
 | `ntupleSelection/` | Step 2: Selections applied to ntuples |
 | `vertexing/` | DV reconstruction |
 | `tools/` | Standalone scripts that inspect the framework's inputs and outputs |
-| `Bugs/` | Known JMTucker bugs, one file each with where it lives, whether Kamui reproduces it on purpose, and the fix. The `template*` files are bugs in Alec's background-template code, kept in its standalone rewrite until that moves into Kamui |
+| `Bugs/` | Known JMTucker bugs, one file each with where it lives, whether Kamui reproduces it on purpose, and the fix. The `template*` files are bugs in Alec's background-template code, kept in its standalone rewrite (`/uscms/home/gdecastr/nobackup/work/BackgroundTemplateRebuild/rewrite`) until that moves into Kamui |
 | `CLAUDE.md` | Conventions for the AI |
 ## The Framework
 

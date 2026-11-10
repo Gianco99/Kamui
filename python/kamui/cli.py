@@ -165,18 +165,22 @@ def _cmdContent(args):
         presets, collections = listPresets(), listCollections()
         sys.exit(f"Error: {e}{_otherRunHint(args.preset, {run: presets.get(run, []) + collections.get(run, []) for run in RUNS}, args.era)}")
     print(f"{args.preset}  (isMC={not args.data}, era {args.era})")
-    print(summarize(resolved))
-    nvar = sum(len(c.get("variables", c.get("extVariables", {}))) for c in resolved["collections"].values())
+    try:
+        branches = _branches(resolved)
+    except ImportError as e:
+        branches, branchError = None, e
+    ## A collection's count is its own branches, leaving out the n<Collection> length branch
+    counts = {cname: len([b for b in names if b.startswith(cname + "_")]) for cname, names in (branches or {}).items() if any(b.startswith(cname + "_") for b in names)}
+    print(summarize(resolved, counts))
+    nvar = sum(counts.get(cname, len(c.get("variables", c.get("extVariables", {})))) for cname, c in resolved["collections"].items())
     ncol = len(resolved["collections"])
     print(f"\n  {ncol} collection{'' if ncol == 1 else 's'}, {nvar} variable{'' if nvar == 1 else 's'}")
     skim = resolved["skim"]
     if skim:
         npath = len(skim.get("hltPaths", []))
         print(f"  skim: {skim['triggers']} ({npath} path{'' if npath == 1 else 's'}, mode {skim.get('mode', 'any')}, process {skim.get('process', 'HLT')})")
-    try:
-        branches = _branches(resolved)
-    except ImportError as e:
-        print(f"\n  Branch names need the CMSSW environment, so run cmsenv first ({e})")
+    if branches is None:
+        print(f"\n  Branch names need the CMSSW environment, so run cmsenv first ({branchError})")
     else:
         print("\n  Branches")
         for cname, names in branches.items():

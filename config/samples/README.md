@@ -58,6 +58,7 @@ Example grid for two masses in one era:
 "name":    "rpvStopDD_M{mass}_ctau1mm_{era}",
 "dataset": "/StopStopbarTo2Dbar2D_M-{mass}_CTau-1mm_TuneCP5_13TeV-pythia8/{campaign}/MINIAODSIM",
 "content": "dvDisplaced",
+"isMC":    true,
 "axes": {
   "mass": ["400", "600"],
   "era":  [{"era": "2016APV", "campaign": "RunIISummer20UL16MiniAODAPVv2-106X_mcRun2_asymptotic_preVFP_v11-v2"}]

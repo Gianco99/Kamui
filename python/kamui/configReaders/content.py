@@ -420,11 +420,11 @@ def _checkExtVars(cname, variables):
     return out
 
 
-def summarize(resolved):
-    """One line per collection, as `kamui content <name>` prints it."""
+def summarize(resolved, counts=None):
+    """One line per collection, as `kamui content <name>` prints it. counts, when given, replaces a collection's variable count with the number of branches it writes."""
     lines = ["  " + " ".join([f"{'Collection':<12}", f"{'Type':<16}", f"{'Source':<34}", f"{'Vars':>4}"])]
     for cname, c in sorted(resolved["collections"].items()):
-        n = len(c.get("variables", c.get("extVariables", {})))
+        n = (counts or {}).get(cname, len(c.get("variables", c.get("extVariables", {}))))
         bits = [f"{cname:<12}", f"{c['kind']:<16}", f"{c.get('src',''):<34}"]
         bits.append(f"{n:>4}")
         if c.get("cut"):

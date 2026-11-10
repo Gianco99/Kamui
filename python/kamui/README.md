@@ -44,9 +44,8 @@ Two things to keep in mind:
 
 #### check
 
-Validates the configs and the framework locally. It can be divided into config and architecture checks.
+Validates the configs locally.
 
-**Config Checks:**
 
 | Check | What it means |
 | --- | --- |
@@ -288,14 +287,12 @@ See `config/selections/README.md` for how a cut is written.
 | **`--selection NAME`** (required, default: None) | A config in `config/selections/`, read from the run folder of the samples' era. Names joined by commas run one after another, such as `lepton,dv3x4`. A blind selection refuses data samples |
 | **`--task NAME`** (required, default: None) | Names this selection pass |
 | **`--inputTask NAME`** (required, default: None) | The ntuple production task to read from |
-| `--inputBase PATH` (optional, default: the output directory the input task's `task.json` records, else `stageoutBase` in `sites.json`) | Base holding `<base>/ntuples/<inputTask>`, on EOS or a local directory |
+| `--inputBase PATH` (optional, default: the output directory the input task's `task.json` in its local job area records, else `stageoutBase` in `sites.json`) | Base holding `<base>/ntuples/<inputTask>`, on EOS or a local directory |
 | `--outputBase PATH` (optional, default: `stageoutBase` in `sites.json`) | EOS base for the selected ntuples, condor only |
 | `--backend BACKEND` (optional, default: `local`) | `local` or `condor` |
 | `--filesPerJob N` (optional, default: 5) | Input files per job on condor |
 | `--maxFiles N` (optional, default: None) | Use at most this many input files per sample |
 | `--dryRun` (optional, default: None) | Locally, print each sample's input file count, its output path and the resolved selection, and run nothing. On condor, write the job area and submit nothing |
-
-To apply one selection after another, list both in `--selection`, such as `lepton,dv3x4`. 
 
 A local pass writes `<sample>/<sample>_selected.root`, `cutflow.json` and `task.json` under `ntupleSelection/out/<task>/`, and rewrites the cutflow after every sample. A condor pass builds its job area in `ntupleSelection/jobs/<task>/`, writes to `<base>/selected/<task>/` on EOS, and copies `task.json` there once the jobs are submitted. Both records hold the input task, the selection resolved for each era and the commit that ran. Before anything runs, `select` compares the collections the selection reads with the content the input task's `task.json` records, and stops with the missing ones named.
 ```

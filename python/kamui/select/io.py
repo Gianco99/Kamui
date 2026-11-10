@@ -192,7 +192,7 @@ def writePassRecord(d, plan, outputDir, fields=None, sites=None):
     record = {"task": plan["task"], "stage": "select", "backend": plan["backend"], "selection": plan["selection"], "inputTask": plan["inputTask"], "inputDir": plan["inputDir"], "maxFiles": plan["maxFiles"], "samples": [s["name"] for s in plan["samples"]], "nInputFiles": {s["name"]: len(plan["fileLists"][s["name"]]) for s in plan["samples"]}, "partialInputs": plan["partialInputs"], "outputDir": outputDir}
     record.update(fields or {})
     record["resolvedSelections"] = plan["resolvedSelections"]
-    writeTaskRecord(d, record, samples=plan["samples"], sites=sites)
+    writeTaskRecord(d, record, samples=[dict(s, content=plan["presets"].get(s["name"]) or s["content"]) for s in plan["samples"]], sites=sites)
 
 
 def _selectedPath(outDir, sampleName):

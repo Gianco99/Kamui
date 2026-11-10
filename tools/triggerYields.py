@@ -24,7 +24,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "python"))
 from kamui.foundations import paths
 from kamui.configReaders.catalog import loadCatalog
-from kamui.submit.common import recordedOutputDir
+from kamui.select.io import findInputs
 from kamui.foundations.config import loadWithIncludes
 from kamui.configReaders.content import resolveContent
 from kamui.configReaders.sites import loadSites
@@ -33,14 +33,6 @@ from kamui.configReaders.sites import loadSites
 def branchName(path):
     """'HLT_IsoMu24_v*' -> 'HLT_IsoMu24'. The output module names branches without the version."""
     return path.split("_v*")[0].rstrip("*").rstrip("_")
-
-
-def listEos(sites, lfnDir):
-    red = sites["eosRedirector"].rstrip("/")
-    r = subprocess.run(["xrdfs", red, "ls", lfnDir], capture_output=True, text=True)
-    if r.returncode != 0:
-        return []
-    return [f"{red}/{l.strip()}" for l in r.stdout.splitlines() if l.strip().endswith(".root")]
 
 
 def yieldsFor(files, paths_):
@@ -129,7 +121,7 @@ def main():
             if not skim.get("hltPaths"):
                 print(f"  {name}: content preset '{s['content']}' declares no trigger skim, skipping")
                 continue
-            files = listEos(sites, f"{recordedOutputDir(info)}/{name}")
+            files = findInputs(args.task, name)
             jobs.append((name, skim.get("triggers", "?"), skim["hltPaths"], files))
 
     hdr = f"{'sample':<42} {'channel':<16} {'files':>5} {'total':>9} {'pass':>9} {'eff':>8}"
