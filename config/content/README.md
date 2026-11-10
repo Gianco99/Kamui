@@ -79,6 +79,8 @@ A `dv` collection fits the DVs. Its `src` and its `vertexing.jets` name the coll
 
 See `vertexing/README.md` for what those steps do.
 
+A `dvTrack` collection writes the tracks of every DV the `dv` collection in its `src` keeps, one row per track with the index of its DV. Its `variables` are methods of `reco::Track`.
+
 ## Presets
 
 A preset defines the collections you want to save in your output ntuples.
@@ -118,9 +120,9 @@ Collections:
 | `vertices` | IVF secondary vertices from MiniAOD |
 | `tracks` | Tracks and lost tracks, preselected with the pT cut and the minimum pixel and strip layers of the seed track definition |
 | `gen` | Generator particles, generator MET, weights and pileup. All `mcOnly` |
-| `vertexing` | DV seed tracks, the jets the `sharedJets` step reads, and the DVs |
+| `vertexing` | DV seed tracks, the jets the `sharedJets` step reads, the DVs, and the tracks of each DV |
 
-- The Run 3 `vertexing` has no `beampipe` block yet, so it does not resolve and `check` skips it.
+- The Run 3 `vertexing` has no `beampipe` block yet, so it does not resolve, `check` skips it, and the Run 3 `dvFull` leaves it out.
 - The `trackErrScale` and `trackDrop` numbers come from the Run 2 analysis, which measured both by comparing data with MC. Run 3 has no such measurement yet, so the Run 3 seeding applies neither correction.
 - `tightLepVeto`, the jet ID, has no Run 3 eras yet, so the Run 3 `VertexJet` uses only the pT and eta cuts of `analysisJet`.
 
@@ -130,7 +132,7 @@ Presets:
 |---|---|---|
 | `dvBase` | run2, run3 | `core`, `jets`, `leptons`, `vertices`  |
 | `dvSignal` | run2, run3 | `dvBase` plus `gen` |
-| `dvFull` | run2, run3 | `dvSignal` plus `tracks` |
+| `dvFull` | run2, run3 | `dvSignal` plus `tracks`, and in Run 2 also `vertexing` |
 | `dvDisplaced` | run2 | `dvFull` skimmed to the displacement-triggered channel |
 | `dvLepton` | run2 | `dvFull` skimmed to the lepton-triggered channel |
 
@@ -147,5 +149,6 @@ See `python/kamui/README.md` for the flags and worked examples.
 - `collections/` and `presets/` are searched together, so the two cannot share a name.
 - `expr` is C++ evaluated at job runtime, so `check` cannot catch a typo.
 - Use `precision: -1` for anything a selection threshold compares against, including `vx`, `vy`, `vz` and the `PV` positions that impact parameters are recomputed from. Fewer bits can round pT onto a threshold and flip whether an object passes.
+- Give a `dvTrack` collection no `cut` or `maxLen`, and keep its variables at full precision, since a revertexer rebuilds each DV from all of its rows.
 - `GenPart` takes no `cut` and `PV` no `maxLen`, since `genPartIdxMother` and `Track_pvIdx` point into them by position.
 - `maxLen` keeps the first objects in `src` order, with no sorting. Jets arrive pT-ordered, `SV` does not.

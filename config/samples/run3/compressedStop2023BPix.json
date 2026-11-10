@@ -1,0 +1,95 @@
+{
+  "_doc": "Central Summer23BPix long-lived stop pairs with a compressed neutralino LSP, each stop decaying to b W* LSP or c LSP.",
+  "family": "compressedStop2023BPix",
+  "defaults": {"era": "Summer23BPix", "isMC": true, "dasInstance": "prod/global", "content": "dvSignal", "tags": ["signal", "compressedStop", "run3"]},
+  "grids": [
+    {
+      "name": "compressedStop_mStop{mStop}_mLsp{mLsp}_ctau{ctau}mm_2023BPix",
+      "dataset": "/StopStopbar_MET-100_HT-200_Mstop-{mStop}-Mlsp-{mLsp}-ctau-{ctau}_TuneCP5_13p6TeV_madgraphMLM-pythia8/Run3Summer23BPixMiniAODv4-130X_mcRun3_2023_realistic_postBPix_v6-v2/MINIAODSIM",
+      "axes": {
+        "massPoint": [
+          {"mStop": "400", "mLsp": "375"},
+          {"mStop": "500", "mLsp": "475"},
+          {"mStop": "600", "mLsp": "575"},
+          {"mStop": "700", "mLsp": "675"},
+          {"mStop": "800", "mLsp": "775"},
+          {"mStop": "900", "mLsp": "875"},
+          {"mStop": "1000", "mLsp": "975"},
+          {"mStop": "1100", "mLsp": "1075"},
+          {"mStop": "1200", "mLsp": "1175"},
+          {"mStop": "1300", "mLsp": "1275"},
+          {"mStop": "1400", "mLsp": "1375"},
+          {"mStop": "1500", "mLsp": "1475"},
+          {"mStop": "1600", "mLsp": "1575"}
+        ],
+        "ctau": ["0p2", "1p0"]
+      }
+    },
+    {
+      "name": "compressedStop_mStop{mStop}_mLsp{mLsp}_ctau{ctau}mm_2023BPix",
+      "dataset": "/StopStopbar_MET-100_HT-200_Mstop-{mStop}-Mlsp-{mLsp}-ctau-{ctau}_TuneCP5_13p6TeV_madgraphMLM-pythia8/Run3Summer23BPixMiniAODv4-130X_mcRun3_2023_realistic_postBPix_v6-v2/MINIAODSIM",
+      "axes": {
+        "massPoint": [
+          {"mStop": "400", "mLsp": "380"},
+          {"mStop": "500", "mLsp": "480"},
+          {"mStop": "600", "mLsp": "580"},
+          {"mStop": "700", "mLsp": "680"},
+          {"mStop": "800", "mLsp": "780"},
+          {"mStop": "900", "mLsp": "880"},
+          {"mStop": "1000", "mLsp": "980"},
+          {"mStop": "1100", "mLsp": "1080"},
+          {"mStop": "1200", "mLsp": "1180"},
+          {"mStop": "1300", "mLsp": "1280"},
+          {"mStop": "1400", "mLsp": "1380"},
+          {"mStop": "1500", "mLsp": "1480"},
+          {"mStop": "1600", "mLsp": "1580"}
+        ],
+        "ctau": ["0p2", "2p0", "5p0"]
+      }
+    },
+    {
+      "name": "compressedStop_mStop{mStop}_mLsp{mLsp}_ctau{ctau}mm_2023BPix",
+      "dataset": "/StopStopbar_MET-100_HT-200_Mstop-{mStop}-Mlsp-{mLsp}-ctau-{ctau}_TuneCP5_13p6TeV_madgraphMLM-pythia8/Run3Summer23BPixMiniAODv4-130X_mcRun3_2023_realistic_postBPix_v6-v2/MINIAODSIM",
+      "axes": {
+        "massPoint": [
+          {"mStop": "400", "mLsp": "385"},
+          {"mStop": "500", "mLsp": "485"},
+          {"mStop": "600", "mLsp": "585"},
+          {"mStop": "700", "mLsp": "685"},
+          {"mStop": "800", "mLsp": "785"},
+          {"mStop": "900", "mLsp": "885"},
+          {"mStop": "1000", "mLsp": "985"},
+          {"mStop": "1100", "mLsp": "1085"},
+          {"mStop": "1200", "mLsp": "1185"},
+          {"mStop": "1300", "mLsp": "1285"},
+          {"mStop": "1400", "mLsp": "1385"},
+          {"mStop": "1500", "mLsp": "1485"},
+          {"mStop": "1600", "mLsp": "1585"}
+        ],
+        "ctau": ["2p0", "20", "50"]
+      }
+    },
+    {
+      "name": "compressedStop_mStop{mStop}_mLsp{mLsp}_ctau{ctau}mm_2023BPix",
+      "dataset": "/StopStopbar_MET-100_HT-200_Mstop-{mStop}-Mlsp-{mLsp}-ctau-{ctau}_TuneCP5_13p6TeV_madgraphMLM-pythia8/Run3Summer23BPixMiniAODv4-130X_mcRun3_2023_realistic_postBPix_v6-v2/MINIAODSIM",
+      "axes": {
+        "massPoint": [
+          {"mStop": "400", "mLsp": "388"},
+          {"mStop": "500", "mLsp": "488"},
+          {"mStop": "600", "mLsp": "588"},
+          {"mStop": "700", "mLsp": "688"},
+          {"mStop": "800", "mLsp": "788"},
+          {"mStop": "900", "mLsp": "888"},
+          {"mStop": "1000", "mLsp": "988"},
+          {"mStop": "1100", "mLsp": "1088"},
+          {"mStop": "1200", "mLsp": "1188"},
+          {"mStop": "1300", "mLsp": "1288"},
+          {"mStop": "1400", "mLsp": "1388"},
+          {"mStop": "1500", "mLsp": "1488"},
+          {"mStop": "1600", "mLsp": "1588"}
+        ],
+        "ctau": ["20", "200", "500"]
+      }
+    }
+  ]
+}

@@ -6,8 +6,9 @@ This is the number we compare against JMTucker.
 
 Needs cmsenv (uses ROOT) and no grid proxy for files already on our EOS.
 
-  python3 tools/triggerYields.py --task run2val
+  python3 tools/triggerYields.py --task run2Val
   python3 tools/triggerYields.py --files out.root --triggers run2/lepton
+  python3 tools/triggerYields.py --files out.root --triggers run3/bParking --era Summer24
 """
 
 # Import Block
@@ -25,8 +26,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 from kamui.foundations import paths
 from kamui.configReaders.catalog import loadCatalog
 from kamui.select.io import findInputs
-from kamui.foundations.config import loadWithIncludes
-from kamui.configReaders.content import resolveContent
+from kamui.configReaders.content import loadTriggerConfig, resolveContent, triggerEras
 from kamui.configReaders.sites import loadSites
 
 
@@ -85,6 +85,7 @@ def main():
     ap.add_argument("--task", metavar="NAME", help="Task name under ntupleProduction/jobs/")
     ap.add_argument("--files", nargs="+", metavar="FILE", help="Ntuple files to read; --task is ignored when these are given")
     ap.add_argument("--triggers", metavar="NAME", help="Trigger config, named with its run folder such as run2/lepton; required with --files")
+    ap.add_argument("--era", metavar="NAME", help="Era whose paths to read from a trigger config keyed by era; required with --files for such a config, and ignored under --task, which uses each sample's era")
     ap.add_argument("--sample", action="append", metavar="NAME", help="Restrict to these samples")
     ap.add_argument("--perPath", action="store_true", help="Print the per-path breakdown")
     args = ap.parse_args()
@@ -97,7 +98,13 @@ def main():
     if args.files:
         if not args.triggers:
             sys.exit("--files needs --triggers <name>")
-        trig = loadWithIncludes(args.triggers, paths.TRIGGERS_DIR)
+        try:
+            eras = triggerEras(args.triggers)
+            if eras and not args.era:
+                sys.exit(f"{args.triggers} keys its paths by era, so --files needs --era with one of: {', '.join(eras)}")
+            trig = loadTriggerConfig(args.triggers, era=args.era, triggerDir=paths.TRIGGERS_DIR)
+        except (FileNotFoundError, ValueError) as e:
+            sys.exit(f"Error: {e}")
         jobs.append(("(files)", args.triggers, trig["paths"], args.files))
     else:
         if not args.task:

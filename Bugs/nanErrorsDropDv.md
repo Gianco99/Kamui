@@ -1,5 +1,5 @@
-# A DV whose fit covariance is not positive definite gets NaN uncertainties and is silently dropped by the vertex selector.
+# A DV whose fit covariance has a negative eigenvalue can get NaN uncertainties, and the vertex selector then drops it silently.
 
 - **JMTucker:** `MFVNeutralino/plugins/VertexSelector.cc:380-450`. `use_vertex` is one long conjunction of comparisons, and every comparison with a NaN uncertainty is false, including the ones set to cut nothing. `mfvVerticesAux` runs this selector in the ntuple job, so such a DV never reaches the ntuple.
-- **Kamui:** `vertexing/plugins/DVProducer.cc`, `positiveDefinite` and its use in `selectionQuantities`. Reproduced on purpose: `DV_dBVErr` is NaN when the DV's position covariance is not positive definite, so the DV fails the `tightDV` cut on it.
+- **Kamui:** `vertexing/plugins/DVProducer.cc`, `jmtErrorsFinite` and its use in `selectionQuantities`. Reproduced on purpose: `DV_dBVErr` is NaN when one of the uncertainties JMTucker's selector compares comes out NaN (the DV's error along its position seen from the origin, in 2D and 3D, along its distance to the beamspot, and on its miss distance to the PV along its momentum), so the DV fails the `tightDV` cut on it. A covariance with a negative eigenvalue often gives finite values for all of them, and then both keep the DV.
 - **Fix:** Decide deliberately: repair the covariance before computing uncertainties, or drop these DVs with an explicit cut that shows up in the cutflow.

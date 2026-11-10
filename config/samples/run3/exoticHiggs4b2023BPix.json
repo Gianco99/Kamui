@@ -1,0 +1,38 @@
+{
+  "_doc": "Central Summer23BPix exotic Higgs H->SS->4b samples in every production mode.",
+  "family": "exoticHiggs4b2023BPix",
+  "defaults": {"era": "Summer23BPix", "isMC": true, "dasInstance": "prod/global", "content": "dvSignal", "tags": ["signal", "exoticHiggs", "run3"]},
+  "grids": [
+    {
+      "name": "ggH-2S-4B_mS{mS}_ctau{ctau}mm_2023BPix",
+      "dataset": "/ggH_Hto2Sto4B_MH-125-MS-{mS}-ctauS-{ctau}_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer23BPixMiniAODv4-130X_mcRun3_2023_realistic_postBPix_v6-v2/MINIAODSIM",
+      "axes": {
+        "mS": ["15", "23", "30", "40", "55"],
+        "ctau": ["0p1", "1", "10", "100", "1000", "10000", "100000"]
+      }
+    },
+    {
+      "name": "{mode}-2S-4B_mS{mS}_ctau{ctau}mm_2023BPix",
+      "dataset": "/{mode}_Hto2Sto4B_ctauS-{ctau}_MH-125_MS-{mS}_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer23BPixMiniAODv4-130X_mcRun3_2023_realistic_postBPix_v6-{version}/MINIAODSIM",
+      "axes": {
+        "mode": [
+          {"mode": "VBFH", "version": "v4"},
+          {"mode": "WplusH", "version": "v2"},
+          {"mode": "WminusH", "version": "v2"},
+          {"mode": "ZH", "version": "v2"},
+          {"mode": "ttH", "version": "v2"}
+        ],
+        "mS": ["15", "23", "30", "40", "55"],
+        "ctau": ["0p1", "1", "10", "100", "1000", "10000", "100000"]
+      }
+    }
+  ],
+  "overrides": {
+    "ggH-2S-4B_mS15_ctau100000mm_2023BPix": {"dataset": "/ggH_Hto2Sto4B_MH-125-MS-15-ctauS-100000_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer23BPixMiniAODv4-130X_mcRun3_2023_realistic_postBPix_v2-v2/MINIAODSIM"},
+    "ggH-2S-4B_mS23_ctau100000mm_2023BPix": {"dataset": "/ggH_Hto2Sto4B_MH-125-MS-23-ctauS-100000_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer23BPixMiniAODv4-130X_mcRun3_2023_realistic_postBPix_v2-v2/MINIAODSIM"},
+    "ggH-2S-4B_mS30_ctau100000mm_2023BPix": {"dataset": "/ggH_Hto2Sto4B_MH-125-MS-30-ctauS-100000_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer23BPixMiniAODv4-130X_mcRun3_2023_realistic_postBPix_v2-v2/MINIAODSIM"},
+    "ggH-2S-4B_mS40_ctau100000mm_2023BPix": {"dataset": "/ggH_Hto2Sto4B_MH-125-MS-40-ctauS-100000_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer23BPixMiniAODv4-130X_mcRun3_2023_realistic_postBPix_v2-v2/MINIAODSIM"},
+    "ggH-2S-4B_mS55_ctau100000mm_2023BPix": {"dataset": "/ggH_Hto2Sto4B_MH-125-MS-55-ctauS-100000_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer23BPixMiniAODv4-130X_mcRun3_2023_realistic_postBPix_v2-v2/MINIAODSIM"},
+    "WminusH-2S-4B_mS15_ctau1000mm_2023BPix": {"dataset": "/WminusH_Hto2Sto4B_ctauS-1000_MH-125_MS-15_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer23BPixMiniAODv4-130X_mcRun3_2023_realistic_postBPix_v6-v1/MINIAODSIM"}
+  }
+}

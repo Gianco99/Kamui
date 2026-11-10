@@ -144,7 +144,7 @@ def _errScaleRegion(region):
 ## The quantities DVProducer computes for every DV it keeps, written as DV branches: (type, doc)
 DV_SELECTION_QUANTITIES = {
     "dBV": ("float", "2D distance from the beamspot at the DV's z [cm]"),
-    "dBVErr": ("float", "Uncertainty on the 2D distance from the beamspot, from a refit of the DV's tracks, with the track uncertainty scale applied in MC. 0 when the refit fails, NaN when the DV's position covariance is not positive definite [cm]"),
+    "dBVErr": ("float", "Uncertainty on the 2D distance from the beamspot, from a refit of the DV's tracks, with the track uncertainty scale applied in MC. 0 when the refit fails, NaN when JMTucker's vertex selector would drop the DV for a NaN uncertainty [cm]"),
     "mass": ("float", "Invariant mass of the DV's tracks, taken as pions [GeV]"),
     "sumPt": ("float", "Scalar sum of the DV's track pT [GeV]"),
     "insideBeampipe": ("bool", "DV lies inside the beampipe"),
@@ -161,6 +161,7 @@ def _dvModules(content, name, c, producerName):
         rescaledSeedTracks=cms.InputTag(seedLabel, "rescaled"),
         beamSpot=cms.InputTag(v["beamSpot"]),
         jets=cms.InputTag(_inputLabel(content, v["jets"])),
+        goodPv=cms.InputTag(seedLabel, "goodPv"),
         minTracks=cms.int32(v["minTracks"]),
         maxChi2PerDof=cms.double(v["maxChi2PerDof"]),
         kalman=cms.PSet(
@@ -177,6 +178,15 @@ def _dvModules(content, name, c, producerName):
     table = _objectTable(name, dict(c, src=producerName))
     table.externalVariables = cms.PSet(**{q: _extVar({"src": producerName + ":" + q, "type": t, "doc": doc}) for q, (t, doc) in DV_SELECTION_QUANTITIES.items()})
     return producer, table
+
+
+def _dvTrackTable(content, name, c):
+    """The table of the tracks in every DV the vertexer keeps, each with the index of its DV."""
+    dvLabel = _inputLabel(content, c["src"])
+    table = _objectTable(name, dict(c, src=dvLabel + ":tracks"))
+    link = _extVar({"src": dvLabel + ":tracksVertexIdx", "type": "int", "doc": "Index into the %s collection" % c["src"]})
+    table.externalVariables = cms.PSet(**{_moduleStem(c["src"]) + "Idx": link})
+    return table
 
 
 def buildTables(content):
@@ -201,6 +211,8 @@ def buildTables(content):
         elif kind == "dv":
             producerName = _moduleStem(name) + "Producer"
             modules[producerName], modules[modName] = _dvModules(content, name, c, producerName)
+        elif kind == "dvTrack":
+            modules[modName] = _dvTrackTable(content, name, c)
         else:
             modules[modName] = _objectTable(name, c)
 
@@ -220,7 +232,7 @@ def buildSkim(skim):
     if not paths:
         return None, None
     import HLTrigger.HLTfilters.hltHighLevel_cfi as hltHighLevel
-    ## throw=False because one path list serves every era and a path absent from a year never fires.
+    ## throw=False because a path list can name paths a given menu lacks (a plain list serves every era, and an era can list both its data and MC names), and a missing path never fires.
     f = hltHighLevel.hltHighLevel.clone(
         TriggerResultsTag=cms.InputTag("TriggerResults", "", skim.get("process", "HLT")),
         HLTPaths=cms.vstring(*paths),

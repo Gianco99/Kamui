@@ -80,8 +80,13 @@ A later layer replaces lists and single values outright, so a grid that names `t
 | File | What |
 |---|---|
 | `run3/exoticHiggs4d2024.json` | Summer24 Exotic Higgs H->SS->4d. Central |
+| `run3/exoticHiggs4d{2022,2022EE,2023,2023BPix}.json` | Summer22 to Summer23BPix Exotic Higgs H->SS->4d. Central |
+| `run3/exoticHiggs4b{2022,2022EE,2023,2023BPix,2024}.json` | Summer22 to Summer24 Exotic Higgs H->SS->4b. Central |
+| `run3/exoticHiggs4tau{2022,2022EE,2023,2023BPix,2024}.json` | Summer22 to Summer24 Exotic Higgs H->SS->4tau, VBF only. Central |
 | `run3/stealthSusy2024.json` | Summer24 Stealth SUSY SHH and SYY. Private |
 | `run3/rpv2024.json` | Summer24 RPV stop->dd. Private |
+| `run3/rpv4b2024.json` | Summer24 RPV stop->bb. Central |
+| `run3/compressedStop{2022,2022EE,2023,2023BPix,2024}.json` | Summer22 to Summer24 long-lived stop with a compressed LSP. Central |
 | `run2/run2Validation.json` | Run 2 UL points for reproducing JMTucker results. Central |
 | `run2/tutorial/zhLeptonTriggered.json` | The sample used in the tutorial slides. Central |
 
@@ -100,13 +105,23 @@ See `python/kamui/README.md` for the flags and worked examples.
 
 Physics caveats per family are kept here so the configs stay readable.
 
-**Exotic Higgs (exoticHiggs4d2024)**
+**Exotic Higgs (exoticHiggs4b, exoticHiggs4d and exoticHiggs4tau families)**
 - Run 3 ggH has no gen-HT filter. The Run 2 samples had gen-HT > 200 GeV.
+- The `ggHPTH80` samples in 2022 and 2022EE are filtered on pTH > 80 GeV, so normalizing them needs that filter efficiency on top of the ggH cross section.
 - ZH and WH decays are inclusive in Run 3. For Run 2 they are exclusive to lepton decays.
-- Summer24 has exclusive ZH-Zto2L and WH-WtoLNu available. They have yet to be registered.
+- The Summer24 exclusive ZH-Zto2L, WplusH-WtoLNu and GluGluZH datasets named `Hto2S` decay the Higgs promptly to a strange-quark pair, so they hold no LLP.
+- Run 3 has no ggZH H->SS samples, so the ZH samples cover only the qq-initiated part.
 
 **RPV (rpv2024)**
-- Private from Bruno. Nothing exists in Run 3 for gluino to tbs or stop to bb, official or private.
+- Private from Bruno. Nothing exists in Run 3 for gluino to tbs, official or private.
+
+**RPV stop to bb (rpv4b2024)**
+- Exists in Summer24 only. 2022 and 2023 need a sample request.
+
+**Compressed stop (compressedStop families)**
+- Each stop decays half the time to b W* LSP and half to c LSP. The LSP is only slightly lighter than the stop, so the decay products carry a few GeV and their tracks are soft.
+- A generator filter requires MET > 100 GeV and HT > 200 GeV, so normalizing needs that filter efficiency.
+- Sample names keep the DAS lifetime spelling, so `ctau1p0mm` and `ctau20mm` both appear.
 
 **Stealth SUSY (stealthSusy2024)**
 - Private from Bruno.

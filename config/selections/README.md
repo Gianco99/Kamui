@@ -7,11 +7,12 @@ A selection JSON is an ordered list of event-level cuts, applied in the order th
 | `run2/lepton.json` | Run 2 lepton-triggered channel: MET filters, then a single-muon or single-electron path that fired with one lepton on its plateau |
 | `run2/displaced.json` | Run 2 displacement-triggered channel: high-HT veto, lepton-channel veto, a b-jet or displaced-dijet path that fired along with offline cuts that mimic it, MET filters |
 | `run2/dv3trk.json`, `dv4trk.json`, `dv5trk.json` | One-DV regions: exactly one tight DV with 3, 4, or 5 or more tracks |
-| `run2/dv3x3.json`, `dv3x4.json`, `dv4x4.json`, `dv4x5.json`, `dv5x5.json` | Two-DV regions, named by the track counts of two tight DVs. `dv5x5` is the signal region and is blind |
+| `run2/dv3x3.json`, `dv3x4.json`, `dv3x5.json`, `dv4x4.json`, `dv4x5.json`, `dv5x5.json` | Two-DV regions, named by the track counts of two tight DVs. `dv5x5` is the signal region and is blind |
+| `run3/vbfParking.json`, `run3/bParking.json` | Run 3 trigger studies: only a cut on the VBF or single-muon B parking paths of the sample's era, so the fraction of events kept is the trigger efficiency |
 
 A tight DV passes the `tightDV` definition in `config/definitions/`. The DV regions hold no channel cuts, so they run stacked after a channel: `--selection lepton,dv3x4` applies `lepton.json`'s cuts and then `dv3x4.json`'s, with one cutflow.
 
-No content preset carries the DV collections yet. `./kamui submit --content vertexing` writes them and nothing else, so its ntuples can run a region alone but not stacked after a channel.
+In Run 2, `dvFull` carries the DV collections, and so do `dvLepton` and `dvDisplaced`, which build on it.
 
 Selections sit in a folder per run. A selection pass reads the file of that name from the run folder of each sample's era, so `--selection lepton` picks the Run 2 or Run 3 file to match the samples.
 ## File Structure
@@ -94,7 +95,8 @@ See `python/kamui/README.md` for the flags and worked examples.
 - An `anyOf` inside `requirements` lets different objects pass through different groups, and all of them count toward `min`. An `anyOf` cut with one object cut per alternative needs `min` objects passing a single alternative, so the two give the same result only when `min` is 1.
 - Kamui keeps every DV, even those outside the beampipe or with a broken covariance. A DV cut of your own needs `tightDV`, or both an `insideBeampipe` requirement and a `dBVErr` bound, or it counts DVs JMTucker never had.
 - The two-DV regions can overlap, like JMTucker's: an event with tight DVs of 5, 6 and 4 tracks is in both `dv4x5` and `dv5x5`.
-- `dv4x5` copies JMTucker's bug of counting only DVs with exactly 5 tracks, so an event whose tight DVs have 4 and 6 tracks lands in no two-DV region. See `Bugs/fiveTrackCappedAtFive.md`.
+- Like JMTucker, `dv3x5` drops events that also hold a tight DV with 4 tracks, so it never shares an event with `dv4x5`.
+- `dv3x5` and `dv4x5` copy JMTucker's bug of counting only DVs with exactly 5 tracks, so an event whose tight DVs have 3 and 6 tracks, or 4 and 6, lands in no two-DV region. See `Bugs/fiveTrackCappedAtFive.md`.
 
 **Every Run 2 selection**
 - These must keep matching JMTucker: any change has to reproduce JMTucker's yields again.

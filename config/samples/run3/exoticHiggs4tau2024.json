@@ -1,0 +1,15 @@
+{
+  "_doc": "Central Summer24 exotic Higgs H->SS->4tau samples in VBF production.",
+  "family": "exoticHiggs4tau2024",
+  "defaults": {"era": "Summer24", "isMC": true, "dasInstance": "prod/global", "content": "dvSignal", "tags": ["signal", "exoticHiggs", "run3"]},
+  "grids": [
+    {
+      "name": "VBFH-2S-4Tau_mS{mS}_ctau{ctau}mm_2024",
+      "dataset": "/VBFH-Hto2Sto4Tau_Par-ctauS-{ctau}-MH-125-MS-{mS}_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-v2/MINIAODSIM",
+      "axes": {
+        "mS": ["7", "15", "23", "30", "40", "55"],
+        "ctau": ["0p1", "1", "10", "100", "1000", "10000", "100000"]
+      }
+    }
+  ]
+}

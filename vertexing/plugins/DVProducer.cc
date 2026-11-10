@@ -56,14 +56,15 @@ private:
   bool fitVertex(KalmanVertexFitter&, std::vector<reco::TransientTrack>&, reco::Vertex&) const;
   int matchedJet(const reco::Track&, const pat::JetCollection&) const;
   std::vector<std::vector<size_t>> loneSharedJetTracks(const std::vector<std::vector<size_t>>&, const std::vector<std::vector<size_t>>&, size_t, size_t) const;
-  SelectionQuantities selectionQuantities(const reco::Vertex&, const reco::TrackCollection&, const reco::BeamSpot&, const reco::Vertex&, KalmanVertexFitter&, const TransientTrackBuilder&) const;
-  template <typename T>
-  void putPerVertex(edm::Event&, const edm::OrphanHandle<reco::VertexCollection>&, const std::vector<T>&, const std::string&) const;
+  SelectionQuantities selectionQuantities(const reco::Vertex&, const reco::TrackCollection&, const reco::BeamSpot&, const reco::Vertex&, const reco::Vertex*, KalmanVertexFitter&, const TransientTrackBuilder&) const;
+  template <typename H, typename T>
+  void putValueMap(edm::Event&, const H&, const std::vector<T>&, const std::string&) const;
 
   const edm::EDGetTokenT<reco::TrackCollection> seedTracksToken_;
   const edm::EDGetTokenT<reco::TrackCollection> rescaledSeedTracksToken_;
   const edm::EDGetTokenT<reco::BeamSpot> beamSpotToken_;
   const edm::EDGetTokenT<pat::JetCollection> jetsToken_;
+  const edm::EDGetTokenT<reco::VertexCollection> goodPvToken_;
   const edm::ESGetToken<TransientTrackBuilder, TransientTrackRecord> ttBuilderToken_;
   const edm::ParameterSet kalman_;
   const int minTracks_;
@@ -88,6 +89,7 @@ DVProducer::DVProducer(const edm::ParameterSet& cfg)
       rescaledSeedTracksToken_(consumes(cfg.getParameter<edm::InputTag>("rescaledSeedTracks"))),
       beamSpotToken_(consumes(cfg.getParameter<edm::InputTag>("beamSpot"))),
       jetsToken_(consumes(cfg.getParameter<edm::InputTag>("jets"))),
+      goodPvToken_(consumes(cfg.getParameter<edm::InputTag>("goodPv"))),
       ttBuilderToken_(esConsumes(edm::ESInputTag("", "TransientTrackBuilder"))),
       kalman_(cfg.getParameter<edm::ParameterSet>("kalman")),
       minTracks_(cfg.getParameter<int>("minTracks")),
@@ -106,6 +108,8 @@ DVProducer::DVProducer(const edm::ParameterSet& cfg)
     throw cms::Exception("DVProducer") << "beampipe.center needs exactly two numbers, x and y";
   produces<reco::VertexCollection>();
   produces<edm::ValueMap<int>>("trackVertexIdx");
+  produces<reco::TrackCollection>("tracks");
+  produces<edm::ValueMap<int>>("tracksVertexIdx");
   for (const char* label : {"dBV", "dBVErr", "mass", "sumPt"})
     produces<edm::ValueMap<float>>(label);
   produces<edm::ValueMap<bool>>("insideBeampipe");
@@ -142,14 +146,28 @@ bool DVProducer::fitVertex(KalmanVertexFitter& fitter, std::vector<reco::Transie
   return true;
 }
 
-// Sylvester's criterion on a DV's 3x3 position covariance
-static bool positiveDefinite(const reco::Vertex::CovarianceMatrix& c) {
-  const double det = c(0, 0) * (c(1, 1) * c(2, 2) - c(1, 2) * c(1, 2)) - c(0, 1) * (c(0, 1) * c(2, 2) - c(1, 2) * c(0, 2)) + c(0, 2) * (c(0, 1) * c(1, 2) - c(1, 1) * c(0, 2));
-  return c(0, 0) > 0 && c(0, 0) * c(1, 1) - c(0, 1) * c(0, 1) > 0 && det > 0;
+// JMTucker's vertex selector drops a DV when an uncertainty it compares comes out NaN. From the DV's own position covariance these are its error along its position seen from the origin, in the transverse plane and in 3D (gen2derr, gen3derr), along its transverse distance to the beamspot (bs2derr), and on its miss distance to the PV along the DV's momentum (missdistpverr, which adds the PV covariance). A covariance with a negative eigenvalue can still give finite values for all of them, and then JMTucker keeps the DV.
+static bool jmtErrorsFinite(const reco::Vertex& vtx, const reco::Vertex& beamSpotVertex, const reco::Vertex* pv) {
+  using Vec3 = ROOT::Math::SVector<double, 3>;
+  for (const double z : {0., vtx.z()}) {
+    const Vec3 v(vtx.x(), vtx.y(), z);
+    if (ROOT::Math::Mag2(v) != 0 && !(ROOT::Math::Similarity(v, vtx.covariance()) >= 0))
+      return false;
+  }
+  if (std::isnan(VertexDistanceXY().distance(vtx, beamSpotVertex).error()))
+    return false;
+  const auto p4 = vtx.p4();
+  if (!pv || p4.pt() <= 0)
+    return true;
+  const Vec3 n = ROOT::Math::Unit(Vec3(p4.x(), p4.y(), p4.z()));
+  const Vec3 d(vtx.x() - pv->x(), vtx.y() - pv->y(), vtx.z() - pv->z());
+  const Vec3 jac = 2. * (d - ROOT::Math::Dot(n, d) * n);
+  const double err = std::sqrt(ROOT::Math::Similarity(jac, pv->covariance() + vtx.covariance())) / 2 / ROOT::Math::Mag(ROOT::Math::Cross(n, d));
+  return !std::isnan(err);
 }
 
-// dBVErr refits the DV's tracks with the MC track uncertainty scale applied, the same fit in data. A failed refit leaves it at 0, and a DV whose own position covariance is not positive definite gets NaN, so it fails any cut on it.
-SelectionQuantities DVProducer::selectionQuantities(const reco::Vertex& vtx, const reco::TrackCollection& rescaledSeedTracks, const reco::BeamSpot& beamSpot, const reco::Vertex& beamSpotVertex, KalmanVertexFitter& fitter, const TransientTrackBuilder& ttBuilder) const {
+// dBVErr refits the DV's tracks with the MC track uncertainty scale applied, the same fit in data. A failed refit leaves it at 0. A DV that JMTucker's selector would drop for a NaN uncertainty gets NaN, so it fails any cut on it.
+SelectionQuantities DVProducer::selectionQuantities(const reco::Vertex& vtx, const reco::TrackCollection& rescaledSeedTracks, const reco::BeamSpot& beamSpot, const reco::Vertex& beamSpotVertex, const reco::Vertex* pv, KalmanVertexFitter& fitter, const TransientTrackBuilder& ttBuilder) const {
   SelectionQuantities q;
   q.dBV = std::hypot(vtx.x() - beamSpot.x(vtx.z()), vtx.y() - beamSpot.y(vtx.z()));
   q.mass = vtx.p4().mass();
@@ -167,16 +185,17 @@ SelectionQuantities DVProducer::selectionQuantities(const reco::Vertex& vtx, con
   const reco::Vertex refit(TransientVertex(fitter.vertex(rescaledTtks)));
   if (refit.isValid())
     q.dBVErr = vertexDist2d_.distance(refit, beamSpotVertex).error();
-  if (!positiveDefinite(vtx.covariance()))
+  if (!jmtErrorsFinite(vtx, beamSpotVertex, pv))
     q.dBVErr = std::numeric_limits<float>::quiet_NaN();
   return q;
 }
 
-template <typename T>
-void DVProducer::putPerVertex(edm::Event& event, const edm::OrphanHandle<reco::VertexCollection>& vertices, const std::vector<T>& values, const std::string& label) const {
+// A ValueMap with one value for each entry of the keys collection
+template <typename H, typename T>
+void DVProducer::putValueMap(edm::Event& event, const H& keys, const std::vector<T>& values, const std::string& label) const {
   auto map = std::make_unique<edm::ValueMap<T>>();
   typename edm::ValueMap<T>::Filler filler(*map);
-  filler.insert(vertices, values.begin(), values.end());
+  filler.insert(keys, values.begin(), values.end());
   filler.fill();
   event.put(std::move(map), label);
 }
@@ -228,6 +247,8 @@ void DVProducer::produce(edm::StreamID, edm::Event& event, const edm::EventSetup
   const double bsy = beamSpot.position().y();
   const reco::Vertex beamSpotVertex(beamSpot.position(), beamSpot.covariance3D());
   const TransientTrackBuilder& ttBuilder = setup.getData(ttBuilderToken_);
+  const reco::VertexCollection& goodPv = event.get(goodPvToken_);
+  const reco::Vertex* pv = goodPv.empty() ? nullptr : &goodPv[0];
 
   const edm::Handle<reco::TrackCollection> seedTracks = event.getHandle(seedTracksToken_);
   KalmanVertexFitter fitter(kalman_, kalman_.getParameter<bool>("doSmoothing"));
@@ -498,14 +519,20 @@ void DVProducer::produce(edm::StreamID, edm::Event& event, const edm::EventSetup
       throw cms::Exception("DVProducer") << "Vertex holds duplicated tracks";
   }
 
+  // Each kept DV's tracks are also copied out, DV by DV in the order its fit took them, so a revertexer can rebuild the DV from the ntuple
   std::vector<int> trackVertexIdx(seedTracks->size(), -1);
   auto kept = std::make_unique<reco::VertexCollection>();
+  auto dvTracks = std::make_unique<reco::TrackCollection>();
+  std::vector<int> dvTrackVertexIdx;
   for (const reco::Vertex& vtx : *vertices) {
     const TrackSet tracks = vertexTrackSet(vtx);
     if (int(tracks.size()) < minTracks_)
       continue;
-    for (auto tk : tracks)
+    for (auto tk : tracks) {
       trackVertexIdx[trackIndex.at(tk)] = kept->size();
+      dvTracks->push_back(*tk);
+      dvTrackVertexIdx.push_back(kept->size());
+    }
     kept->push_back(vtx);
   }
 
@@ -513,7 +540,7 @@ void DVProducer::produce(edm::StreamID, edm::Event& event, const edm::EventSetup
   std::vector<float> dBV, dBVErr, mass, sumPt;
   std::vector<bool> insideBeampipe;
   for (const reco::Vertex& vtx : *kept) {
-    const SelectionQuantities q = selectionQuantities(vtx, rescaledSeedTracks, beamSpot, beamSpotVertex, fitter, ttBuilder);
+    const SelectionQuantities q = selectionQuantities(vtx, rescaledSeedTracks, beamSpot, beamSpotVertex, pv, fitter, ttBuilder);
     dBV.push_back(q.dBV);
     dBVErr.push_back(q.dBVErr);
     mass.push_back(q.mass);
@@ -522,17 +549,15 @@ void DVProducer::produce(edm::StreamID, edm::Event& event, const edm::EventSetup
   }
 
   const edm::OrphanHandle<reco::VertexCollection> keptHandle = event.put(std::move(kept));
-  putPerVertex(event, keptHandle, dBV, "dBV");
-  putPerVertex(event, keptHandle, dBVErr, "dBVErr");
-  putPerVertex(event, keptHandle, mass, "mass");
-  putPerVertex(event, keptHandle, sumPt, "sumPt");
-  putPerVertex(event, keptHandle, insideBeampipe, "insideBeampipe");
+  putValueMap(event, keptHandle, dBV, "dBV");
+  putValueMap(event, keptHandle, dBVErr, "dBVErr");
+  putValueMap(event, keptHandle, mass, "mass");
+  putValueMap(event, keptHandle, sumPt, "sumPt");
+  putValueMap(event, keptHandle, insideBeampipe, "insideBeampipe");
+  putValueMap(event, seedTracks, trackVertexIdx, "trackVertexIdx");
 
-  auto idxMap = std::make_unique<edm::ValueMap<int>>();
-  edm::ValueMap<int>::Filler filler(*idxMap);
-  filler.insert(seedTracks, trackVertexIdx.begin(), trackVertexIdx.end());
-  filler.fill();
-  event.put(std::move(idxMap), "trackVertexIdx");
+  const edm::OrphanHandle<reco::TrackCollection> dvTracksHandle = event.put(std::move(dvTracks), "tracks");
+  putValueMap(event, dvTracksHandle, dvTrackVertexIdx, "tracksVertexIdx");
 }
 
 DEFINE_FWK_MODULE(DVProducer);

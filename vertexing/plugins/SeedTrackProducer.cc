@@ -149,6 +149,7 @@ SeedTrackProducer::SeedTrackProducer(const edm::ParameterSet& cfg)
   produces<reco::TrackCollection>();
   produces<reco::TrackCollection>("rescaled");
   produces<edm::ValueMap<int>>("candIdx");
+  produces<reco::VertexCollection>("goodPv");
 }
 
 const reco::Vertex* SeedTrackProducer::firstGoodPv(const reco::VertexCollection& pvs) const {
@@ -207,6 +208,11 @@ void SeedTrackProducer::produce(edm::StreamID, edm::Event& event, const edm::Eve
   filler.insert(handle, candIdx.begin(), candIdx.end());
   filler.fill();
   event.put(std::move(candIdxMap), "candIdx");
+  // The PV the seeds were chosen with (none when the event has no good PV), for DVProducer
+  auto goodPv = std::make_unique<reco::VertexCollection>();
+  if (pv)
+    goodPv->push_back(*pv);
+  event.put(std::move(goodPv), "goodPv");
 }
 
 DEFINE_FWK_MODULE(SeedTrackProducer);

@@ -34,6 +34,7 @@ KIND_TO_PLUGIN = {
     "seedTrack":        "SimpleTrackFlatTableProducer",
     "vertexJet":        "PATJetSelector",
     "dv":               "SimpleVertexFlatTableProducer",
+    "dvTrack":          "SimpleTrackFlatTableProducer",
 }
 
 # Kinds whose producer needs conditions
@@ -134,23 +135,43 @@ TRIGGER_FIELDS = {"paths", "mode", "process"}
 TRIGGER_MODES = ("any", "all")
 
 
-def loadTriggerConfig(name, era=None, triggerDir=None):
-    """A trigger config with its includes merged and every field checked, as paths, mode and process with the defaults filled in. It is read from the era's run folder unless triggerDir names one."""
-    searchDir = triggerDir or runDir(paths.TRIGGERS_DIR, era)
+def _readTriggerConfig(name, searchDir):
+    """A trigger config with its includes merged and every field checked, with paths still one list for every era or an object keyed by era. The name of the file for error messages comes with it."""
     trig = loadWithIncludes(name, searchDir)
     where = f"Trigger config '{name}' in {os.path.relpath(searchDir, paths.CONFIG_DIR)}"
     unknown = sorted(set(trig) - TRIGGER_FIELDS)
     if unknown:
         raise ValueError(f"{where} has unknown key(s) {unknown}; valid keys are {sorted(TRIGGER_FIELDS | {'include'})}")
-    if not isNameList(trig.get("paths")):
-        raise ValueError(f"{where} needs 'paths', a non-empty list of HLT path patterns")
+    pathList = trig.get("paths")
+    if not isNameList(pathList) and not (isinstance(pathList, dict) and pathList and all(isNameList(v) for v in pathList.values())):
+        raise ValueError(f"{where} needs 'paths', a non-empty list of HLT path patterns or an object mapping each era to one")
     mode = trig.get("mode", "any")
     if mode not in TRIGGER_MODES:
         raise ValueError(f"{where} has mode {mode!r}; it must be 'any' or 'all'")
     process = trig.get("process", "HLT")
     if not isinstance(process, str) or not process:
         raise ValueError(f"{where} has process {process!r}; it must be a process name such as 'HLT'")
-    return {"paths": list(trig["paths"]), "mode": mode, "process": process}
+    return {"paths": pathList, "mode": mode, "process": process}, where
+
+
+def loadTriggerConfig(name, era=None, triggerDir=None):
+    """A trigger config with its includes merged and every field checked, as paths, mode and process with the defaults filled in. It is read from the era's run folder unless triggerDir names one, and paths keyed by era give that era's list."""
+    trig, where = _readTriggerConfig(name, triggerDir or runDir(paths.TRIGGERS_DIR, era))
+    pathList = trig["paths"]
+    if isinstance(pathList, dict):
+        if era is None:
+            raise ValueError(f"{where} keys its paths by era, so it needs one of: {', '.join(pathList)}")
+        ## An era the file leaves out is one where the channel never existed, so it never borrows another era's paths
+        if era not in pathList:
+            raise ValueError(f"{where} lists no paths for era '{era}'; it lists {', '.join(pathList)}")
+        pathList = pathList[era]
+    return {"paths": list(pathList), "mode": trig["mode"], "process": trig["process"]}
+
+
+def triggerEras(name, triggerDir=None):
+    """The eras a trigger config keys its paths by, empty when one list serves every era. It is read from triggerDir, or from the whole trigger folder."""
+    pathList = _readTriggerConfig(name, triggerDir or paths.TRIGGERS_DIR)[0]["paths"]
+    return list(pathList) if isinstance(pathList, dict) else []
 
 
 ## Every key a skim block may carry
@@ -441,13 +462,19 @@ def listTriggerConfigs():
     return sorted(f"{r}/{f[:-5]}" for r in runs for f in os.listdir(os.path.join(paths.TRIGGERS_DIR, r)) if f.endswith(".json"))
 
 
-def validateTriggers():
-    """Check every trigger config loads through loadTriggerConfig, from its own run folder. Returns a list of problems, empty if all are fine."""
+def validateTriggers(erasByRun):
+    """Check every trigger config loads through loadTriggerConfig from its own run folder, for each era it keys its paths by, and that each of those eras is one of its run's eras in erasByRun. Returns a list of problems, one per broken file, empty if all are fine."""
     problems = []
     for label in listTriggerConfigs():
         run, name = label.split("/", 1)
+        triggerDir = os.path.join(paths.TRIGGERS_DIR, run)
         try:
-            loadTriggerConfig(name, triggerDir=os.path.join(paths.TRIGGERS_DIR, run))
+            eras = triggerEras(name, triggerDir)
+            stray = [e for e in eras if e not in erasByRun.get(run, [])]
+            if stray:
+                raise ValueError(f"Trigger config '{label}' keys paths by {', '.join(stray)}, outside the {run} eras {', '.join(erasByRun.get(run, []))}")
+            for era in eras or [None]:
+                loadTriggerConfig(name, era, triggerDir)
         except Exception as e:
             problems.append(str(e))
     return problems

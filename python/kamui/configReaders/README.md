@@ -27,7 +27,8 @@ See `config/README.md` for the file formats.
     - `KIND_TO_PLUGIN` maps each collection's `type`, like `patJet`, to the CMSSW plugin that builds its table.
     - Run 2 and Run 3 samples read separate content files, so a preset both use needs a copy in each.
     - A requirement in the `VertexJet` collection can only name a variable that the `Jet` collection in `jets.json` defines, since Kamui builds the C++ cut from that variable's expression in `Jet`.
-    - `loadTriggerConfig` is the one reader of trigger files, so the skim, selection trigger cuts and `check` all apply the same rules.
+    - `loadTriggerConfig` is the one reader of trigger files, so the skim, selection trigger cuts, `check` and `tools/triggerYields.py` all apply the same rules.
+      - It reads paths keyed by era with the era it is given, and stops on an era the file does not list, or on no era at all.
 - `selections.py`
     - With no era given, a threshold, trigger list or flag list set per era raises an error.
       - An `anyOf` alternative can name the `eras` it applies to. With an era given, the alternatives for other eras are dropped, and with no era every alternative is kept.

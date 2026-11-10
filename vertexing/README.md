@@ -1,6 +1,6 @@
 # Vertexing
 
-This folder reconstructs DVs: vertices fit from displaced tracks, the tracks that pass far from the beamspot. Its CMSSW plugins run inside the ntuple production job when the content preset includes the vertexing collections.
+This folder reconstructs DVs: vertices fit from displaced tracks, the tracks that pass far from the beamspot. Its CMSSW plugins run inside the ntuple production job when the content preset includes the vertexing collections, as the Run 2 `dvFull` and every preset built on it do.
 
 `plugins/SeedTrackProducer.cc`: Selects the seed tracks the vertices are built from.
 
@@ -39,6 +39,9 @@ Output:
   - `DV_dBVErr`: the uncertainty on `DV_dBV`, from refitting the DV with the corrected seed-track copies. In data the copies are the tracks themselves.
   - `DV_mass` and `DV_sumPt`: the invariant mass of its tracks, taken as pions, and their scalar pT sum.
   - `DV_insideBeampipe`: whether it lies inside the `beampipe` circle.
+- The `DVTrack` table copies out the uncorrected seed tracks of every kept DV, one row per track, so a revertexer can rebuild the DVs from the ntuple.
+  - `DVTrack_dvIdx` is the DV each row belongs to, and a DV's rows come in the order its fit took them.
+  - Each row holds the track's charge, chi2, ndof, reference point, momentum and 5x5 covariance. Refitting a DV's rows the way the vertexer does gives back its stored position.
 - Vertices outside the beampipe are kept here, since that cut belongs to the selection stage. 
 
 ## Constants
@@ -57,5 +60,5 @@ Kamui reproduces the bugs found in JMTucker's vertexing that change its output, 
   - Because every event has its own seed, the drops in different jobs are independent.
   - JMTucker seeds its engine once per job and keeps drawing from it event after event, so its drops cannot be replayed.
 - Seed tracks keep their `packedPFCandidates` order. Every fit takes its tracks in that order too, since `plugins/DVProducer.cc` gathers them in a `std::set<reco::TrackRef>`, which sorts them by seed-track index. The Kalman fit is order sensitive!
-- Two odd `DV_dBVErr` values copy JMTucker: 0 when the refit fails, which passes any upper cut, and NaN when the DV's covariance is broken (not positive definite), which fails any cut on `DV_dBVErr`. See `Bugs/`.
+- Two odd `DV_dBVErr` values copy JMTucker: 0 when the refit fails, which passes any upper cut, and NaN when the DV's covariance is broken enough that JMTucker's selector gets a NaN uncertainty and drops the DV, which fails any cut on `DV_dBVErr`. See `Bugs/`.
 - A plugin name must be unique across all of CMSSW, the release included. Before naming a new one, grep `$CMSSW_RELEASE_BASE/lib/$SCRAM_ARCH/.edmplugincache` for it.

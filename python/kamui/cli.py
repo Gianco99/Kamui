@@ -515,8 +515,9 @@ def _cmdCheck(args):
                 problems.append(f"Definition '{run}/{name}' for era '{era}': {e}")
     note("Definitions", "pass" if nDef == nDefTried else "fail", f"Every definition resolves for each era ({nDef}/{nDefTried})")
 
+    ## A trigger file keyed by era is resolved for each era it lists, and each of those must be an era of the file's run
     nTrig = len(listTriggerConfigs())
-    trigProblems = validateTriggers()
+    trigProblems = validateTriggers(eras)
     problems += trigProblems
     note("Triggers", "pass" if not trigProblems else "fail", f"Every trigger file is well-formatted ({nTrig - len(trigProblems)}/{nTrig})")
 

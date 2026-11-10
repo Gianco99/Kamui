@@ -96,6 +96,37 @@
         "ndof": {"expr": "ndof()", "type": "float", "doc": "Vertex fit ndof", "precision": -1},
         "nTracks": {"expr": "tracksSize()", "type": "uint8", "doc": "Seed tracks in the vertex"}
       }
+    },
+    "DVTrack": {
+      "type": "dvTrack",
+      "src": "DV",
+      "doc": "Seed tracks of every DV, one row per track, in the order the DV fit took them",
+      "variables": {
+        "charge": {"expr": "charge()", "type": "int16", "doc": "Electric charge"},
+        "chi2": {"expr": "chi2()", "type": "float", "doc": "Track fit chi2", "precision": -1},
+        "ndof": {"expr": "ndof()", "type": "float", "doc": "Track fit ndof", "precision": -1},
+        "vx": {"expr": "vx()", "type": "double", "doc": "Reference point x [cm]"},
+        "vy": {"expr": "vy()", "type": "double", "doc": "Reference point y [cm]"},
+        "vz": {"expr": "vz()", "type": "double", "doc": "Reference point z [cm]"},
+        "px": {"expr": "px()", "type": "double", "doc": "Momentum x [GeV]"},
+        "py": {"expr": "py()", "type": "double", "doc": "Momentum y [GeV]"},
+        "pz": {"expr": "pz()", "type": "double", "doc": "Momentum z [GeV]"},
+        "cov00": {"expr": "covariance(0,0)", "type": "float", "doc": "Track parameter covariance, qoverp qoverp", "precision": -1},
+        "cov01": {"expr": "covariance(0,1)", "type": "float", "doc": "Track parameter covariance, qoverp lambda", "precision": -1},
+        "cov02": {"expr": "covariance(0,2)", "type": "float", "doc": "Track parameter covariance, qoverp phi", "precision": -1},
+        "cov03": {"expr": "covariance(0,3)", "type": "float", "doc": "Track parameter covariance, qoverp dxy", "precision": -1},
+        "cov04": {"expr": "covariance(0,4)", "type": "float", "doc": "Track parameter covariance, qoverp dsz", "precision": -1},
+        "cov11": {"expr": "covariance(1,1)", "type": "float", "doc": "Track parameter covariance, lambda lambda", "precision": -1},
+        "cov12": {"expr": "covariance(1,2)", "type": "float", "doc": "Track parameter covariance, lambda phi", "precision": -1},
+        "cov13": {"expr": "covariance(1,3)", "type": "float", "doc": "Track parameter covariance, lambda dxy", "precision": -1},
+        "cov14": {"expr": "covariance(1,4)", "type": "float", "doc": "Track parameter covariance, lambda dsz", "precision": -1},
+        "cov22": {"expr": "covariance(2,2)", "type": "float", "doc": "Track parameter covariance, phi phi", "precision": -1},
+        "cov23": {"expr": "covariance(2,3)", "type": "float", "doc": "Track parameter covariance, phi dxy", "precision": -1},
+        "cov24": {"expr": "covariance(2,4)", "type": "float", "doc": "Track parameter covariance, phi dsz", "precision": -1},
+        "cov33": {"expr": "covariance(3,3)", "type": "float", "doc": "Track parameter covariance, dxy dxy", "precision": -1},
+        "cov34": {"expr": "covariance(3,4)", "type": "float", "doc": "Track parameter covariance, dxy dsz", "precision": -1},
+        "cov44": {"expr": "covariance(4,4)", "type": "float", "doc": "Track parameter covariance, dsz dsz", "precision": -1}
+      }
     }
   }
 }

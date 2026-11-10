@@ -1,0 +1,41 @@
+{
+  "_doc": "Central Summer22 exotic Higgs H->SS->4b samples in every production mode.",
+  "family": "exoticHiggs4b2022",
+  "defaults": {"era": "Summer22", "isMC": true, "dasInstance": "prod/global", "content": "dvSignal", "tags": ["signal", "exoticHiggs", "run3"]},
+  "grids": [
+    {
+      "name": "ggH-2S-4B_mS{mS}_ctau{ctau}mm_2022",
+      "dataset": "/ggH_Hto2Sto4B_MH-125-MS-{mS}-ctauS-{ctau}_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer22MiniAODv4-130X_mcRun3_2022_realistic_v5-v2/MINIAODSIM",
+      "axes": {
+        "mS": ["15", "23", "30", "40", "55"],
+        "ctau": ["0p1", "1", "10", "100", "1000", "10000", "100000"]
+      }
+    },
+    {
+      "name": "ggHPTH80-2S-4B_mS{mS}_ctau{ctau}mm_2022",
+      "dataset": "/ggH_Hto2Sto4B_MH-125-MS-{mS}-ctauS-{ctau}_PTH-80_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer22MiniAODv4-130X_mcRun3_2022_realistic_v5-v2/MINIAODSIM",
+      "axes": {
+        "mS": ["15", "23", "30", "40", "55"],
+        "ctau": ["0p1", "1", "10", "100", "1000", "10000"]
+      }
+    },
+    {
+      "name": "{mode}-2S-4B_mS{mS}_ctau{ctau}mm_2022",
+      "dataset": "/{mode}_Hto2Sto4B_ctauS-{ctau}_MH-125_MS-{mS}_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer22MiniAODv4-130X_mcRun3_2022_realistic_v5-{version}/MINIAODSIM",
+      "axes": {
+        "mode": [
+          {"mode": "VBFH", "version": "v4"},
+          {"mode": "WplusH", "version": "v2"},
+          {"mode": "WminusH", "version": "v2"},
+          {"mode": "ZH", "version": "v2"},
+          {"mode": "ttH", "version": "v2"}
+        ],
+        "mS": ["15", "23", "30", "40", "55"],
+        "ctau": ["0p1", "1", "10", "100", "1000", "10000", "100000"]
+      }
+    }
+  ],
+  "overrides": {
+    "ggHPTH80-2S-4B_mS23_ctau0p1mm_2022": {"dataset": "/ggH_Hto2Sto4B_MH-125-MS-23-ctauS-0p1_PTH-80_TuneCP5_13p6TeV_powheg-pythia8/Run3Summer22MiniAODv4-130X_mcRun3_2022_realistic_v5-v1/MINIAODSIM"}
+  }
+}

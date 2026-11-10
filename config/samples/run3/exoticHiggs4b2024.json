@@ -1,0 +1,23 @@
+{
+  "_doc": "Central Summer24 exotic Higgs H->SS->4b samples in every production mode.",
+  "family": "exoticHiggs4b2024",
+  "defaults": {"era": "Summer24", "isMC": true, "dasInstance": "prod/global", "content": "dvSignal", "tags": ["signal", "exoticHiggs", "run3"]},
+  "grids": [
+    {
+      "name": "{mode}-2S-4B_mS{mS}_ctau{ctau}mm_2024",
+      "dataset": "/{dasMode}Hto2Sto4B_Par-ctauS-{ctau}-MH-125-MS-{mS}_TuneCP5_13p6TeV_powheg-pythia8/RunIII2024Summer24MiniAODv6-150X_mcRun3_2024_realistic_v2-{version}/MINIAODSIM",
+      "axes": {
+        "mode": [
+          {"mode": "ggH", "dasMode": "GluGluH-", "version": "v2"},
+          {"mode": "VBFH", "dasMode": "VBFH-", "version": "v4"},
+          {"mode": "WplusH", "dasMode": "WplusH-", "version": "v2"},
+          {"mode": "WminusH", "dasMode": "WminusH-", "version": "v2"},
+          {"mode": "ZH", "dasMode": "ZH-", "version": "v2"},
+          {"mode": "ttH", "dasMode": "ttH-", "version": "v2"}
+        ],
+        "mS": ["15", "23", "30", "40", "55"],
+        "ctau": ["0p1", "1", "10", "100", "1000", "10000", "100000"]
+      }
+    }
+  ]
+}

@@ -269,13 +269,16 @@ def _resolveFlags(name, where, cut, era):
 
 
 def _resolveTrigger(name, where, cut, era):
-    """Any of the paths must have fired. Which paths existed depends on the year, so a trigger list may be keyed by era."""
+    """Any of the paths must have fired. Which paths existed depends on the year, so a trigger list, or the paths of the trigger config it names, may be keyed by era."""
     if "triggers" not in cut:
         raise ValueError(f"{where} of type 'trigger' needs 'triggers'")
     triggers = _forEra(where, "triggers", cut["triggers"], era)
     if isinstance(triggers, str):
         ## The path list is expanded here so the resolved selection is self-contained and a worker never reads config/triggers/.
-        trig = loadTriggerConfig(triggers, era)
+        try:
+            trig = loadTriggerConfig(triggers, era)
+        except ValueError as e:
+            raise ValueError(f"{where}: {e}") from None
         if trig["mode"] != "any":
             raise ValueError(f"{where} names trigger config '{triggers}', whose mode is '{trig['mode']}'; a trigger cut keeps an event when any of its paths fired, so it reads only configs with mode 'any'")
         return {"triggers": triggers, "hltPaths": trig["paths"]}
