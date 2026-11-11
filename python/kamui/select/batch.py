@@ -20,6 +20,8 @@ from .io import CUTFLOW_NAME, SELECTED_NAME, checkFreshTask, writePassRecord
 
 ## Input files per job when the flag does not say otherwise
 DEFAULT_FILES_PER_JOB = 5
+## Memory each job asks condor for, in MB, when --memoryMB does not say otherwise
+DEFAULT_MEMORY_MB = 2000
 
 ## The folder under the output base that condor selection passes write to, <base>/selected/<task>
 OUTPUT_STAGE = "selected"
@@ -66,7 +68,7 @@ def packageKamui(d):
     return out
 
 
-def prepare(plan, sites=None, filesPerJob=None, memoryMB=2000, diskKB=4000000, base=None, cmsswVersion=None, scramArch=None):
+def prepare(plan, sites=None, filesPerJob=None, memoryMB=None, diskKB=4000000, base=None, cmsswVersion=None, scramArch=None):
     """Write a complete condor area for a pass that io.preparePass planned. Returns the job area, the job count and the EOS output directory."""
     sites = sites or loadSites()
     taskName = plan["task"]
@@ -88,6 +90,7 @@ def prepare(plan, sites=None, filesPerJob=None, memoryMB=2000, diskKB=4000000, b
         selectionFiles[era] = p
 
     perJob = int(filesPerJob or DEFAULT_FILES_PER_JOB)
+    memoryMB = int(memoryMB or DEFAULT_MEMORY_MB)
     chunked, jobRows = {}, []
     for s in plan["samples"]:
         groups = chunk(sorted(set(plan["fileLists"][s["name"]])), perJob)

@@ -1,108 +1,123 @@
-# Normalization Documentation
+# Normalizations
 
-The numbers that turn a count of selected events into an expected yield.
+This folder holds the numbers that turn a count of selected events into an expected yield: the luminosity of each era, the cross section of each process, and the generator weight sum of each sample.
+
 ## The Normalization Formula
+
+Post-processing applies these numbers when you report or analyze yields, with this formula. Inside Kamui, only `check` reads `lumi.json` and the cross section files.
 
 ```
 N_expected = lumi[pb^-1] * xsec[pb] * filterEff * sum(per-event weights of passing events) / sumGenWeight
 ```
-- `lumi` comes from `lumi.json`
-- `xsec` and `filterEff` come from a cross section file, one per physics model
+
+- `lumi` comes from `lumi.json`.
+- `xsec` and `filterEff` come from a cross section file, one per physics model.
 - `sumGenWeight` comes from `generatorSums.json`.
+
 ## Cross Section Files
 
-One file per physics model, holding the cross sections its samples are normalized by. Its top level holds one block per run, `run2` or `run3`, and a sample is normalized with the block of its era's run. Every JSON here other than `lumi.json` and `generatorSums.json` is read as a cross section file.
+Each physics model has one file, holding the cross sections its samples are normalized by. Its top level holds one block per run, `run2` or `run3`. Normalize a sample with the block of its era's run, so a Run 2 cross section never normalizes a Run 3 sample. Every JSON here other than `lumi.json` and `generatorSums.json` is read as a cross section file.
 
-**Per run, under `run2` or `run3`**
+`exoticHiggs.json` holds only a `run2` block, at 13 TeV. Run 3 samples need a `run3` block, at 13.6 TeV, before they can be normalized.
+
+A small example with one process:
+
+```
+{
+  "run2": {
+    "processes": {
+      "ggH": {"xsec": <pb>, "source": "<where the number came from>"}
+    }
+  }
+}
+```
+
+A run block, under `run2` or `run3`, holds:
 
 | Field | Meaning |
 |---|---|
-| **`processes`** (required, default: None) | Cross section per production mode, keyed by process name |
-| `filterEfficiencies` (optional, default: None) | Generator filter efficiency, keyed by signal model |
+| **`processes`** (required) | The cross section of each production mode, keyed by process name |
+| `filterEfficiencies` (optional) | The generator filter efficiency, keyed by signal model |
 
-**Per process, under `processes`**
-
-| Field | Meaning |
-|---|---|
-| **`xsec`** (required, default: None) | Cross section in picobarns |
-| **`source`** (required, default: None) | Where the number came from |
-
-**Per model, under `filterEfficiencies`**
+Each process under `processes` holds:
 
 | Field | Meaning |
 |---|---|
-| **`byScalarMass`** (required, default: None) | Efficiency keyed by the scalar mass |
-| **`source`** (required, default: None) | Where the numbers came from |
+| **`xsec`** (required) | The cross section in picobarns |
+| **`source`** (required) | Where the number came from |
+
+Each model under `filterEfficiencies` holds:
+
+| Field | Meaning |
+|---|---|
+| **`byScalarMass`** (required) | The efficiency, keyed by the scalar mass |
+| **`source`** (required) | Where the numbers came from |
+
 ## generatorSums.json
 
-Written by the Kamui CLI command `norm`, with one entry per sample name under `samples`. Every field is optional because a sample keeps whatever `norm` has measured so far.
+`./kamui norm --write` writes this file, with one entry per sample name under `samples`. Every field of an entry is optional, because a sample keeps whatever `norm` has measured so far.
 
-**Top level**
+Next to it, `norm --write` keeps an empty `generatorSums.json.lock`, which lets several runs write one after another. Leave it in place.
 
-| Field | Meaning |
-|---|---|
-| **`samples`** (required, default: None) | The entries, keyed by sample name |
-
-**Per sample, under `samples`**
+The top level holds:
 
 | Field | Meaning |
 |---|---|
-| `genEvents` (optional, default: None) | Generated event count of the whole dataset |
-| `sumGenWeight` (optional, default: None) | Sum of `genEventSumw`, the normalization denominator |
-| `sumGenWeight2` (optional, default: None) | Sum of `genEventSumw2`, for the statistical uncertainty |
+| **`samples`** (required) | The entries, keyed by sample name |
+
+Each sample under `samples` holds:
+
+| Field | Meaning |
+|---|---|
+| `genEvents` (optional) | The generated event count of the whole dataset |
+| `sumGenWeight` (optional) | The sum of `genEventSumw`, the normalization denominator |
+| `sumGenWeight2` (optional) | The sum of `genEventSumw2`, for the statistical uncertainty |
 
 `norm` reads these numbers from the `Runs` tree of the sample's NanoAOD, where the NanoAOD `genWeightsTable` producer writes them. Any other file format would need its own reader.
+
 ## lumi.json
 
-Integrated luminosity in inverse picobarns.
+This file holds the integrated luminosity, in inverse picobarns.
 
-**Top level**
-
-| Field | Meaning |
-|---|---|
-| **`eras`** (required, default: None) | Luminosity per era, keyed by name |
-| `channels` (optional, default: None) | Per-channel overrides, keyed by channel and then by an era that `eras` lists |
-
-**Per era, under `eras` and under a channel**
+The top level holds:
 
 | Field | Meaning |
 |---|---|
-| **`lumi`** (required, default: None) | Integrated luminosity in pb^-1 |
-| **`source`** (required, default: None) | Where the number came from |
+| **`eras`** (required) | The luminosity of each era, keyed by era name |
+| `channels` (optional) | Per-channel overrides, keyed by channel and then by an era that `eras` lists |
 
+Each era, under `eras` or under a channel, holds:
 
-Run 3 comes from the certified-golden luminosity:
+| Field | Meaning |
+|---|---|
+| **`lumi`** (required) | The integrated luminosity in pb^-1 |
+| **`source`** (required) | Where the number came from |
 
-- `totrecorded` from `brilcalc lumi` with `-b 'STABLE BEAMS'` and `--normtag normtag_PHYSICS.json`, integrated over the official golden JSON for the era.
+The Run 3 values are the certified golden luminosity: `totrecorded` from `brilcalc lumi` with `-b 'STABLE BEAMS'` and `--normtag normtag_PHYSICS.json`, integrated over the era's official golden JSON. The Run 2 values are taken from JMTucker's `AnalysisConstants.h`.
 
-Run 2 entries are taken from JMTucker `AnalysisConstants.h`.
-
-`channels` holds the smaller luminosity a channel integrates when its triggers were not active for a whole era. 
-
--   Ex: `channels.displaced` overrides 2017 and 2018 for the displacement-triggered channel.
-    - The b-jet triggers were active for only part of 2017 and 2018.
+`channels` holds the smaller luminosity a channel integrates when its triggers were not active for a whole era. For example, `channels.displaced` overrides 2017 and 2018 for the displacement-triggered channel, since the b-jet triggers were active for only part of those years.
 
 ## Relevant Commands
 
-- Use `norm` to register entries into `generatorSums.json`. 
-- Run `check` after editing anything here. It fails on a file that is not well-formatted.
+- `./kamui norm --write` registers entries in `generatorSums.json`.
+- Run `./kamui check` after editing anything here. It fails on any JSON file here that is not well formatted.
 
-See `python/kamui/README.md` for the flags and worked examples.
+The flags and worked examples are in `python/kamui/README.md`.
 
 ## Caveats
 
-- Cross sections are stored unfiltered and `filterEfficiencies` are applied separately.
-- The luminosity value moves with the golden JSON and normtag, which is why each Run 3 `source` records the exact brilcalc command. Re-run it against whatever golden JSON the data was filtered with.
+- Cross sections are stored before the generator filter, and the `filterEfficiencies` are applied separately.
+- The luminosity changes with the golden JSON and the normtag, which is why each Run 3 `source` records the exact brilcalc command. Rerun it against whichever golden JSON the data was filtered with.
 
-Physics caveats per model are kept here so the configs stay readable.
+The physics caveats of each model are kept here, so the configs stay readable.
 
-**Exotic Higgs (exoticHiggs.json)**
-- Higgs production at MH = 125 GeV, assuming BR(H -> LLP) = 1.
-- Each run's numbers sit under their own key, so a Run 2 cross section can never normalize a Run 3 sample. The `run2` block is at 13 TeV, and Run 3 still needs its own `run3` block at 13.6 TeV.
-- The Run 2 VH samples are generated with leptonic decays only, so their cross sections are just summed over the three lepton flavors.
+For the exotic Higgs model, `exoticHiggs.json`:
+
+- The cross sections are for Higgs production at MH = 125 GeV, assuming BR(H->SS) = 1.
+- The Run 2 VH samples are generated with leptonic decays only, so their cross sections are summed over the three lepton flavors.
   - `WplusH`: three times the inclusive W+H cross section times BR(W -> lv) for one lepton flavor.
   - `WminusH`: three times the inclusive W-H cross section times BR(W -> lv) for one lepton flavor.
-- `ZH` is the qq-initiated piece, with the gg component split off into `ggZH`.
+- `ZH` is the qq-initiated part, and the gg-initiated part is split off into `ggZH`.
   - `ZH`: three times the ZH -> llH cross section for one lepton flavor, minus its gg-initiated part.
   - `ggZH`: three times the inclusive ggZH cross section times BR(Z -> ll) for one lepton flavor.
-- Even though the `filterEfficiencies` are keyed by scalar mass, the filter itself is on gen-HT.
+- The `filterEfficiencies` are keyed by scalar mass, but the filter itself cuts on gen-HT.

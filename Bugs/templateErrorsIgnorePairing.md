@@ -1,5 +1,0 @@
-# The template's per-bin errors treat every constructed pair as independent, while each vertex is reused, so they understate the true statistical error.
-
-- **JMTucker:** `MFVNeutralino/test/One2Two/2v_from_jets.cc:3515`, `3583`, `4071` and `4631` (Alec's uncommitted version, snapshot of 2026-11-05). Each anchor gets one random partner, each vertex with 5 or more tracks is used about 2.2 times, and the errors are plain Sumw2, which assumes independent pairs. Changing only the two pairing seeds moves the 4-bin fractions by 0.4 to 0.8 of the quoted error in lepton and 0.5 to 1.0 in displacement (RMS over 5 seeds). That spread is expected from the random partner choice. The reuse correlates the pairs, so the quoted error is smaller than the real one.
-- **Kamui:** Not in Kamui yet. The standalone template rewrite reproduces it on purpose: `2v_from_jets.cc:812-822` (`pairingLoop`) and `896-898` (`runConfiguration`).
-- **Fix:** Draw K partners per anchor with weight 1/K, and take the per-bin errors from a bootstrap over the 1V vertices.

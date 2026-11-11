@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Count how many events pass a channel's trigger OR, per sample, per path.
+Count how many events pass a channel's trigger, per sample, per path. The paths combine as the trigger config's mode says: any is an OR, all an AND.
 
 This is the number we compare against JMTucker.
 
@@ -24,10 +24,8 @@ import sys
 ## Kamui modules
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "python"))
 from kamui.foundations import paths
-from kamui.configReaders.catalog import loadCatalog
 from kamui.select.io import findInputs
-from kamui.configReaders.content import loadTriggerConfig, resolveContent, triggerEras
-from kamui.configReaders.sites import loadSites
+from kamui.configReaders.content import loadTriggerConfig, triggerEras
 
 
 def branchName(path):
@@ -35,8 +33,18 @@ def branchName(path):
     return path.split("_v*")[0].rstrip("*").rstrip("_")
 
 
-def yieldsFor(files, paths_):
-    """Return (nTotal, nPass, {path: nFires})."""
+def taskSkim(info, detail):
+    """The skim a task's jobs applied to one sample, read from the resolved content saved in its task.json, or None when the record holds none for that sample."""
+    written = {k: c for k, c in (info.get("resolvedContent") or {}).items() if c.get("name") == detail["content"] and bool(c.get("isMC")) == bool(detail["isMC"])}
+    # A preset resolved for several eras is saved once per era, as <preset>.<mc or data>.<era>.json
+    written = {k: c for k, c in written.items() if k.endswith(f".{detail['era']}.json")} or written
+    if len(written) != 1:
+        return None
+    return next(iter(written.values())).get("skim") or {}
+
+
+def yieldsFor(files, paths_, mode):
+    """Return (nTotal, nPass, {path: nFires}). Under mode any an event passes when one path fired, and under mode all when every path in the file's menu fired."""
     import ROOT
 
     # TChain.Add silently accepts a missing path, which would surface as a believable zero yield.
@@ -74,8 +82,8 @@ def yieldsFor(files, paths_):
 
     if not terms:
         return total, 0, perPath
-    orExpr = "||".join(terms)
-    nPass = chain.GetEntries(orExpr)
+    # A path missing from the menu is left out of the AND, as the skim's hltHighLevel filter leaves it out
+    nPass = chain.GetEntries(("&&" if mode == "all" else "||").join(terms))
 
     return total, nPass, perPath
 
@@ -105,7 +113,7 @@ def main():
             trig = loadTriggerConfig(args.triggers, era=args.era, triggerDir=paths.TRIGGERS_DIR)
         except (FileNotFoundError, ValueError) as e:
             sys.exit(f"Error: {e}")
-        jobs.append(("(files)", args.triggers, trig["paths"], args.files))
+        jobs.append(("(files)", args.triggers, trig["paths"], trig["mode"], args.files))
     else:
         if not args.task:
             sys.exit("Give --task or --files")
@@ -116,30 +124,33 @@ def main():
             sys.exit(f"No task '{args.task}' under {paths.JOBS_DIR}")
         with open(rec) as f:
             info = json.load(f)
-        sites = loadSites()
-        catalog = {s["name"]: s for s in loadCatalog()}
+        details = {d["name"]: d for d in info.get("sampleDetails", [])}
         wanted = args.sample or info["samples"]
         for name in wanted:
-            s = catalog.get(name)
-            if s is None:
-                print(f"  {name}: not in the catalog, skipping")
+            detail = details.get(name)
+            if detail is None:
+                print(f"  {name}: not a sample of task '{args.task}', skipping")
                 continue
-            skim = resolveContent(s["content"], isMC=bool(s["isMC"]), era=s["era"])["skim"]
+            # The skim the jobs ran with, so editing a preset after the task ran changes nothing here
+            skim = taskSkim(info, detail)
+            if skim is None:
+                print(f"  {name}: task.json holds no resolved content for preset '{detail['content']}', skipping")
+                continue
             if not skim.get("hltPaths"):
-                print(f"  {name}: content preset '{s['content']}' declares no trigger skim, skipping")
+                print(f"  {name}: content preset '{detail['content']}' declares no trigger skim, skipping")
                 continue
             files = findInputs(args.task, name)
-            jobs.append((name, skim.get("triggers", "?"), skim["hltPaths"], files))
+            jobs.append((name, skim.get("triggers", "?"), skim["hltPaths"], skim.get("mode", "any"), files))
 
     hdr = f"{'sample':<42} {'channel':<16} {'files':>5} {'total':>9} {'pass':>9} {'eff':>8}"
     print(hdr)
     print("-" * len(hdr))
 
-    for name, chan, plist, files in jobs:
+    for name, chan, plist, mode, files in jobs:
         if not files:
             print(f"{name:<42} {chan:<16} {'0':>5}   no output files found")
             continue
-        total, nPass, perPath = yieldsFor(files, plist)
+        total, nPass, perPath = yieldsFor(files, plist, mode)
         eff = 100.0 * nPass / total if total else 0.0
         line = f"{name:<42} {chan:<16} {len(files):>5} {total:>9,} {nPass:>9,} {eff:>7.3f}%"
         print(line)

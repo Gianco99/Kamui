@@ -1,5 +1,5 @@
 {
   "cuts": [
-    {"name": "dv4trk", "doc": "Exactly one tight DV with 4 tracks.", "type": "quantity", "conditions": [{"quantity": {"collection": "DV", "requirements": [{"definition": "tightDV"}, {"variable": "nTracks", "min": 4, "max": 4}]}, "min": 1, "max": 1}]}
+    {"name": "dv4trk", "doc": "Keeps events with exactly one tight 4-track DV.", "type": "quantity", "conditions": [{"quantity": {"collection": "DV", "requirements": [{"definition": "tightDV"}, {"variable": "nTracks", "min": 4, "max": 4}]}, "min": 1, "max": 1}]}
   ]
 }

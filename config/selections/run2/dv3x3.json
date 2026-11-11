@@ -1,5 +1,5 @@
 {
   "cuts": [
-    {"name": "dv3x3", "doc": "Two or more tight DVs with 3 tracks.", "type": "quantity", "conditions": [{"quantity": {"collection": "DV", "requirements": [{"definition": "tightDV"}, {"variable": "nTracks", "min": 3, "max": 3}]}, "min": 2}]}
+    {"name": "dv3x3", "doc": "Keeps events with two or more tight 3-track DVs.", "type": "quantity", "conditions": [{"quantity": {"collection": "DV", "requirements": [{"definition": "tightDV"}, {"variable": "nTracks", "min": 3, "max": 3}]}, "min": 2}]}
   ]
 }

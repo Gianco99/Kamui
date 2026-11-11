@@ -1,0 +1,6 @@
+# A failed sharedJets refit leaves an empty vertex, which the cleanup then drops.
+
+- **JMTucker:** `MFVNeutralino/plugins/Vertexer.cc:1916-1921, 1937-1940`. `sv0_resolved_sharedtracks` starts as a default `reco::Vertex` and gets a fit only when `kv_reco_dropin` returns one, yet `sv0` is overwritten with it either way. The trackless vertex fails every later `nTracks() > 2` test and the cleanup erases it (1940), so a vertex that should lose one lone track is lost entirely.
+- **Kamui:** `vertexing/plugins/DVProducer.cc:506-508, 514-515`. Reproduced on purpose to match JMTucker: the `fitVertex` result is ignored and `sv0` takes the default vertex.
+- **Impact:** Minor: it changes a tight DV in 2 of 15,000 signal MC events and in none of 22,138 data events. 35 of the 38 failures in MC, and the one in data, were on 3-track vertices, where removing the track correctly leaves 2 tracks and `minTracks` drops the vertex all the same.
+- **Fix:** Keep the previous vertex when the refit fails only for vertices with 4 or more tracks. A 3-track vertex already ends up where a correct removal would leave it, dropped by `minTracks`, and keeping it whole changes far more events: 21 of 10,000 in signal MC, and one data event that moves from 1V to 0V.

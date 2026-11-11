@@ -1,5 +1,5 @@
 {
-  "_doc": "Lepton-triggered channel for Run 2.",
+  "_doc": "Run 2 lepton-triggered channel, for events that fired a single-muon or single-electron trigger.",
   "eras": ["2016", "2016APV", "2017", "2018"],
   "cuts": [
     {
@@ -53,16 +53,16 @@
           "Flag_ecalBadCalibFilter"
         ]
       },
-      "doc": "Standard MET filters, all required."
+      "doc": "Keeps events that pass every standard MET filter."
     },
     {
       "name": "leptonPlateau",
       "type": "anyOf",
-      "doc": "At least one lepton on the plateau of the path that actually fired, passing the appropriate ID and ISO.",
+      "doc": "Keeps events where a single-muon or single-electron path fired and a lepton of that flavor is on its plateau and passes ID and isolation.",
       "anyOf": [
         {
           "name": "muon",
-          "doc": "Muon leg",
+          "doc": "A single-muon path fired and a muon is on its plateau.",
           "cuts": [
             {"name": "fired", "type": "trigger", "triggers": {"2016APV": ["HLT_IsoMu24_v*"], "2016": ["HLT_IsoMu24_v*"], "2017": ["HLT_IsoMu27_v*"], "2018": ["HLT_IsoMu24_v*"]}},
             {"name": "plateau", "type": "object", "collection": "Muon", "min": 1, "requirements": [{"definition": "plateauMuon"}]}
@@ -70,7 +70,7 @@
         },
         {
           "name": "electron",
-          "doc": "Electron leg. The impact parameter requirement differs either side of |eta| = 1.48",
+          "doc": "A single-electron path fired and an electron is on its plateau, with looser impact parameter cuts beyond |eta| = 1.48.",
           "cuts": [
             {
               "name": "fired",

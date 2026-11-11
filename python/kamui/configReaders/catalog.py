@@ -5,6 +5,7 @@ Reads the sample config files and filters them. The file format is documented in
 # Import Block
 
 ## Standard Python imports
+import difflib
 import itertools
 import fnmatch
 import os
@@ -188,6 +189,15 @@ def loadCatalog(samplesDir=None):
     return catalog
 
 
+def _didYouMean(value, known):
+    """A sentence offering up to three known names close to a misspelled one, compared without case, or an empty string when none is close."""
+    byLower = {k.lower(): k for k in sorted(known, reverse=True)}
+    close = [f"'{byLower[m]}'" for m in difflib.get_close_matches(value.lower(), byLower, n=3)]
+    if not close:
+        return ""
+    return f" Did you mean {' or '.join(close)}?"
+
+
 def _resolve(value, allowed, what):
     """Return the catalog's own spelling of a family, era or tag, matched case-insensitively, and raise if it exists nowhere."""
     allowed = {a for a in allowed if a}
@@ -195,11 +205,11 @@ def _resolve(value, allowed, what):
         return value
     hit = sorted(a for a in allowed if a.lower() == value.lower())
     if len(hit) > 1:
-        raise KeyError(f"Ambiguous {what} '{value}': the catalog spells it {hit}. Use the exact spelling.")
+        raise ValueError(f"Ambiguous {what} '{value}': the catalog spells it {' and '.join(hit)}. Use the exact spelling.")
     if hit:
         return hit[0]
     plural = "families" if what == "family" else what + "s"
-    raise KeyError(f"Unknown {what} '{value}'. Known {plural}: {', '.join(sorted(allowed))}")
+    raise ValueError(f"Unknown {what} '{value}'.{_didYouMean(value, allowed)} Known {plural}: {', '.join(sorted(allowed))}")
 
 
 def select(catalog, names=None, family=None, era=None, tag=None, pattern=None):
@@ -211,7 +221,8 @@ def select(catalog, names=None, family=None, era=None, tag=None, pattern=None):
         out = [s for s in out if s["name"] in wanted]
         missing = wanted - {s["name"] for s in out}
         if missing:
-            raise KeyError(f"Unknown sample(s): {sorted(missing)}")
+            known = [s["name"] for s in catalog]
+            raise ValueError(" ".join(f"Unknown sample '{m}'.{_didYouMean(m, known)}" for m in sorted(missing)))
     if family:
         family = _resolve(family, {s.get("family") for s in catalog}, "family")
         out = [s for s in out if s.get("family") == family]

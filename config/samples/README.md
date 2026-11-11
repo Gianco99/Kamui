@@ -1,58 +1,60 @@
-# Sample Configs Documentation
+# Samples
 
-Each JSON file here is a sample family: a set of datasets to process that belong together, such as one signal model. A sample is one DAS dataset with a short name, the era it belongs to, and the content preset its ntuples are written with. Commands such as `submit` work on the samples you pick by name, family, era or tag. A family lists its samples one by one, or generates them from a grid: name and dataset templates whose `{placeholders}` are filled in from lists of values called axes.
+Each JSON file here is a sample family: a set of datasets to process that belong together, such as one signal model. A sample is one DAS dataset with a short name, the era it belongs to, and the content preset its ntuples are written with. Commands such as `submit` work on the samples you pick by name, family, era or tag.
+
+A family lists a few samples one by one under `samples`, or generates them under `grids` when the datasets follow a pattern. A grid has name and dataset templates with `{placeholders}`, which Kamui fills in from lists of values called axes, once for every combination. A family with one sample listed by hand looks like this:
+
+```json
+{
+  "family": "myFamily",
+  "defaults": {"era": "<era>", "isMC": true, "content": "<preset>"},
+  "samples": [{"name": "<sampleName>", "dataset": "<DAS dataset path>"}]
+}
+```
+
 ## JSON Fields
 
-Below are all the supported fields one can add to the JSON file.
-
-**Top level**
+### Top Level
 
 | Field | Meaning |
 |---|---|
-| `family` (optional, default: the file name) | The name for selecting this file's samples with `--family` |
-| `defaults` (optional, default: None) | Sample fields applied to every sample in the file |
-| `samples` (optional, default: None) | A list of explicit sample entries |
-| `grids` (optional, default: None) | A list of grids, each generating samples from templates and axes |
-| `overrides` (optional, default: None) | Fields to override on individual samples, keyed by sample name |
+| `family` (optional) | The name for picking this file's samples with `--family`. Defaults to the file name |
+| `defaults` (optional) | Sample fields applied to every sample in the file |
+| `samples` (optional) | Explicit sample entries, as a list |
+| `grids` (optional) | Grids, as a list, each generating samples from templates and axes |
+| `overrides` (optional) | Fields to override on individual samples, keyed by sample name |
 
-A file has to define at least one sample, through `samples` or `grids`. Kamui stops with an error naming the file when it defines none, or when a key at the top level, in a grid or on a sample is missing from these tables.
+A file must define at least one sample, through `samples` or `grids`. Kamui stops with an error naming the file when it defines none, or when a key at the top level, in a grid or on a sample is missing from these tables.
 
-**Grid level**
-
-| Field | Meaning |
-|---|---|
-| **`name`** (required, default: None) | Template for the sample name, with `{placeholders}` |
-| **`dataset`** (required, default: None) | Template for the DAS path |
-| `axes` (optional, default: None) | The values substituted into the placeholders, as an object of non-empty lists. Every placeholder in `name` and `dataset` needs an axis that fills it |
-| `skip` (optional, default: None) | Generated sample names to drop |
-
-A grid may also carry any sample field from the table below, applying it to every point it generates.
-
-**Sample level**
+### Grid Level
 
 | Field | Meaning |
 |---|---|
-| **`name`** (required, default: None) | Short name for the sample, unique across every family. It also names the sample's output folder on EOS and its CRAB output dataset tag. |
-| **`dataset`** (required, default: None) | The full DAS dataset path. |
-| **`era`** (required, default: None) | Data-taking period. It picks the content folder the sample's preset comes from, `run2/` or `run3/`, and the selection thresholds the sample uses. |
-| `dasInstance` (optional, default: `prod/global`) | `prod/global` for central datasets, `prod/phys03` for USER-created datasets. |
-| **`isMC`** (required, default: None) | `true` for MC, `false` for data, written without quotes. Kamui stops with an error when it disagrees with a central dataset's tier: `MINIAODSIM` holds MC and `MINIAOD` holds data. |
-| `family` (optional, default: the file's `family` key, then the file name) | The name for selecting this file's samples with `--family`. |
-| `content` (optional, default: `dvBase`) | The content preset defining the branches to write. |
-| `tags` (optional, default: `[]`) | A list of free-form labels for selecting samples with `--tag`. |
-| `unitsPerJob` (optional, default: None) | A positive integer, the input files per job for this sample. `--filesPerJob` in the CLI overrides it. |
-| `lumiMask` (optional, default: None) | A lumi mask JSON, such as the golden JSON, restricting processing to the lumi sections it lists. Data only. CRAB applies it, and `submit` refuses a sample that has one on condor. |
+| **`name`** (required) | Template for the sample name, with `{placeholders}` |
+| **`dataset`** (required) | Template for the DAS path |
+| `axes` (optional) | The values that fill the placeholders, as an object of non-empty lists. Every placeholder in `name` and `dataset` needs one |
+| `skip` (optional) | Generated sample names to drop |
+
+A grid may also carry any sample field from the table below, and applies it to every point it generates.
+
+### Sample Level
+
+| Field | Meaning |
+|---|---|
+| **`name`** (required) | A short name, unique across every family. It also names the sample's EOS output folder and CRAB output dataset tag |
+| **`dataset`** (required) | The full DAS dataset path |
+| **`era`** (required) | The data-taking period. It picks the content folder of the sample's preset, `run2/` or `run3/`, and its selection thresholds |
+| `dasInstance` (optional, default `prod/global`) | `prod/global` for central datasets, `prod/phys03` for USER-created ones |
+| **`isMC`** (required) | `true` for MC, `false` for data, without quotes. Kamui stops with an error when it disagrees with a central dataset's tier, `MINIAODSIM` for MC or `MINIAOD` for data |
+| `family` (optional) | The name for picking this sample with `--family`. Defaults to the file's `family` key, then the file name |
+| `content` (optional, default `dvBase`) | The content preset, which sets the branches written |
+| `tags` (optional, default `[]`) | Free-form labels, as a list, for picking samples with `--tag` |
+| `unitsPerJob` (optional) | Input files per job for this sample, a positive integer. `--filesPerJob` overrides it |
+| `lumiMask` (optional) | A lumi mask JSON, such as the golden JSON, that limits processing to the lumi sections it lists. Data only. CRAB applies it, and `submit` refuses a sample that has one on condor |
+
 ## Writing a JSON Sample Family File
 
-A family lists samples one of two ways: 
-
-- Explicitly under a `samples` key when there are only a few.
-- As a grid under a `grids` key when the datasets follow a pattern.
-
-  - A grid is formed from templates and a list of axes. 
-  - Every combination of the axes is generated, and each one fills in the `{placeholders}`.
-
-Example grid for two masses in one era:
+An example grid for two masses in one era:
 
 ```json
 "name":    "rpvStopDD_M{mass}_ctau1mm_{era}",
@@ -65,7 +67,7 @@ Example grid for two masses in one era:
 }
 ```
 
-Write an axis as a plain list when each value fills in one placeholder of the same name, as `mass` does. Write it as a list of blocks when picking one value has to fill in several placeholders at once, as `era` does.
+Write an axis as a plain list when each value fills in one placeholder of the same name, as `mass` does, and as a list of blocks when one value has to fill in several placeholders at once, as `era` does.
 
 A sample's fields come from four layers, each overriding the ones before it:
 
@@ -75,58 +77,58 @@ A sample's fields come from four layers, each overriding the ones before it:
 4. `overrides`
 
 A later layer replaces lists and single values outright, so a grid that names `tags` throws away the `tags` in `defaults`.
+
 ## What Is Here Now
 
-| File | What |
+| File | What it holds |
 |---|---|
-| `run3/exoticHiggs4d2024.json` | Summer24 Exotic Higgs H->SS->4d. Central |
-| `run3/exoticHiggs4d{2022,2022EE,2023,2023BPix}.json` | Summer22 to Summer23BPix Exotic Higgs H->SS->4d. Central |
+| `run3/exoticHiggs4d{2022,2022EE,2023,2023BPix,2024}.json` | Summer22 to Summer24 Exotic Higgs H->SS->4d. Central |
 | `run3/exoticHiggs4b{2022,2022EE,2023,2023BPix,2024}.json` | Summer22 to Summer24 Exotic Higgs H->SS->4b. Central |
 | `run3/exoticHiggs4tau{2022,2022EE,2023,2023BPix,2024}.json` | Summer22 to Summer24 Exotic Higgs H->SS->4tau, VBF only. Central |
-| `run3/stealthSusy2024.json` | Summer24 Stealth SUSY SHH and SYY. Private |
-| `run3/rpv2024.json` | Summer24 RPV stop->dd. Private |
+| `run3/stealthSusy2024.json` | Summer24 Stealth SUSY SHH and SYY. Private, from Bruno |
+| `run3/rpv2024.json` | Summer24 RPV stop->dd. Private, from Bruno |
 | `run3/rpv4b2024.json` | Summer24 RPV stop->bb. Central |
 | `run3/compressedStop{2022,2022EE,2023,2023BPix,2024}.json` | Summer22 to Summer24 long-lived stop with a compressed LSP. Central |
 | `run2/run2Validation.json` | Run 2 UL points for reproducing JMTucker results. Central |
 | `run2/tutorial/zhLeptonTriggered.json` | The sample used in the tutorial slides. Central |
 
-Each family file sits in the folder of its run, and Kamui stops with an error if a sample's era belongs to the other run. Family and sample names still carry their year or run, because commands pick samples by name across every folder.
+- Run 3 has no ggZH H->SS samples, so the ZH samples cover only the qq-initiated part.
+- Run 3 has no RPV gluino to tbs samples, official or private.
+- RPV stop->bb exists in Summer24 only, so 2022 and 2023 need a sample request.
+
+Each family file sits in the folder of its run, and Kamui stops with an error if a sample's era belongs to the other run. Family and sample names carry their year or run anyway, because commands pick samples by name across every folder.
 
 ## Relevant Commands
 
-- Use `find` to get a dataset path from DAS before writing it here.
-- Use `list` to confirm a family expanded into the samples you expected.
-- Use `query` to ask DAS how many files, events and GB each registered sample holds.
-- Use `stage` to copy MiniAOD files to EOS when you want to open one by hand.
+- `./kamui find` gets a dataset path from DAS, before you write it here.
+- `./kamui list` confirms that a family expanded into the samples you expected.
+- `./kamui query` asks DAS how many files, events and GB each registered sample holds.
+- `./kamui stage` copies a sample's MiniAOD files to EOS, to run one job by hand on them.
 
-See `python/kamui/README.md` for the flags and worked examples.
+The flags and worked examples are in `python/kamui/README.md`.
 
 ## Caveats
 
-Physics caveats per family are kept here so the configs stay readable.
+The physics caveats for each family live here, so the configs stay readable.
 
-**Exotic Higgs (exoticHiggs4b, exoticHiggs4d and exoticHiggs4tau families)**
-- Run 3 ggH has no gen-HT filter. The Run 2 samples had gen-HT > 200 GeV.
+### Exotic Higgs (`exoticHiggs4b*`, `exoticHiggs4d*` and `exoticHiggs4tau*` Families)
+
+- Run 3 ggH has no gen-HT filter. The Run 2 samples required gen-HT > 200 GeV.
 - The `ggHPTH80` samples in 2022 and 2022EE are filtered on pTH > 80 GeV, so normalizing them needs that filter efficiency on top of the ggH cross section.
-- ZH and WH decays are inclusive in Run 3. For Run 2 they are exclusive to lepton decays.
+- ZH and WH decays are inclusive in Run 3, and exclusive to lepton decays in Run 2.
 - The Summer24 exclusive ZH-Zto2L, WplusH-WtoLNu and GluGluZH datasets named `Hto2S` decay the Higgs promptly to a strange-quark pair, so they hold no LLP.
-- Run 3 has no ggZH H->SS samples, so the ZH samples cover only the qq-initiated part.
 
-**RPV (rpv2024)**
-- Private from Bruno. Nothing exists in Run 3 for gluino to tbs, official or private.
+### Compressed Stop (`compressedStop*` Families)
 
-**RPV stop to bb (rpv4b2024)**
-- Exists in Summer24 only. 2022 and 2023 need a sample request.
-
-**Compressed stop (compressedStop families)**
 - Each stop decays half the time to b W* LSP and half to c LSP. The LSP is only slightly lighter than the stop, so the decay products carry a few GeV and their tracks are soft.
 - A generator filter requires MET > 100 GeV and HT > 200 GeV, so normalizing needs that filter efficiency.
-- Sample names keep the DAS lifetime spelling, so `ctau1p0mm` and `ctau20mm` both appear.
+- Sample names keep the DAS lifetime spelling, so both `ctau1p0mm` and `ctau20mm` appear.
 
-**Stealth SUSY (stealthSusy2024)**
-- Private from Bruno.
+### Stealth SUSY (`stealthSusy2024`)
+
 - Each sample holds a single (mStop, mSo, ctau) point.
-- Inclusive samples exist for Run 2. These can be filtered using `randPar`.
+- In Run 2, one sample mixes many signal points, and filtering on `randPar`, a parameter built into the samples themselves, picks out one point.
 
-**Run 2 validation (run2Validation)**
-- Dataset paths copied from JMTucker's `Tools/python/Samples.py`.
+### Run 2 Validation (`run2Validation`)
+
+- The dataset paths are copied from JMTucker's `Tools/python/Samples.py`.

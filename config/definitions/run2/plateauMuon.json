@@ -1,5 +1,5 @@
 {
-  "_doc": "Muon on the plateau of the single-muon trigger.",
+  "_doc": "A muon on the efficiency plateau of the single-muon trigger.",
   "requirements": [
     {"variable": "pt", "min": {"2016APV": 27, "2016": 27, "2017": 30, "2018": 27}},
     {"variable": "eta", "absMax": 2.4},

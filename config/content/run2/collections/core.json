@@ -11,21 +11,19 @@
         "xErr": {"expr": "xError()", "type": "float", "doc": "PV x uncertainty [cm]", "precision": 8},
         "yErr": {"expr": "yError()", "type": "float", "doc": "PV y uncertainty [cm]", "precision": 8},
         "zErr": {"expr": "zError()", "type": "float", "doc": "PV z uncertainty [cm]", "precision": 8},
-        "ndof": {"expr": "ndof()", "type": "float", "doc": "Number of degrees of freedom", "precision": -1},
-        "chi2": {"expr": "normalizedChi2()", "type": "float", "doc": "chi2/ndof", "precision": -1},
-        "nTracks": {"expr": "tracksSize()", "type": "uint16", "doc": "Number of tracks fitted to this PV"},
-        "isFake": {"expr": "isFake()", "type": "bool", "doc": "Vertex is a placeholder"},
-        "isGood": {"expr": "!isFake() && ndof() > 4 && abs(position().z()) <= 24 && position().Rho() <= 2", "type": "bool", "doc": "Standard good-PV definition"}
+        "ndof": {"expr": "ndof()", "type": "float", "doc": "Vertex fit degrees of freedom", "precision": -1},
+        "chi2": {"expr": "normalizedChi2()", "type": "float", "doc": "Vertex fit chi2 per degree of freedom", "precision": -1},
+        "isFake": {"expr": "isFake()", "type": "bool", "doc": "Placeholder PV made from the beamspot when no vertex is found"},
+        "isGood": {"expr": "!isFake() && ndof() > 4 && abs(position().z()) <= 24 && position().Rho() <= 2", "type": "bool", "doc": "Good PV: not fake, ndof > 4, |z| <= 24 cm, rho <= 2 cm"}
       }
     },
     "BeamSpot": {
       "type": "beamSpot",
       "src": "offlineBeamSpot",
-      "doc": "Offline beamspot",
       "variables": {
-        "x": {"expr": "x0()", "type": "float", "doc": "Beamspot x at z=0 [cm]", "precision": -1},
-        "y": {"expr": "y0()", "type": "float", "doc": "Beamspot y at z=0 [cm]", "precision": -1},
-        "z": {"expr": "z0()", "type": "float", "doc": "Beamspot z [cm]", "precision": -1},
+        "x": {"expr": "x0()", "type": "float", "doc": "Beamspot center x [cm]", "precision": -1},
+        "y": {"expr": "y0()", "type": "float", "doc": "Beamspot center y [cm]", "precision": -1},
+        "z": {"expr": "z0()", "type": "float", "doc": "Beamspot center z [cm]", "precision": -1},
         "sigmaZ": {"expr": "sigmaZ()", "type": "float", "doc": "Beamspot length in z [cm]", "precision": 10},
         "widthX": {"expr": "BeamWidthX()", "type": "float", "doc": "Transverse width in x [cm]", "precision": 10},
         "widthY": {"expr": "BeamWidthY()", "type": "float", "doc": "Transverse width in y [cm]", "precision": 10},
@@ -37,32 +35,31 @@
       "type": "patMET",
       "src": "slimmedMETs",
       "singleton": true,
-      "doc": "Type-1 corrected PF MET",
+      "_doc": "The type-1 corrected PF MET.",
       "variables": {
         "pt": {"expr": "pt()", "type": "float", "doc": "MET [GeV]", "precision": 10},
-        "phi": {"expr": "phi()", "type": "float", "doc": "MET phi", "precision": 10},
-        "sumEt": {"expr": "sumEt()", "type": "float", "doc": "Scalar sum ET [GeV]", "precision": 10},
+        "phi": {"expr": "phi()", "type": "float", "doc": "MET azimuthal angle [rad]", "precision": 10},
+        "sumEt": {"expr": "sumEt()", "type": "float", "doc": "Scalar sum of ET [GeV]", "precision": 10},
         "significance": {"expr": "metSignificance()", "type": "float", "doc": "MET significance", "precision": 10},
-        "caloPt": {"expr": "caloMETPt()", "type": "float", "doc": "Calo MET [GeV]", "precision": 10}
+        "caloPt": {"expr": "caloMETPt()", "type": "float", "doc": "Calorimeter MET [GeV]", "precision": 10}
       }
     },
     "PuppiMET": {
       "type": "patMET",
       "src": "slimmedMETsPuppi",
       "singleton": true,
-      "doc": "PUPPI MET",
       "variables": {
         "pt": {"expr": "pt()", "type": "float", "doc": "PUPPI MET [GeV]", "precision": 10},
-        "phi": {"expr": "phi()", "type": "float", "doc": "PUPPI MET phi", "precision": 10},
-        "sumEt": {"expr": "sumEt()", "type": "float", "doc": "PUPPI scalar sum ET [GeV]", "precision": 10}
+        "phi": {"expr": "phi()", "type": "float", "doc": "PUPPI MET azimuthal angle [rad]", "precision": 10},
+        "sumEt": {"expr": "sumEt()", "type": "float", "doc": "PUPPI scalar sum of ET [GeV]", "precision": 10}
       }
     },
     "Rho": {
       "type": "global",
-      "doc": "Pileup energy densities",
+      "_doc": "Pileup energy densities.",
       "variables": {
         "fastjetAll": {"src": "fixedGridRhoFastjetAll", "type": "double", "doc": "Rho from all PF candidates"},
-        "fastjetCentral": {"src": "fixedGridRhoFastjetCentral", "type": "double", "doc": "Rho, |eta| < 2.5"}
+        "fastjetCentral": {"src": "fixedGridRhoFastjetCentral", "type": "double", "doc": "Rho from PF candidates with |eta| < 2.5"}
       }
     }
   },

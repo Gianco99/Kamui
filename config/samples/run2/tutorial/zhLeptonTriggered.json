@@ -1,5 +1,5 @@
 {
-  "_doc": "Sample for the tutorial!",
+  "_doc": "Central 2018 ZH sample with Z->ll and H->SS->4d, used in the tutorial slides.",
   "family": "tutorial",
   "defaults": {"era": "2018", "isMC": true, "dasInstance": "prod/global", "content": "dvLepton", "tags": ["tutorial", "run2"]},
   "samples": [

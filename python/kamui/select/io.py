@@ -93,8 +93,12 @@ def _publishedRecord(directory, local, sites):
 
 # A task name stands for one pass, so a second pass under it would mix its outputs and cutflow with the first one's.
 def checkFreshTask(taskName, backend):
-    """Refuse a task name an earlier selection pass used. A condor job area that was never submitted, such as one a dry run left, may be rebuilt."""
+    """Refuse a task name an earlier selection pass or a production task used. A condor job area that was never submitted, such as one a dry run left, may be rebuilt."""
     checkTaskName(taskName)
+    ## Status picks the production task when a name has both, so a pass sharing its name could not be followed
+    production = os.path.join(paths.JOBS_DIR, taskName)
+    if os.path.exists(production):
+        raise ValueError(f"Task '{taskName}' is already the name of a production task ({production}). Give the selection pass its own --task, such as {taskName}Selected.")
     outDir = os.path.join(paths.SELECTION_OUT_DIR, taskName)
     jobArea = os.path.join(paths.SELECTION_JOBS_DIR, taskName)
     for d in (outDir, jobArea):

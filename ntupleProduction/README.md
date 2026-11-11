@@ -1,6 +1,12 @@
 # NtupleProduction
 
-This folder holds the first stage of the analysis: a DAS dataset in, ntuples out. `./kamui submit` turns the samples you pick into a task, a named batch of jobs on condor or CRAB. Each task gets a job area, `jobs/<task>/`, holding the files its jobs are built from. Every job runs `cmssw/ntuple_cfg.py` with its sample's content preset.
+This folder is the first stage of the analysis: a DAS dataset goes in and ntuples come out. `./kamui submit` turns the samples you pick into a task, a named batch of jobs that runs on condor or CRAB. Every job runs `cmssw/ntuple_cfg.py` with its sample's content preset, the JSON that says what the ntuples save. Each task gets a job area, `jobs/<task>/`, holding the files its jobs are built from.
+
+For example, this writes the job area `jobs/myNtuples/` for the Summer24 samples matching the pattern, and submits nothing:
+
+```
+./kamui submit --task myNtuples --match 'ggH*ctau10mm*' --era Summer24 --dryRun
+```
 
 ## What Lives Here
 
@@ -13,14 +19,14 @@ This folder holds the first stage of the analysis: a DAS dataset in, ntuples out
 
 The submission code is in `python/kamui/submit/`.
 
-## Choosing A Backend
+## Choosing a Backend
 
-- **condor** for a fast answer: a new preset, a handful of files, a private dataset CRAB is awkward about. It asks DAS for the file list up front, reads inputs through `sourceRedirector` from `config/sites.json`, and has no automatic retries. It cannot apply a data sample's lumi mask, so masked data goes through CRAB.
-- **CRAB** for a full production. It makes one CRAB task per sample, runs jobs at sites that already hold the data, and splits and retries them on its own.
+- Use condor for a fast answer: a new preset, a handful of files, or a private dataset CRAB is awkward about. It asks DAS for the file list up front, reads the inputs through `sourceRedirector` from `config/sites.json`, and has no automatic retries. It cannot apply a data sample's lumi mask, so data with a mask goes through CRAB.
+- Use CRAB for a full production. It makes one CRAB task per sample, runs the jobs at sites that already hold the data, and splits and retries them by itself.
 
-## Running One Job By Hand
+## Running One Job by Hand
 
-Before submitting to a cluster, it is worth running things locally to make sure they work. First save the preset with `./kamui content --write`, which writes the same file a job receives, with every include and per-era value filled in. Then run the same `cmsRun` command the workers run. An example for the `dvSignal` preset:
+Before you submit to a cluster, run one job locally to make sure it works. First save the preset with `./kamui content --write`, which writes the same file a job receives, with every include and per-era value filled in. Then run the same `cmsRun` command the workers run. For the `dvSignal` preset:
 
 ```
 ./kamui content dvSignal --era Summer24 --write /tmp/dvSignal.json
@@ -29,28 +35,30 @@ cmsRun ntupleProduction/cmssw/ntuple_cfg.py content=/tmp/dvSignal.json isMC=True
 
 Setting `maxEvents` adds it to the output name, so this writes `test_numEvent1000.root`.
 
-Note: Content with the vertexing collections also needs `globalTag=`, the era's tag from `config/sites.json`.
-## What A Job Area Contains
+Content with the vertexing collections also needs `globalTag=`, set to the era's tag from `config/sites.json`.
 
-`jobs/<task>/`:
+## What a Job Area Contains
+
+Everything below sits in `jobs/<task>/`.
 
 | File | Backend | What it is |
 | --- | --- | --- |
-| `task.json` | both | The provenance record, with `outputDir`, the EOS directory the output lands in. Condor also records the cluster, the schedd and one entry per retry. CRAB also records which samples were submitted and which failed to submit |
-| `<preset>.<mc\|data>.<era>.json` | both | The preset written out in full, as the `cmsRun` job receives it. One per preset, MC or data, and era |
-| `ntuple_cfg.py`, `ntupleTables.py` | both | Copies of the `cmssw/` files taken at submit, which the jobs and their retries run |
+| `task.json` | both | The provenance record. It holds `outputDir`, the EOS directory the output lands in. Condor also records the cluster, the schedd and one entry per retry. CRAB also records which samples were submitted and which failed to submit |
+| `<preset>.<mc\|data>.<era>.json` | both | The preset written out in full, as the `cmsRun` job receives it. There is one for each combination of preset, MC or data, and era |
+| `ntuple_cfg.py`, `ntupleTables.py` | both | Copies of the `cmssw/` files taken at submit. The jobs and their retries run these copies |
 | `crabConfig_<sample>.py` | CRAB | One per sample |
-| `crab/crab_<task>__<sample>/` | CRAB | The work area `crab status` and `crab resubmit` are pointed at |
+| `crab/crab_<task>__<sample>/` | CRAB | The work area you point `crab status` and `crab resubmit` at |
 | `fileLists.json` | condor | For each sample, the input files each job reads |
 | `jobList.txt` | condor | One `sample,index,script` row per job |
 | `runJob_<preset>_<mc\|data>_<era>.sh` | condor | The script a worker runs. One per content file above |
-| `cmsswArea.tar.gz` | condor | The compiled code of your CMSSW area (`lib/`, `python/`, `cfipython/`), which each worker unpacks into its fresh release |
-| `submit.jdl` | condor | What `condor_submit` is given |
+| `cmsswArea.tar.gz` | condor | The compiled code of your CMSSW area (`lib/`, `python/`, `cfipython/`). Each worker unpacks it into its fresh release |
+| `submit.jdl` | condor | The file `condor_submit` is given |
 | `logs/` | condor | `<sample>_<index>.out`, `.err`, and `condor.log` |
+| `submit.retry<n>.jdl`, `jobList.retry<n>.txt`, `logs/retry<n>/` | condor | What retry `<n>` of `./kamui resubmit` adds: its JDL, the jobs it reruns and their logs |
 
-## Where The Output Lands
+## Where the Output Lands
 
-`config/sites.json` holds one output base for condor and a separate one for CRAB, and `--outputBase` overrides either.
+`config/sites.json` holds one output base for condor and another for CRAB, and `--outputBase` overrides either.
 
 | | condor | CRAB |
 | --- | --- | --- |
@@ -58,7 +66,7 @@ Note: Content with the vertexing collections also needs `globalTag=`, the era's 
 | Ntuples | `<base>/ntuples/<task>/<sample>/<sample>_ntuple_<index>.root` | Under `<base>/ntuples/<task>/`, with the output dataset tag set to the sample name |
 | Provenance | `<base>/ntuples/<task>/task.json` | `<base>/ntuples/<task>/task.json` |
 
-`task.json` is copied to EOS at submit, so someone inspecting the output ROOT files can still find out where they came from:
+`task.json` is copied to EOS at submit, so anyone looking at the output ROOT files can still find out where they came from. It records:
 
 - The commit and branch
 - Whether the repo had uncommitted changes
@@ -69,14 +77,14 @@ Note: Content with the vertexing collections also needs `globalTag=`, the era's 
 
 ## Relevant Commands
 
-- Use `submit` to produce ntuples, `status` to watch a task, and `resubmit` to retry what failed.
-- Run `check` before submitting. It validates every config offline and needs no proxy.
-- Before writing a preset for a new campaign, use `tools/inspectMiniAOD.py` to see what its MiniAOD files carry.
+- `./kamui submit` produces ntuples, `./kamui status` shows how a task is doing, and `./kamui resubmit` retries what failed.
+- Run `./kamui check` before submitting. It validates every config offline and needs no proxy.
+- Before writing a preset for a new campaign, run `tools/inspectMiniAOD.py` to see what its MiniAOD files carry.
 
-See `python/kamui/README.md` for the flags and worked examples.
+The flags and worked examples are in `python/kamui/README.md`.
 
 ## Caveats
- 
-- The job finds the gen-weight table by its key: any collection whose key contains `genweight`, ignoring case, runs outside the skim so it sees every event.
-- Condor jobs set up the CMSSW release named in `config/sites.json`. Do not bump it without checking. CRAB ignores it and uses the release you submit from.
-- LPC has several schedds, the servers that hold the condor job queue, and each submission lands on one of them. A bare `condor_q` asks only the default schedd, where a task on another schedd shows no jobs and looks finished. So kamui records in `task.json` the schedd of the first submission and of each retry, and asks each one about its own cluster. A `task.json` with no `schedd` key falls back to the default.
+
+- The job finds the gen-weight table by its key. Any collection whose key contains `genweight`, in any capitalization, runs outside the skim so that it sees every event.
+- Condor jobs set up the CMSSW release named in `config/sites.json`. Don't bump it without checking. CRAB ignores it and uses the release you submit from.
+- LPC has several schedds, the servers that hold the condor job queue, and each submission lands on one of them. A bare `condor_q` asks only the default schedd, so a task sitting on another schedd shows no jobs there and looks finished. That is why Kamui records in `task.json` the schedd of the first submission and of each retry, and asks each schedd about its own cluster. A `task.json` with no `schedd` key falls back to the default schedd.

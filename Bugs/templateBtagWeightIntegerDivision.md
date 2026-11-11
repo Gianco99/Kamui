@@ -1,5 +1,0 @@
-# The b-composition weight of a constructed pair uses integer division, so b-tagged pairs weigh 1 and untagged pairs weigh 0.
-
-- **JMTucker:** `MFVNeutralino/test/One2Two/2v_from_jets.cc:3917-3923` and `4323-4329` (Alec's uncommitted version, snapshot of 2026-11-05). `btag_weight = 99/80` and `1/20` are meant as f2/f1 and (1 - f2)/(1 - f1) with the placeholders f2 = 0.99 and f1 = 0.80, but integer division gives 1 and 0. Every pair with an untagged anchor drops out: 759 of 2,188 in the lepton channel and 413 of 6,991 in the displacement channel, and the nobtags output is empty. Float division moves the 4-bin template by up to 0.6 of its quoted error in lepton and 0.1 in displacement, while unit weights move it by up to 9.6 and 2.5, so the template depends strongly on f2.
-- **Kamui:** Not in Kamui yet. The standalone template rewrite reproduces it on purpose: `2v_from_jets.cc:762-764` (`fillPair`).
-- **Fix:** Use floating point, with f2 measured for this method (`templateBQuarkFractionUnmeasured.md`) and f1 from the 1V pool (71.5% lepton, 90.1% displacement).

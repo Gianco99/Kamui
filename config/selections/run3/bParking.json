@@ -1,7 +1,7 @@
 {
-  "_doc": "Run 3 single-muon B parking trigger study: keeps events that fired any B parking path of their era. It has no offline cuts, so the fraction of events kept is the trigger efficiency.",
+  "_doc": "Run 3 single-muon B parking trigger study with no offline cuts, so the fraction of events it keeps is the trigger efficiency.",
   "eras": ["Summer22", "Summer22EE", "Summer24"],
   "cuts": [
-    {"name": "bParking", "type": "trigger", "triggers": "bParking", "doc": "Any path in config/triggers/run3/bParking.json for the sample's era."}
+    {"name": "bParking", "type": "trigger", "triggers": "bParking", "doc": "Keeps events that fired any path that config/triggers/run3/bParking.json lists for the sample's era."}
   ]
 }

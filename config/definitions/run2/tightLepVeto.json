@@ -1,5 +1,5 @@
 {
-  "_doc": "TightLepVeto PF jet ID.",
+  "_doc": "The TightLepVeto working point of the PF jet ID.",
   "requirements": {
     "2016APV": [
       {"variable": "neHEF", "below": 0.9},

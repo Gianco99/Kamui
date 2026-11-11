@@ -148,15 +148,17 @@ def _projectDir(configPath):
     return os.path.join(values["workArea"], "crab_" + values["requestName"])
 
 
-def submit(configPaths, dryRun=False, sites=None, taskName=None, base=None):
-    """Run `crab submit` for each generated config, and record in task.json which samples went out and which failed. Returns the configs that went out and the ones that failed."""
+def submit(configPaths, dryRun=False, sites=None, taskName=None, base=None, maxMemoryMB=None):
+    """Run `crab submit` for each generated config, and record in task.json which samples went out and which failed. maxMemoryMB, when given, replaces the memory the configs ask for. Returns the configs that went out and the ones that failed."""
+    ## A config parameter given after the config file overrides the value the file sets
+    override = [f"JobType.maxMemoryMB={int(maxMemoryMB)}"] if maxMemoryMB else []
     ok, bad = [], []
     for p in configPaths:
         if dryRun:
-            print(f"  [dryRun] crab submit -c {p}")
+            print(f"  [dryRun] {' '.join(['crab', 'submit', '-c', p] + override)}")
             ok.append(p)
             continue
-        r = subprocess.run(["crab", "submit", "-c", p], capture_output=True, text=True)
+        r = subprocess.run(["crab", "submit", "-c", p] + override, capture_output=True, text=True)
         project = _projectDir(p)
         if r.returncode != 0 or not os.path.isdir(project):
             reason = r.stderr.strip().splitlines()[-1:] or r.stdout.strip().splitlines()[-3:]
@@ -179,9 +181,16 @@ def submit(configPaths, dryRun=False, sites=None, taskName=None, base=None):
     return ok, bad
 
 
+def wasSubmitted(taskName):
+    """Whether crab submit ever ran for the task. A dry run writes the configs and records no crab submit."""
+    d = taskDir(taskName, create=False)
+    rec = readTaskRecord(d)
+    return os.path.isdir(os.path.join(d, "crab")) or bool(rec.get("submittedSamples") or rec.get("failedSubmissions"))
+
+
 # CRAB tracks its own failed jobs and writes retried output to the same place, so a retry needs no new job list or destination.
-def resubmit(taskName, dryRun=False, sites=None):
-    """`crab submit` again for each sample whose submission failed, and `crab resubmit` over every other crab project in the task. Returns the number of projects asked to resubmit and the samples that still failed to submit."""
+def resubmit(taskName, dryRun=False, sites=None, memoryMB=None):
+    """`crab submit` again for each sample whose submission failed, and `crab resubmit` over every other crab project in the task. memoryMB, when given, is the memory every resubmitted job asks for. Returns the number of projects asked to resubmit and the samples that still failed to submit."""
     d = taskDir(taskName, create=False)
     rec = readTaskRecord(d)
     retry = [os.path.join(d, _configName(name)) for name in rec.get("failedSubmissions", [])]
@@ -189,6 +198,7 @@ def resubmit(taskName, dryRun=False, sites=None):
     if not os.path.isdir(workArea) and not retry:
         raise FileNotFoundError(f"No crab work area at {workArea}")
     retryProjects = {_projectDir(p) for p in retry}
+    maxMemory = ["--maxmemory", str(int(memoryMB))] if memoryMB else []
     n = 0
     for proj in sorted(os.listdir(workArea)) if os.path.isdir(workArea) else []:
         full = os.path.join(workArea, proj)
@@ -196,10 +206,10 @@ def resubmit(taskName, dryRun=False, sites=None):
             continue
         n += 1
         if dryRun:
-            print(f"  [dryRun] crab resubmit -d {full}")
+            print(f"  [dryRun] {' '.join(['crab', 'resubmit', '-d', full] + maxMemory)}")
             continue
         print(f"\n=== {proj}")
-        subprocess.run(["crab", "resubmit", "-d", full])
+        subprocess.run(["crab", "resubmit", "-d", full] + maxMemory)
     if not retry:
         return n, []
 
@@ -212,7 +222,7 @@ def resubmit(taskName, dryRun=False, sites=None):
     if retry:
         print(f"\n=== Submitting again {len(retry)} sample(s) whose crab submit failed")
         ## The recorded outputDir is <base>/ntuples/<task>
-        bad = submit(retry, dryRun=dryRun, sites=sites, taskName=taskName, base=recordedOutputDir(rec).rsplit("/", 2)[0])[1]
+        bad = submit(retry, dryRun=dryRun, sites=sites, taskName=taskName, base=recordedOutputDir(rec).rsplit("/", 2)[0], maxMemoryMB=memoryMB)[1]
     return n, [_sampleOfConfig(p) for p in bad + leftover]
 
 

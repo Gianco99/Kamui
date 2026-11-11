@@ -1,72 +1,62 @@
-# Kamui CLI Documentation
+# Kamui CLI
 
-Kamui is the CLI for the whole analysis framework. Every stage of the analysis is meant to be driven through it, so there is one place to look for all of our analysis needs. It relies on a set of configuration files so we are never editing or hard-coding things into our scripts.
+Kamui is the CLI for the whole analysis framework. Every stage of the analysis is meant to run through it, so there is one place to look for everything. It reads what to do from the configuration files, so nothing is edited or hard-coded into the scripts.
 
 These terms come up throughout:
 
 - A sample is one dataset registered in a file under `config/samples/`, with a name, an era and tags.
-- A content preset says what a sample's ntuples keep: which collections, such as jets or tracks, and which of their variables. Each sample names the preset it uses.
-- A task is one run of `submit` or `select`, named with `--task`. Kamui builds the task's jobs in a folder of that name, called the job area, and the output lands in another folder of that name.
+- A content preset says which collections, such as jets or tracks, and which of their variables a sample's ntuples keep. Each sample names its preset.
+- A task is one run of `submit` (a production task) or `select` (a selection pass), named with `--task`. A production task or a condor selection pass builds its jobs in a folder of that name, the job area, and its output lands in another folder of that name. A local pass writes only to `ntupleSelection/out/<task>/`.
 
- 
+Every command has the same shape:
 
 ```
 ./kamui <command> [flags]
 ```
 
-`./kamui <command> --help` prints the flags for one command.
+For example, `./kamui list --tag validation` shows every sample tagged `validation`, and `./kamui <command> --help` prints one command's flags.
 
+## Picking Samples
 
-## Picking samples
+Six commands pick their samples with the same five flags: `list`, `query`, `stage`, `submit`, `select` and `norm`.
 
-Six commands pick samples with the same five flags:
 | Flag | What it matches |
 | --- | --- |
-| `--name NAME` (optional, default: None) | Exact sample name, repeatable |
-| `--family NAME` (optional, default: None) | The `family` key of a file in `config/samples/` |
-| `--era NAME` (optional, default: None) | Data-taking period |
-| `--tag NAME` (optional, default: None) | A tag from the sample config |
-| `--match PATTERN` (optional, default: None) | Wildcard on the sample name |
+| `--name NAME` (optional) | Exact sample name. Repeat the flag to name several |
+| `--family NAME` (optional) | The `family` key of a file in `config/samples/`, or the file's name when it has no `family` key |
+| `--era NAME` (optional) | Data-taking period |
+| `--tag NAME` (optional) | A tag from the sample config |
+| `--match PATTERN` (optional) | Wildcard on the sample name |
 
-
-
-The commands that take them are `list`, `query`, `stage`, `submit`, `select` and `norm`.
-
-Two things to keep in mind:
-
-- An unknown `--name`, `--family`, `--era` or `--tag` is always an error, on every command.
-
-- If no sample matches, every command but `list` stops, and `list` reports nothing found.
+- A sample has to match every flag you give.
+- Every command but `list` refuses to run with none of these flags, and prints its help.
+- An unknown `--name`, `--family`, `--era` or `--tag` is always an error, and the message suggests close known names.
+- If no sample matches, `list` says it found nothing, and every other command stops.
 
 ## Commands
 
-### Initial framework setup
+### Initial Framework Setup
 
 #### check
 
-Validates the configs locally.
-
+Validates the config files locally, reporting on each check:
 
 | Check | What it means |
 | --- | --- |
-| Catalog | Every sample is listed once and is well-formatted |
+| Catalog | Every sample is listed once and well formatted |
 | Content | Every preset and collection file resolves for each era of its run, as MC and as data, and every sample's preset exists in its run |
-| Parked content | A warning naming the content files check skips while their configuration is unfinished, listed in `PARKED_CONTENT` in `cli.py` |
+| Parked content | Warns about the content files `check` skips while their configuration is unfinished. `PARKED_CONTENT` in `cli.py` lists each with the reason `content` and `submit` give when they stop on it |
 | Selections | Every selection resolves for each era it declares, or for each era of its run when it declares none |
-| Definitions | Common definitions, shared to avoid repetition, are valid for each era |
-| Triggers | Every trigger file is well-formatted |
-| Normalizations | Every file in `config/normalizations/` is well-formatted |
-| Generator sums | MC samples that know their total generator weight. A sample without one is only a warning, with a reminder to run `./kamui norm --write` |
-| Sites and CMSSW | Validated `sites.json` and the CMSSW job script configurations |
+| Definitions | The common definitions, shared to avoid repeating the same cuts, are valid for each era |
+| Triggers | Every trigger file is well formatted |
+| Normalizations | Every JSON file in `config/normalizations/` is well formatted |
+| Generator sums | How many MC samples know their total generator weight. A missing one only warns, with a reminder to run `./kamui norm --write` |
+| Sites and CMSSW | `sites.json` and the CMSSW job script configurations are valid |
 
-A run's eras are the ones in `RUN2_ERAS` in `foundations/config.py` for Run 2, plus every era the catalog, the `globalTags` in `sites.json` or a selection names.
+A run's eras are `RUN2_ERAS` in `foundations/config.py` for Run 2, plus every era a catalog sample, the `globalTags` in `sites.json` or a selection names.
 
-Each line is marked with a status.
+Each line starts with a check mark when it passes, a cross for a failure or a warning sign for something incomplete. `check` exits non-zero on any failure, and a warning alone does not fail it. Run it after editing any config and before submitting anything.
 
-- A cross is a failure
-- A warning is something incomplete
-
-Run it after editing any config, and before submitting anything. It exits non-zero when it finds a problem.
 ```
 ./kamui check
 ```
@@ -75,13 +65,13 @@ Run it after editing any config, and before submitting anything. It exits non-ze
 
 #### find
 
-Searches DAS for datasets matching a wildcard, regardless of whether we have them in our configs.
+Searches DAS for datasets matching a wildcard, whether or not our configs have them. It needs cmsenv and a valid grid proxy.
 
 | Flag | Meaning |
 | --- | --- |
-| **`pattern`** (required, default: None) | Positional. The DAS wildcard to search for |
-| `--instance INSTANCE` (optional, default: `prod/global`) | `prod/global` for central datasets, `prod/phys03` for USER-created datasets |
-| `--refresh` (optional, default: None) | Bypass the DAS cache |
+| **`pattern`** (required) | Positional. The DAS wildcard |
+| `--instance INSTANCE` (optional, default `prod/global`) | `prod/global` for central datasets, `prod/phys03` for USER ones |
+| `--refresh` (optional) | Bypass the DAS cache |
 
 ```
 ./kamui find '/*HAHM*/*/MINIAODSIM'                       Everything from one model, any campaign
@@ -91,13 +81,13 @@ Searches DAS for datasets matching a wildcard, regardless of whether we have the
 
 #### norm
 
-Records the generator weight sum for normalization in `config/normalizations/generatorSums.json`. The sums are read from the sample's central NanoAOD.
+Measures each MC sample's generator weight sum, which normalization needs, from its central NanoAOD, and with `--write` records it in `config/normalizations/generatorSums.json`. It skips data samples, which have no generator weights, and any sample whose dataset has no central NanoAOD.
 
 | Flag | Meaning |
 | --- | --- |
-| The five sample flags | See above |
-| `--write` (optional, default: None) | Write results to the JSON |
-| `--refresh` (optional, default: None) | Bypass the DAS cache |
+| The five sample flags | See Picking Samples |
+| `--write` (optional) | Write the sums to the JSON |
+| `--refresh` (optional) | Bypass the DAS cache |
 
 ```
 ./kamui norm --family tutorial            Report the sums, write nothing
@@ -105,25 +95,21 @@ Records the generator weight sum for normalization in `config/normalizations/gen
 ./kamui norm --tag validation --write     A whole tag at once
 ```
 
-A sample whose dataset has no central NanoAOD is skipped. This functionality should be updated at some point!
-
-Use `./kamui check` to see how many cataloged samples have a sum recorded.
-
 ### Working with Registered Samples
 
 #### list
 
-Shows the samples in your config files, grouped by family. Four columns:
+Shows the samples in your config files, grouped by family, in four columns:
 
 - The sample name
 - The era
 - The content preset it uses
-- The tags it uses
+- Its tags
 
 | Flag | Meaning |
 | --- | --- |
-| The five sample flags | See above |
-| `--datasets` (optional, default: None) | Print only the bare DAS paths |
+| The five sample flags | See Picking Samples |
+| `--datasets` (optional) | Print only the bare DAS paths |
 
 ```
 ./kamui list                                       Everything
@@ -138,12 +124,12 @@ Shows the samples in your config files, grouped by family. Four columns:
 
 #### query
 
-Asks DAS how many files, events and gigabytes each selected sample holds, and totals them. Needs cmsenv and a valid grid proxy. Answers are cached.
+Asks DAS how many files, events and gigabytes each selected sample holds, and adds up the totals. It needs cmsenv and a valid grid proxy.
 
 | Flag | Meaning |
 | --- | --- |
-| The five sample flags | See above |
-| `--refresh` (optional, default: None) | Ignore the cache and ask DAS again |
+| The five sample flags | See Picking Samples |
+| `--refresh` (optional) | Ignore the cache and ask DAS again |
 
 ```
 ./kamui query --tag validation                     Every sample tagged validation
@@ -153,14 +139,14 @@ Asks DAS how many files, events and gigabytes each selected sample holds, and to
 
 #### stage
 
-Copies a sample's MiniAOD files to EOS, under `<stageoutBase>/<miniaodDir>/<sample>/` from `config/sites.json`, so you can run one job by hand on files at FNAL (see Running One Job By Hand in `ntupleProduction/README.md`). It copies the whole dataset unless `--maxFiles` caps it.
+Copies a sample's MiniAOD files to EOS, into `<stageoutBase>/<miniaodDir>/<sample>/` with `stageoutBase` and `miniaodDir` from `config/sites.json`, to run one job by hand on files at FNAL (see Running One Job by Hand in `ntupleProduction/README.md`) or to prototype a content preset. Without `--maxFiles` it copies the whole dataset.
 
 | Flag | Meaning |
 | --- | --- |
-| The five sample flags | See above |
-| `--maxFiles N` (optional, default: None) | Copy at most this many files per sample |
-| `--dryRun` (optional, default: None) | Print what would be copied, copy nothing |
-| `--refresh` (optional, default: None) | Bypass the DAS cache |
+| The five sample flags | See Picking Samples |
+| `--maxFiles N` (optional) | Copy at most this many files per sample |
+| `--dryRun` (optional) | Print what would be copied, and copy nothing |
+| `--refresh` (optional) | Bypass the DAS cache |
 
 ```
 ./kamui stage --name ggH-2S-4D_mS55_ctau10mm_2024             One whole sample
@@ -172,55 +158,55 @@ Copies a sample's MiniAOD files to EOS, under `<stageoutBase>/<miniaodDir>/<samp
 
 #### content
 
-Shows what a content preset would write into your ntuples, without running anything.
+Shows what a content preset would write into your ntuples, without running anything. `config/content/README.md` explains how to write a collection or preset.
 
-See `config/content/README.md` for how a collection or preset is written.
-
-One row per collection:
+It prints a table with one row per collection, showing:
 
 - Its name
 - What kind of object it is
-- Which MiniAOD collection it comes from
-- How many variables are kept
-- Any cut or cap.
+- The MiniAOD collection it comes from
+- How many variables it keeps
+- Any cut or cap
 
-Below the table it lists the branches each collection writes: `n<Collection>` for a collection with many entries per event, and `<Collection>_<variable>` for each variable. The names come from the table producers a job builds, so the DV collection includes the quantities `DVProducer` computes. A collection whose CMSSW producer names its own branches, such as `Pileup`, says so. When the preset belongs to the other run, the error names the `--era` values to pass.
+Then it lists each collection's branches: `n<Collection>` when it has many entries per event, and `<Collection>_<variable>` for each variable. The names come from the table producers a job builds, so the DV collection includes the quantities `DVProducer` computes, and a collection whose CMSSW producer names its own branches, such as `Pileup`, says so. For a preset of the other run, the error names the `--era` values to pass.
 
 | Flag | Meaning |
 | --- | --- |
-| `preset` (optional, default: None) | Positional. The preset or collection to show. Omit it to list the presets |
-| `--data` (optional, default: None) | Show the data version, which drops the `mcOnly` collections |
-| `--era NAME` (optional, default: `Summer24`) | The era, which picks the Run 2 or Run 3 content files and any values set per era. It must be one of a run's eras, as `check` defines them |
-| `--write PATH` (optional, default: None) | Write the JSON a job would receive to this path |
+| `preset` (optional) | Positional. The preset or collection to show. Leave it out to list the presets |
+| `--data` (optional) | Show the data version, which drops the `mcOnly` collections |
+| `--era NAME` (optional, default `Summer24`) | Picks the Run 2 or Run 3 content files and any per-era values. It must be one of a run's eras (see `check`) |
+| `--write PATH` (optional) | Write the JSON a job would receive to this path |
+
 ```
 ./kamui content                                    The presets run2 and run3 define
 ./kamui content dvSignal                           What one preset would write
 ./kamui content jets                               A single collection on its own
 ./kamui content dvSignal --data                    The generator collections disappear
 ./kamui content dvLepton --era 2018                A Run 2 preset
-./kamui content dvFull --write resolved.json       Write out exactly what a job would be handed
+./kamui content dvFull --write resolved.json       Exactly what a job would be handed
 ```
 
 ### Producing the Ntuples
 
-See `ntupleProduction/README.md` for more details on job submission. This section just describes how to run the submission via the CLI.
+These commands run job submission, which `ntupleProduction/README.md` explains in detail.
 
 #### submit
 
-Produces the ntuples. It takes the samples you selected, works out what each job should write, builds a job area on disk, and sends it to condor or to CRAB.
+Produces the ntuples: it works out what each job writes, builds a job area, and sends it to condor or CRAB. It checks every sample's content preset first, so a misspelled `--content` stops before DAS is asked for files and leaves no job area.
 
 | Flag | Meaning |
 | --- | --- |
-| The five sample flags | See above |
-| **`--task NAME`** (required, default: None) | Names the directory under `ntupleProduction/jobs/` and the EOS output subdirectory |
-| `--backend BACKEND` (optional, default: `condor`) | `condor` or `crab` |
-| `--content NAME` (optional, default: None) | Override the content preset the selected samples use |
-| `--filesPerJob N` (optional, default: the sample's `unitsPerJob`, else 5) | Input files per job |
-| `--maxFiles N` (optional, default: None) | Use at most this many input files per sample |
-| `--memoryMB N` (optional, default: 2500) | Memory request per job |
-| `--dryRun` (optional, default: None) | Write the job area, submit nothing |
-| `--refresh` (optional, default: None) | Bypass the DAS cache |
-| `--outputBase PATH` (optional, default: the backend's base in `sites.json`) | Write output under this EOS path |
+| The five sample flags | See Picking Samples |
+| **`--task NAME`** (required) | Names the folder under `ntupleProduction/jobs/` and the EOS output subfolder |
+| `--backend BACKEND` (optional, default `condor`) | `condor` or `crab` |
+| `--content NAME` (optional) | Content preset for every selected sample, overriding their own |
+| `--filesPerJob N` (optional) | Input files per job. Defaults to the sample's `unitsPerJob`, or `5` when it has none |
+| `--maxFiles N` (optional) | Use at most this many input files per sample |
+| `--memoryMB N` (optional, default `2500`) | Memory per job, in MB |
+| `--dryRun` (optional) | Write the job area, and submit nothing |
+| `--refresh` (optional) | Bypass the DAS cache |
+| `--outputBase PATH` (optional) | Write the output under this EOS path. Defaults to the backend's base in `sites.json` |
+
 ```
 ./kamui submit --tag validation --task run2Val --dryRun                               Build the job area, submit nothing
 ./kamui submit --tag validation --task run2Val --backend crab                         Every sample tagged validation, through CRAB
@@ -230,15 +216,19 @@ Produces the ntuples. It takes the samples you selected, works out what each job
 ./kamui submit --tag rpv --task elsewhere --outputBase /store/user/gdecastr/Scratch   Output somewhere other than the default
 ```
 
-`submit` exits non-zero when condor or CRAB refuses the jobs, including a CRAB task in which any sample failed to submit.
+`submit` exits non-zero when condor or CRAB refuses the jobs, which on CRAB includes any sample failing to submit.
 
 #### status
 
-Reports how a submitted task is doing, a production task or a condor selection pass. It reads the job area to find whether condor or CRAB ran the task, and asks that one. On condor it shows the jobs of the first submission and of every retry, each on its own schedd, then `Outputs N/M present on EOS`. On CRAB it also names any sample whose crab submit failed. A task that was never submitted, such as one a dry run left, says so on either backend.
+Reports how a production task or a condor selection pass is doing. It reads the job area to learn whether condor or CRAB ran the task, and asks that backend.
+
+- On condor it shows the jobs of the first submission and of every retry, each on its own schedd, then `Outputs N/M present on EOS`.
+- On CRAB it also names any sample whose crab submit failed.
+- On either backend, a task that was never submitted, such as one a dry run left behind, says so.
 
 | Flag | Meaning |
 | --- | --- |
-| **`--task NAME`** (required, default: None) | A task under `ntupleProduction/jobs/` or `ntupleSelection/jobs/` |
+| **`--task NAME`** (required) | A task under `ntupleProduction/jobs/` or `ntupleSelection/jobs/` |
 
 ```
 ./kamui status --task run2Val
@@ -246,29 +236,36 @@ Reports how a submitted task is doing, a production task or a condor selection p
 
 #### resubmit
 
-Resubmits only the jobs of a production task whose outputs never reached EOS. On CRAB it asks CRAB to retry its own failed jobs, and submits again any sample whose crab submit failed. On condor it compares what is on EOS against what the task expected, and refuses a task that was never submitted. It does not resubmit selection passes.
+Resubmits only the jobs of a production task whose outputs never reached EOS.
+
+- On CRAB it asks CRAB to retry its own failed jobs, and submits again any sample whose crab submit failed.
+- On condor it compares what is on EOS with what the task expected.
+- It refuses a selection pass, or a task on either backend that was never submitted, and says why.
 
 | Flag | Meaning |
 | --- | --- |
-| **`--task NAME`** (required, default: None) | The production task to retry |
-| `--dryRun` (optional, default: None) | Report what would be resubmitted, submit nothing |
-| `--forceResubmit` (optional, default: None) | Resubmit even while jobs from this task may still be on the queue, held, or on a schedd condor_q cannot reach |
+| **`--task NAME`** (required) | The production task to retry |
+| `--memoryMB N` (optional) | Memory per retried job, in MB. Without it, each asks for what the task's submit asked for |
+| `--dryRun` (optional) | Report what would be resubmitted, and submit nothing |
+| `--forceResubmit` (optional) | Resubmit even while jobs from this task may still be on the queue, held, or on a schedd `condor_q` cannot reach |
+
 ```
 ./kamui resubmit --task run2Val --dryRun           What is missing
 ./kamui resubmit --task run2Val                    Retry it
+./kamui resubmit --task run2Val --memoryMB 6000    Retry with more memory, for jobs held for exceeding their memory request
 ```
 
 ### Applying Selections
 
 #### selection
 
-Lists the selections, or shows one as `select` applies it. With no name it lists each run's selections and the eras each declares. With a name and an `--era` it prints the selection resolved for that era, with every definition expanded and every era-keyed threshold set.
+With no name, lists each run's selections and the eras each declares. With a name and an `--era`, prints the selection exactly as `select` applies it for that era, with every definition expanded and every era-keyed threshold filled in.
 
 | Flag | Meaning |
 | --- | --- |
-| `selection` (optional, default: None) | Positional. A selection name, or names joined by commas. Omit it to list the selections |
-| `--era NAME` (optional, default: None) | The era to resolve for, which picks the run folder and every era-keyed threshold. Needed with a name, and it must be one of a run's eras, as `check` defines them |
-| `--write PATH` (optional, default: None) | Write the resolved JSON to this path instead of printing it |
+| `selection` (optional) | Positional. A selection name, or several joined by commas. Leave it out to list the selections |
+| `--era NAME` (optional) | The era to resolve for, which picks the run folder and every era-keyed threshold. Needed with a name, and must be one of a run's eras (see `check`) |
+| `--write PATH` (optional) | Write the resolved JSON to this path instead of printing it |
 
 ```
 ./kamui selection                                  Every selection, by run
@@ -277,24 +274,29 @@ Lists the selections, or shows one as `select` applies it. With no name it lists
 
 #### select
 
-Applies an event-level selection to ntuples a `submit` task produced, and writes ntuples with the same branches.
-
-See `config/selections/README.md` for how a cut is written.
+Applies an event-level selection to the ntuples a `submit` task produced, and writes ntuples with the same branches. `config/selections/README.md` explains how to write a cut.
 
 | Flag | Meaning |
 | --- | --- |
-| The five sample flags | See above |
-| **`--selection NAME`** (required, default: None) | A config in `config/selections/`, read from the run folder of the samples' era. Names joined by commas run one after another, such as `lepton,dv3x4`. A blind selection refuses data samples |
-| **`--task NAME`** (required, default: None) | Names this selection pass |
-| **`--inputTask NAME`** (required, default: None) | The ntuple production task to read from |
-| `--inputBase PATH` (optional, default: the output directory the input task's `task.json` in its local job area records, else `stageoutBase` in `sites.json`) | Base holding `<base>/ntuples/<inputTask>`, on EOS or a local directory |
-| `--outputBase PATH` (optional, default: `stageoutBase` in `sites.json`) | EOS base for the selected ntuples, condor only |
-| `--backend BACKEND` (optional, default: `local`) | `local` or `condor` |
-| `--filesPerJob N` (optional, default: 5) | Input files per job on condor |
-| `--maxFiles N` (optional, default: None) | Use at most this many input files per sample |
-| `--dryRun` (optional, default: None) | Locally, print each sample's input file count, its output path and the resolved selection, and run nothing. On condor, write the job area and submit nothing |
+| The five sample flags | See Picking Samples |
+| **`--selection NAME`** (required) | A config in `config/selections/`, read from the run folder of the samples' era. Several joined by commas, such as `lepton,dv3x4`, apply in that order in one go. A selection with `blind` set to `true` never runs on data (see `blind` in `config/selections/README.md`) |
+| **`--task NAME`** (required) | Names this selection pass, which must differ from every production task name |
+| **`--inputTask NAME`** (required) | The ntuple production task to read from |
+| `--inputBase PATH` (optional) | The base holding `<base>/ntuples/<inputTask>`, on EOS or local. Defaults to the output directory in the `task.json` of the input task's local job area, else `stageoutBase` in `sites.json` |
+| `--outputBase PATH` (optional) | The EOS base for the selected ntuples, condor only. Defaults to `stageoutBase` in `sites.json` |
+| `--backend BACKEND` (optional, default `local`) | `local` or `condor` |
+| `--filesPerJob N` (optional, default `5`) | Input files per job on condor |
+| `--memoryMB N` (optional, default `2000`) | Memory per job on condor, in MB. A local pass ignores it |
+| `--maxFiles N` (optional) | Use at most this many input files per sample |
+| `--dryRun` (optional) | Locally, print each sample's input file count, output path and resolved selection, and run nothing. On condor, write the job area and submit nothing |
 
-A local pass writes `<sample>/<sample>_selected.root`, `cutflow.json` and `task.json` under `ntupleSelection/out/<task>/`, and rewrites the cutflow after every sample. A condor pass builds its job area in `ntupleSelection/jobs/<task>/`, writes to `<base>/selected/<task>/` on EOS, and copies `task.json` there once the jobs are submitted. Both records hold the input task, the selection resolved for each era and the commit that ran. Before anything runs, `select` compares the collections the selection reads with the content the input task's `task.json` records, and stops with the missing ones named.
+The output depends on the backend:
+
+- A local pass writes `<sample>/<sample>_selected.root`, `cutflow.json` and `task.json` under `ntupleSelection/out/<task>/`, rewriting the cutflow after every sample.
+- A condor pass builds its job area in `ntupleSelection/jobs/<task>/`, writes to `<base>/selected/<task>/` on EOS, and copies `task.json` there once the jobs are submitted.
+
+Either way, `task.json` records the input task, the selection resolved for each era, and the commit that ran. Before anything runs, `select` checks the collections the selection reads against the content in the input task's `task.json`, and stops, naming any that are missing.
+
 ```
 ./kamui select --tag leptonTriggered --selection lepton --task lepPass --inputTask run2Val                                     Run it locally
 ./kamui select --tag displacementTriggered --selection displaced --task dispPass --inputTask run2Val --backend condor          Send it to the cluster
@@ -305,18 +307,18 @@ A local pass writes `<sample>/<sample>_selected.root`, `cutflow.json` and `task.
 
 #### cutflow
 
-Prints the cutflow a `select` task recorded, local or condor. For a condor pass it adds up the cutflow each job left on EOS, and says how many jobs the counts cover until every job has reported. Per cut, it quotes:
+Prints the cutflow a `select` task recorded, local or condor. For a condor pass it adds up the cutflow each job left on EOS, and until every job has reported, it says how many jobs the counts cover. For each cut it shows:
 
 - The events kept
 - The events removed
 - The step efficiency
 - The cumulative efficiency
 
-The first row is `generated`, the events in the whole dataset as `norm` recorded them. A sample has no such row when it has no recorded sum, or when its production or this pass used `--maxFiles` and so read only part of the dataset. Its table then starts at `input`, the events in the ntuples.
+The first row is `generated`, the events in the whole dataset as `norm` recorded them. A sample without a recorded sum, or whose production or this pass read only part of the dataset with `--maxFiles`, starts instead at `input`, the events in the ntuples.
 
 | Flag | Meaning |
 | --- | --- |
-| **`--task NAME`** (required, default: None) | A select task, local or condor |
+| **`--task NAME`** (required) | A select task, local or condor |
 
 ```
 ./kamui cutflow --task lepPass
@@ -326,12 +328,12 @@ The first row is `generated`, the events in the whole dataset as `norm` recorded
 
 #### cache
 
-Describes the DAS cache, or thins it out. DAS is slow, so `find`, `query`, `stage`, `norm` and `submit` keep every answer DAS gives them on disk and reuse it. Prints how many responses are held, how much space they take, how old they are, and how many have expired. An answer expires once it is older than `CACHE_MAX_AGE_DAYS` in `grid/das.py`, and the next command that needs it asks DAS again.
+DAS is slow, so `find`, `query`, `stage`, `norm` and `submit` keep every DAS answer on disk and reuse it. `cache` prints how many answers are stored, their size and age, and how many have expired, and can thin them out. An answer expires once older than `CACHE_MAX_AGE_DAYS` in `grid/das.py`, and the next command that needs it asks DAS again.
 
 | Flag | Meaning |
 | --- | --- |
-| `--prune` (optional, default: None) | Delete expired entries |
-| `--clear` (optional, default: None) | Delete every cached response |
+| `--prune` (optional) | Delete the expired entries |
+| `--clear` (optional) | Delete every cached response |
 
 ```
 ./kamui cache                                      What is cached right now
@@ -341,7 +343,7 @@ Describes the DAS cache, or thins it out. DAS is slow, so `find`, `query`, `stag
 
 ## The Code Behind It
 
-`cli.py` is the driver.
+`cli.py` is the driver, and these folders hold the modules it calls:
 
 | Folder | What it does |
 | --- | --- |
@@ -354,8 +356,8 @@ Describes the DAS cache, or thins it out. DAS is slow, so `find`, `query`, `stag
 
 ## Caveats
 
-- The physics lives in the configuration files, and this code only executes what they say.
+- Keep the physics in the configuration files. This code only carries out what they say.
 - A new analysis stage belongs here, as new commands.
-- `cli.py` stays thin: it parses, calls a module, and prints. The behavior belongs in the modules so they can be imported without the CLI.
-- `--help` lists the commands in the order `cli.py` adds them, so keep that order the same as this README's.
-- Give a selection pass a name no production task uses. `status` and `resubmit` look in `ntupleProduction/jobs/` first, so a shared name shows the production task.
+- Keep `cli.py` thin: it parses the command line, calls a module, and prints. Put the behavior in the modules, so they can be imported without the CLI.
+- `--help` lists the commands in the order `cli.py` adds them. Keep that order the same as this README's.
+- Give a selection pass and a production task different names. `status` and `resubmit` look in `ntupleProduction/jobs/` first, so with a shared name they act on the production task, and `resubmit` retries its jobs. `select` refuses a name a production task already uses.

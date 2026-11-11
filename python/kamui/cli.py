@@ -34,7 +34,7 @@ from .submit.common import outputDir, readTaskRecord, recordedOutputDir, runTool
 def _addSelection(p):
     """Gives a sample command the five sample selection flags. The sample convention is in config/samples/README.md."""
     p.add_argument("--name", metavar="NAME", action="append", help="Exact sample name")
-    p.add_argument("--family", metavar="NAME", help="Family file name, e.g. exoticHiggs4d2024")
+    p.add_argument("--family", metavar="NAME", help="The family key of a file in config/samples/, or its file name when it has no family key, e.g. exoticHiggs4d2024")
     p.add_argument("--era", metavar="NAME", help="Data-taking period, e.g. Summer24")
     p.add_argument("--tag", metavar="NAME", help="Tag from the sample config, e.g. signal")
     p.add_argument("--match", metavar="PATTERN", help="Wildcard on the sample name, e.g. 'ggH*ctau10mm*'")
@@ -42,11 +42,7 @@ def _addSelection(p):
 def _pick(args, required=True):
     """Turns the sample selection flags into a list of samples."""
     cat = loadCatalog()
-    ## The catalog raises KeyError for a sample name, family, era or tag it does not know
-    try:
-        sel = select(cat, names=args.name, family=args.family, era=args.era, tag=args.tag, pattern=args.match)
-    except KeyError as e:
-        sys.exit(f"Error: {e.args[0]}")
+    sel = select(cat, names=args.name, family=args.family, era=args.era, tag=args.tag, pattern=args.match)
     if required and not sel:
         sys.exit("No samples matched the selection (try `kamui list`)")
     return sel
@@ -58,8 +54,8 @@ NEEDS_SELECTION = {"query", "stage", "submit", "select", "norm"}
 
 # Config Helper Functions
 
-## Content files check skips while their configuration is unfinished, by run
-PARKED_CONTENT = {"run3": {"vertexing"}}
+## Content files check skips while their configuration is unfinished, by run, each with the reason content and submit give for refusing it
+PARKED_CONTENT = {"run3": {"vertexing": "Run 3 DV content is parked until the Run 3 beampipe numbers exist"}}
 
 
 def _runEras(cat=None, sites=None):
@@ -75,6 +71,13 @@ def _checkEra(era):
     known = [e for run in RUNS for e in _runEras()[run]]
     if era not in known:
         sys.exit(f"Error: Unknown era '{era}'. Known eras: {', '.join(known)}")
+
+
+def _checkParked(name, era):
+    """Stops on a content file parked for the run an era reads and says why, since the validator's own message gives no hint that the file is parked."""
+    reason = PARKED_CONTENT.get(eraGroup(era), {}).get(name)
+    if reason:
+        sys.exit(f"Error: {reason}, so '{name}' cannot be resolved for {era} yet.")
 
 
 def _otherRunHint(name, namesByRun, era):
@@ -159,6 +162,7 @@ def _cmdContent(args):
             print(f"{group or 'content'}: " + ", ".join(names))
         return
     _checkEra(args.era)
+    _checkParked(args.preset, args.era)
     try:
         resolved = resolveContent(args.preset, isMC=not args.data, era=args.era)
     except FileNotFoundError as e:
@@ -250,6 +254,10 @@ def _cmdSubmit(args):
     if args.content:
         for s in sel:
             s["content"] = args.content
+    ## Each preset is resolved before DAS is asked for files or a job area is made, so a bad one stops at once
+    for content, isMC, era in sorted({(s["content"], bool(s["isMC"]), s["era"]) for s in sel}):
+        _checkParked(content, era)
+        resolveContent(content, isMC=isMC, era=era)
     print(f"Task '{args.task}' : {len(sel)} sample(s), backend={args.backend}")
 
     if args.backend == "crab":
@@ -315,8 +323,10 @@ def _cmdSelect(args):
     if args.backend == "local":
         if args.outputBase:
             print("  --outputBase applies to condor only, so this local pass writes under ntupleSelection/out/")
+        if args.memoryMB is not None:
+            print("  --memoryMB applies to condor only, so this local pass ignores it")
         return selectBackend.runLocal(plan, dryRun=args.dryRun)
-    d, nJobs, outDir = selectBatch.prepare(plan, filesPerJob=args.filesPerJob, base=args.outputBase)
+    d, nJobs, outDir = selectBatch.prepare(plan, filesPerJob=args.filesPerJob, memoryMB=args.memoryMB, base=args.outputBase)
     print(f"  Wrote {nJobs} job(s) under {d}")
     print(f"  Output goes to {outDir}")
     return selectBatch.submit(args.task, dryRun=args.dryRun)
@@ -411,17 +421,18 @@ def _cmdResubmit(args):
 
     if info.get("stage") == "select":
         sys.exit(f"Task '{args.task}' is a selection pass, and resubmit reruns production jobs only. ./kamui status --task {args.task} shows which of its outputs are on EOS.")
+    ## A task that never went out has nothing to retry, and a condor retry would send every job while submit still treats the area as unused and may clear it
+    submitted = crabBackend.wasSubmitted(args.task) if info.get("backend") == "crab" else condorBackend.submissions(info)
+    if not submitted:
+        sys.exit(f"Task '{args.task}' was never submitted, so it has nothing to retry. Run the same ./kamui submit without --dryRun.")
     if info.get("backend") == "crab":
         # CRAB knows which of its own jobs failed, and writes their output to the same place.
-        n, failed = crabBackend.resubmit(args.task, dryRun=args.dryRun)
+        n, failed = crabBackend.resubmit(args.task, dryRun=args.dryRun, memoryMB=args.memoryMB)
         print(f"  {'Would ask' if args.dryRun else 'Asked'} crab to resubmit failed jobs in {n} project(s)")
         if failed:
             sys.exit(f"  Still not submitted: {', '.join(failed)}")
         return 0
 
-    ## A task that never went out has nothing to retry, and a retry would send every job while submit still treats the area as unused and may clear it
-    if not condorBackend.submissions(info):
-        sys.exit(f"Task '{args.task}' was never submitted, so it has nothing to retry. Run the same ./kamui submit without --dryRun.")
     missing, nPresent, nExpected = condorBackend.missingJobs(args.task)
     print(f"Outputs  {nPresent}/{nExpected} present on EOS")
     if not missing:
@@ -434,7 +445,7 @@ def _cmdResubmit(args):
     if len(missing) > 20:
         print(f"           ... and {len(missing) - 20} more")
 
-    n, nJobs, code = condorBackend.resubmit(args.task, dryRun=args.dryRun, rows=missing, force=args.forceResubmit)
+    n, nJobs, code = condorBackend.resubmit(args.task, dryRun=args.dryRun, rows=missing, force=args.forceResubmit, memoryMB=args.memoryMB)
     if code != 0:
         sys.exit(f"  condor_submit failed with code {code}")
     if not args.dryRun:
@@ -523,7 +534,7 @@ def _cmdCheck(args):
 
     normProblems = validateNormalizations()
     problems += normProblems
-    note("Normalizations", "pass" if not normProblems else "fail", "Every file in config/normalizations/ is well-formatted")
+    note("Normalizations", "pass" if not normProblems else "fail", "Every JSON file in config/normalizations/ is well-formatted")
 
     ## Generator sums are measured data that grow with the catalog, so a missing one is reported and never fails the run
     mc = [s["name"] for s in cat if s["isMC"]]
@@ -687,6 +698,7 @@ def main(argv=None):
 
     q = _addCmd(sub, "resubmit", help="Rerun failed jobs", description=_cmdResubmit.__doc__)
     _required(q).add_argument("--task", metavar="NAME", required=True, help="The production task to retry")
+    q.add_argument("--memoryMB", metavar="N", type=int, help="Memory request per retried job in MB (default: what the task's submit asked for)")
     q.add_argument("--dryRun", action="store_true", help="Report what would be resubmitted, submit nothing")
     q.add_argument("--forceResubmit", action="store_true", help="Resubmit even while jobs from this task may still be on the queue, held, or on a schedd condor_q cannot reach")
     q.set_defaults(func=_cmdResubmit)
@@ -706,6 +718,7 @@ def main(argv=None):
     q.add_argument("--outputBase", metavar="PATH", help="EOS base for the selected ntuples, condor only (default: the site stageout base)")
     q.add_argument("--backend", metavar="BACKEND", choices=["local", "condor"], default="local", help="Where the selection runs (default: %(default)s)")
     q.add_argument("--filesPerJob", metavar="N", type=int, default=selectBatch.DEFAULT_FILES_PER_JOB, help="Input files per job on condor (default: %(default)s)")
+    q.add_argument("--memoryMB", metavar="N", type=int, help=f"Memory request per job in MB, condor only (default: {selectBatch.DEFAULT_MEMORY_MB})")
     q.add_argument("--maxFiles", metavar="N", type=int, help="Use at most this many input files per sample")
     q.add_argument("--dryRun", action="store_true", help="Locally, print what the pass would read, write and apply. On condor, write the job area and submit nothing")
     q.set_defaults(func=_cmdSelect)

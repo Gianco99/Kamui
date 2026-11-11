@@ -1,5 +1,5 @@
 {
-  "_doc": "A DV good enough for the analysis regions: inside the beampipe, well separated from the beamspot and precisely measured, with enough mass and track pT.",
+  "_doc": "A high-quality DV that enters our analysis selection.",
   "requirements": [
     {"variable": "insideBeampipe", "min": 1},
     {"variable": "dBV", "min": 0.01},

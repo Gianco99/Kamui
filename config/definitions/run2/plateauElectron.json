@@ -1,9 +1,9 @@
 {
-  "_doc": "Electron on the plateau of the single-electron trigger.",
+  "_doc": "An electron on the efficiency plateau of the single-electron trigger.",
   "requirements": [
     {"variable": "pt", "min": {"2016APV": 30, "2016": 30, "2017": 38, "2018": 35}},
     {"variable": "eta", "absMax": 2.4},
-    {"_doc": "NanoAOD cut-based electron ID, where 4 is tight.", "variable": "cutBased", "min": 4},
+    {"_doc": "Cut-based ID, where 4 is tight.", "variable": "cutBased", "min": 4},
     {
       "anyOf": [
         [{"variable": "eta", "absMax": 1.48}, {"variable": "dxyBeamspot", "absMax": 0.05}, {"variable": "dzPV", "absMax": 0.1}],

@@ -1,4 +1,5 @@
 {
+  "_doc": "Private Summer24 RPV stop pairs that decay to two d quarks and two d antiquarks.",
   "family": "rpv2024",
   "defaults": {"era": "Summer24", "isMC": true, "dasInstance": "prod/phys03", "content": "dvSignal", "tags": ["signal", "rpv", "private", "run3"]},
   "samples": [

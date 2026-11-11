@@ -1,5 +1,5 @@
 {
-  "_doc": "Run 2 UL points for validating Kamui against the Run 2 analysis.",
+  "_doc": "Central Run 2 Ultra Legacy signal samples for validating Kamui against the Run 2 analysis.",
   "family": "run2Validation",
   "defaults": {"isMC": true, "dasInstance": "prod/global", "tags": ["run2", "validation"]},
   "grids": [

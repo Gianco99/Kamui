@@ -1,11 +1,11 @@
 # Kamui AI Documentation
 ## Writing
-- Write prose in normal paragraphs.
 - Every README opens by telling a newcomer what is going on: what the folder is for, what its key ideas mean, and a short example when it helps. Details come after.
-- Never quote current values in a README, such as cut thresholds, working points or counts, since they go stale when the JSON changes. Say what a thing is for, and write examples with placeholders.
+- Write for a student new to the framework, not a senior developer: plain words, start with what the thing is for, and give one example. If the humanizer skill is available, run the text through it before you finish.
+- Never quote current values in a README, such as cut thresholds, working points or counts, since they go stale when the JSON changes. Say what a thing is for, and write examples with placeholders, such as `<ptMin>`.
 - Do not hard-wrap lines at 80 characters or any other column. Let the editor wrap naturally.
   - The same applies to code. Do not break a statement across lines to keep it under some column width.
-- Tables and bullet lists are fine where the content is genuinely tabular or genuinely a list. Lists are preferred for the ease of human readability.
+- Use bullet lists for things that really are lists and tables for lookups, and write everything else as short paragraphs. When in doubt, prefer a list, since it is easier to read.
 - Prefer a pointer to a long second copy, but only point to a README that really explains the topic. A one-line fact needs no pointer: state it or leave it out.
 - Do not put transient facts in a Caveats section.
   - Anything describing the current contents of code goes stale the next time somebody edits that code, and the reader has no way to tell. State the rule and the reason.
@@ -18,6 +18,8 @@
 - Start comments, docstrings, JSON `_doc` strings and anything the user reads, including argparse `help=` text, with a capital letter.
   - Exceptions are things that are naturally lowercase: a variable or function name, a camelCase identifier, a filename, a path, a CMSSW collection, a literal value such as `prod/global`.
 - Don't use em-dashes when writing docs or coding!
+- Headings use Title Case.
+- In a table of keys or flags, write a default as `(required)`, `(optional)` or `(optional, default `value`)`.
 ## Code
 - camelCase everywhere. This is just my (Gianfranco's) preference lol.
 - Do not start file or folder names with `kamui` unless the name needs it (the `kamui` CLI and the `python/kamui` package).
@@ -26,6 +28,8 @@
   - At most one `_doc` per object: one concise sentence on what that object is for.
   - Never cite temporary sources in a `_doc`, such as an AN section or JMTucker.
   - `doc` is different: it is text Kamui writes into its outputs, such as ntuple branch docs and cutflow rows.
+    - A branch `doc` in `config/content` is a short label with its units in brackets, such as `[cm]`.
+    - A cut `doc` in `config/selections` is one sentence on what the cut keeps.
 - Do not add `__init__.py` files unless something actually needs them.
 - A module docstring opens and closes on its own line, with the text between.
 - Group the imports and label the groups with comment headers. A single `#` heading for the whole block, `##` for each group.
@@ -39,4 +43,5 @@
 - Blatant errors should be pointed out to the user and not silently corrected.
 - Changing a config or a piece of functionality means updating the relevant README.md files that reference it, their Caveats included.
 - When something moves, move its documentation with it.
+- A bug file goes in `Bugs/jmtucker/adapted/` when Kamui ports the JMTucker code it lives in, in `Bugs/jmtucker/notPorted/` when Kamui has no counterpart to that code, and in `Bugs/backgroundTemplate/` when it is in the background-template code. A problem in Kamui itself goes in `Bugs/openIssues/`.
 - In general, we want to stick to the latest, greatest CMSSW releases. However, do not update to new releases without asking the maintainer, Gianfranco. This can introduce errors throughout the repository. So let's stick with the current CMSSW we are working with unless prompted to update.

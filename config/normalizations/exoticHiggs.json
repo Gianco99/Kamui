@@ -1,5 +1,5 @@
 {
-  "_doc": "Higgs production cross sections in pb at MH = 125 GeV, assuming BR(H -> long-lived pair) = 1, under the run whose samples they normalize.",
+  "_doc": "Higgs production cross sections in pb at MH = 125 GeV, assuming BR(H->SS) = 1, with one block per run.",
   "run2": {
     "_doc": "At a center-of-mass energy of 13 TeV.",
     "processes": {
@@ -13,7 +13,7 @@
     },
     "filterEfficiencies": {
       "HToSSTo4d": {
-        "_doc": "Efficiency of the gen-HT > 200 GeV filter on the ggH -> SS -> 4d samples.",
+        "_doc": "Efficiency of the gen-HT > 200 GeV filter on the ggH H->SS->4d samples.",
         "byScalarMass": {"15": 0.106, "40": 0.085, "55": 0.082},
         "source": "JMTucker Tools/python/Samples.py"
       }

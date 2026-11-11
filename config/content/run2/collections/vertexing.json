@@ -3,6 +3,7 @@
     "SeedTrack": {
       "type": "seedTrack",
       "src": "packedPFCandidates",
+      "doc": "Seed tracks for the DV fit: PF candidates that pass the seeding cuts",
       "seeding": {
         "beamSpot": "offlineBeamSpot",
         "primaryVertices": "offlineSlimmedPrimaryVertices",
@@ -13,7 +14,7 @@
         "minStripLayers": 6,
         "maxFirstPixelLayer": 1,
         "trackErrScale": {
-          "_doc": "Scales the MC track dxy and dsz uncertainties versus pT to match data, for the nSigmaDxyBsAbove cut and the DV uncertainty refit.",
+          "_doc": "Scales the MC track dxy and dsz uncertainties as a function of pT to match data, for the nSigmaDxyBsAbove cut and the DV uncertainty refit.",
           "2016APV": {
             "barrelAbsEtaBelow": 1.5,
             "barrel": {"dxy": {"form": "p0-p2*exp(-p1*x)", "p": [0.90391, 0.896, -0.1585]}, "dsz": {"form": "p0-p2*exp(-p1*x)", "p": [0.90834, 0.7094, -0.1133]}, "dxyDsz": {"form": "p0-p2*exp(-p1*x)", "p": [0.7946, 0.294, 0.0963]}},
@@ -44,19 +45,19 @@
       "variables": {
         "pt": {"expr": "pt()", "type": "float", "doc": "Track pT [GeV]", "precision": -1},
         "eta": {"expr": "eta()", "type": "float", "doc": "Pseudorapidity", "precision": -1},
-        "phi": {"expr": "phi()", "type": "float", "doc": "Azimuthal angle", "precision": -1},
+        "phi": {"expr": "phi()", "type": "float", "doc": "Azimuthal angle [rad]", "precision": -1},
         "charge": {"expr": "charge()", "type": "int16", "doc": "Electric charge"},
         "vx": {"expr": "vx()", "type": "float", "doc": "Reference point x [cm]", "precision": -1},
         "vy": {"expr": "vy()", "type": "float", "doc": "Reference point y [cm]", "precision": -1},
         "vz": {"expr": "vz()", "type": "float", "doc": "Reference point z [cm]", "precision": -1},
-        "dxyErr": {"expr": "dxyError()", "type": "float", "doc": "dxy uncertainty [cm]", "precision": -1},
-        "dzErr": {"expr": "dzError()", "type": "float", "doc": "dz uncertainty [cm]", "precision": -1},
-        "nPixelLayers": {"expr": "hitPattern().pixelLayersWithMeasurement()", "type": "uint8", "doc": "Pixel layers with a measurement"},
-        "nStripLayers": {"expr": "hitPattern().stripLayersWithMeasurement()", "type": "uint8", "doc": "Strip layers with a measurement"}
+        "dxyErr": {"expr": "dxyError()", "type": "float", "doc": "dxy uncertainty without the MC uncertainty scale [cm]", "precision": -1},
+        "dzErr": {"expr": "dzError()", "type": "float", "doc": "dz uncertainty without the MC uncertainty scale [cm]", "precision": -1},
+        "nPixelLayers": {"expr": "hitPattern().pixelLayersWithMeasurement()", "type": "uint8", "doc": "Number of pixel layers with a measurement"},
+        "nStripLayers": {"expr": "hitPattern().stripLayersWithMeasurement()", "type": "uint8", "doc": "Number of strip layers with a measurement"}
       }
     },
     "VertexJet": {
-      "_doc": "Jets the vertexer uses to separate vertices that share a jet. Not written to the ntuple.",
+      "_doc": "Jets the vertexer uses to separate vertices that share a jet, never written to the ntuple.",
       "type": "vertexJet",
       "src": "slimmedJets",
       "jec": {"payload": "AK4PFchs", "primaryVertices": "offlineSlimmedPrimaryVertices", "levels": ["L1FastJet", "L2Relative", "L3Absolute", "L2L3Residual"]},
@@ -65,6 +66,7 @@
     "DV": {
       "type": "dv",
       "src": "SeedTrack",
+      "doc": "DVs fit from the seed tracks",
       "vertexing": {
         "beamSpot": "offlineBeamSpot",
         "jets": "VertexJet",
@@ -72,11 +74,11 @@
         "maxChi2PerDof": 5,
         "kalman": {"maxDistance": 0.01, "maxIterations": 10, "smoothing": true},
         "sharedTracks": {"_doc": "When two vertices share a track, they merge if they are close, and otherwise the track stays only in the vertex it fits best.", "mergeBelowSigma": 4, "keepBelowSigma": 5, "tieBelowSigma": 1.5},
-        "zRefit": {"_doc": "A track whose removal moves the vertex in z by more than maxShiftSigma standard deviations is dropped.", "maxShiftSigma": 3},
+        "zRefit": {"_doc": "Drops a track when refitting the vertex without it moves the vertex in z by more than maxShiftSigma standard deviations.", "maxShiftSigma": 3},
         "mergeNearby": {"deltaPhiBelow": 0.5, "distance2dBelow": 0.03, "dbvAbove": 0.01},
         "sharedJets": {"_doc": "When two vertices share a jet, a vertex's only track in that jet is dropped if its phi differs from the vertex's phi by more than maxDeltaPhi.", "maxDeltaPhi": 1.5707963267948966},
         "beampipe": {
-          "_doc": "A DV is inside the beampipe when its x-y distance from the beampipe center is below radius. Data centers each era on the measured beampipe position, MC on mcCenter.",
+          "_doc": "A DV is inside the beampipe when its x-y distance from the beampipe center, dataCenter for the era in data and mcCenter in MC, is below radius.",
           "radius": {"2016APV": 2.00, "2016": 2.00, "2017": 2.09, "2018": 2.09},
           "dataCenter": {"2016APV": [0.124, 0.07], "2016": [0.124, 0.07], "2017": [0.113, -0.180], "2018": [0.171, -0.175]},
           "mcCenter": [0, 0]
@@ -93,18 +95,18 @@
         "cyz": {"expr": "covariance(1,2)", "type": "float", "doc": "Position covariance yz [cm^2]", "precision": -1},
         "czz": {"expr": "covariance(2,2)", "type": "float", "doc": "Position covariance zz [cm^2]", "precision": -1},
         "chi2": {"expr": "chi2()", "type": "float", "doc": "Vertex fit chi2", "precision": -1},
-        "ndof": {"expr": "ndof()", "type": "float", "doc": "Vertex fit ndof", "precision": -1},
-        "nTracks": {"expr": "tracksSize()", "type": "uint8", "doc": "Seed tracks in the vertex"}
+        "ndof": {"expr": "ndof()", "type": "float", "doc": "Vertex fit degrees of freedom", "precision": -1},
+        "nTracks": {"expr": "tracksSize()", "type": "uint8", "doc": "Number of seed tracks in the DV"}
       }
     },
     "DVTrack": {
       "type": "dvTrack",
       "src": "DV",
-      "doc": "Seed tracks of every DV, one row per track, in the order the DV fit took them",
+      "doc": "Seed tracks of each DV, one row per track, grouped by DV in the order its fit took them",
       "variables": {
         "charge": {"expr": "charge()", "type": "int16", "doc": "Electric charge"},
         "chi2": {"expr": "chi2()", "type": "float", "doc": "Track fit chi2", "precision": -1},
-        "ndof": {"expr": "ndof()", "type": "float", "doc": "Track fit ndof", "precision": -1},
+        "ndof": {"expr": "ndof()", "type": "float", "doc": "Track fit degrees of freedom", "precision": -1},
         "vx": {"expr": "vx()", "type": "double", "doc": "Reference point x [cm]"},
         "vy": {"expr": "vy()", "type": "double", "doc": "Reference point y [cm]"},
         "vz": {"expr": "vz()", "type": "double", "doc": "Reference point z [cm]"},

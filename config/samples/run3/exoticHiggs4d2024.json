@@ -1,4 +1,5 @@
 {
+  "_doc": "Central Summer24 exotic Higgs H->SS->4d samples in the ggH, VBF, WH, ZH and ttH production modes.",
   "family": "exoticHiggs4d2024",
   "defaults": {"era": "Summer24", "isMC": true, "dasInstance": "prod/global", "content": "dvSignal", "tags": ["signal", "exoticHiggs", "run3"]},
   "grids": [

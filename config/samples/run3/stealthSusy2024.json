@@ -1,4 +1,5 @@
 {
+  "_doc": "Private Summer24 Stealth SUSY stop pairs in the SHH and SYY models.",
   "family": "stealthSusy2024",
   "defaults": {"era": "Summer24", "isMC": true, "dasInstance": "prod/phys03", "content": "dvSignal", "tags": ["signal", "stealthSusy", "private", "run3"]},
   "grids": [

@@ -1,0 +1,6 @@
+# The 3x5 and 4x5 regions take only DVs with exactly 5 tracks, so an event with a 3- or 4-track DV and a DV of 6 or more tracks is in no 2V region.
+
+- **JMTucker:** `MFVNeutralino/python/VertexSelector_cfi.py:132-133` and `MFVNeutralino/python/MiniTree_cff.py:27-28`. `mfvSelectedVerticesTightNtk3or5` and `mfvSelectedVerticesTightNtk4or5` set `max_ntracks = 5`, and the 3x5 and 4x5 cuts take leading DVs of exactly 5 and 3, or 5 and 4, tracks. Every other 5-track category means 5 or more.
+- **Kamui:** `config/selections/run2/dv3x5.json:4` and `config/selections/run2/dv4x5.json:4`. Reproduced on purpose to match JMTucker: the 5-track count has `"max": 5`.
+- **Impact:** Changes physics results: in signal MC the cap keeps only 1/3 (ZH) to 1/8 (stop) of the 3x5 and 4x5 events that 5 or more tracks would give, and the analysis uses these regions as closure rows of the background-template validation. The 5x5 limit bins and the 3x4 and 4x4 normalization do not change, and no data validation sample has a 3x5 or 4x5 event under either definition.
+- **Fix:** Drop `"max": 5` from both. 4x5 then means exactly one DV with 5 or more tracks and at least one with 4, and 3x5 means exactly one with 5 or more, none with 4, and at least one with 3.

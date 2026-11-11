@@ -401,9 +401,23 @@ def _localCopy(path, scratch):
     return dest, True
 
 
+def _isTriggerBit(branch):
+    """Whether a branch holds one trigger or flag decision. NanoAOD gives each one this title, and the name test covers ntuples a selection pass rewrote, which carry no titles."""
+    return branch.title.startswith("Trigger/flag bit") or branch.name.startswith(("HLT_", "Flag_"))
+
+
+def _fewNames(names, shown=5):
+    names = sorted(names)
+    return ", ".join(names[:shown]) + (f" and {len(names) - shown} more" if len(names) > shown else "")
+
+
 # Each read gets its own scratch directory, since a shared one breaks for a second user on the node and lets parallel passes over the same task delete each other's copies.
 def _readAll(inputPaths, treeName, collections=()):
-    """Read every input file into one array. Returns (events, branchNames). Raises MissingCollections from the first file's branches, before reading the rest."""
+    """
+    Read every input file into one array. Returns (events, branchNames), where branchNames is every branch any file has.
+
+    Files written under different HLT menus carry different trigger and flag decisions, so a decision a file lacks reads as False in its events. Every other branch must be in every file. Raises MissingCollections from the first file's branches, before reading the rest.
+    """
     parts = []
     branches = None
     scratch = tempfile.mkdtemp(prefix="kamuiSelect")
@@ -412,11 +426,18 @@ def _readAll(inputPaths, treeName, collections=()):
             local, isCopy = _localCopy(p, scratch)
             with uproot.open(local) as f:
                 tree = f[treeName]
+                names = list(tree.keys())
+                others = {b for b in names if not _isTriggerBit(tree[b])}
                 if branches is None:
-                    branches = [k for k in tree.keys()]
+                    branches, first, firstOthers = list(names), p, others
                     missing = [c for c in collections if not any(b.startswith(c + "_") for b in branches)]
                     if missing:
                         raise MissingCollections(missing)
+                elif others != firstOthers:
+                    lacks = [f"{name} lacks {_fewNames(gone)}" for name, gone in ((p, firstOthers - others), (first, others - firstOthers)) if gone]
+                    raise ValueError(f"Input files {first} and {p} hold different branches besides trigger and flag decisions ({'; '.join(lacks)}), so they cannot be read as one sample. Check that every input comes from the same production.")
+                seen = set(branches)
+                branches += [b for b in names if b not in seen]
                 parts.append(tree.arrays())
             if isCopy:
                 os.remove(local)
@@ -424,7 +445,13 @@ def _readAll(inputPaths, treeName, collections=()):
         shutil.rmtree(scratch, ignore_errors=True)
     if not parts:
         raise ValueError("No input files")
-    return (parts[0] if len(parts) == 1 else ak.concatenate(parts)), branches
+    if len(parts) == 1:
+        return parts[0], branches
+    for i, part in enumerate(parts):
+        if list(part.fields) != branches:
+            present = set(part.fields)
+            parts[i] = ak.zip({b: part[b] if b in present else np.zeros(len(part), dtype=bool) for b in branches}, depth_limit=1)
+    return ak.concatenate(parts), branches
 
 
 def _write(events, path, treeName):

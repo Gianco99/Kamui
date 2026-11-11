@@ -267,6 +267,10 @@ def _translate(cname, c, era, isMC):
         out["vertexing"] = _checkVertexing(cname, c.get("vertexing"), era, isMC)
     elif "vertexing" in c:
         raise ValueError(f"Collection '{cname}': 'vertexing' has no meaning on a '{kind}' collection")
+    if kind == "dvTrack":
+        for k in ("cut", "maxLen", "singleton"):
+            if k in c:
+                raise ValueError(f"Collection '{cname}': '{k}' has no meaning on a 'dvTrack' collection, which writes every track of every DV so that each DV can be rebuilt from its rows")
     if kind == "seedTrack":
         out["seeding"] = _resolveSeeding(cname, c.get("seeding"), era, isMC)
     elif "seeding" in c:

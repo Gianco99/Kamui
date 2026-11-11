@@ -1,5 +1,5 @@
 {
-  "_doc": "Central Summer24 RPV stop pairs decaying to bb.",
+  "_doc": "Central Summer24 RPV stop pairs that decay to two b quarks and two b antiquarks.",
   "family": "rpv4b2024",
   "defaults": {"era": "Summer24", "isMC": true, "dasInstance": "prod/global", "content": "dvSignal", "tags": ["signal", "rpv", "run3"]},
   "grids": [

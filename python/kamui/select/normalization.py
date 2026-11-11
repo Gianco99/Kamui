@@ -7,6 +7,7 @@ They cover the whole generated dataset, so a skim or a capped file list can neve
 # Import Block
 
 ## Standard Python imports
+import fcntl
 import json
 import os
 
@@ -57,9 +58,8 @@ def measureFromNano(fileNames, redirector="root://cms-xrd-global.cern.ch/"):
     return {"genEvents": count, "sumGenWeight": sumw, "sumGenWeight2": sumw2}
 
 
-def record(sampleName, measured=None, genEvents=None, write=True):
-    """Assemble a sample's generated event count and generator weight sums, and store them when write is True."""
-    data = loadSums()
+def _addEntry(data, sampleName, measured, genEvents):
+    """Lay a new measurement over the sample's recorded entry in data, and return the entry."""
     entry = dict(data["samples"].get(sampleName, {}))
     if measured:
         entry["sumGenWeight"] = measured["sumGenWeight"]
@@ -67,14 +67,24 @@ def record(sampleName, measured=None, genEvents=None, write=True):
     if genEvents:
         entry["genEvents"] = genEvents
     data["samples"][sampleName] = {k: entry[k] for k in ("genEvents", "sumGenWeight", "sumGenWeight2") if k in entry}
+    return entry
+
+
+def record(sampleName, measured=None, genEvents=None, write=True):
+    """Assemble a sample's generated event count and generator weight sums, and store them when write is True."""
     if not write:
-        return entry
+        return _addEntry(loadSums(), sampleName, measured, genEvents)
 
     os.makedirs(os.path.dirname(sumsFile()), exist_ok=True)
-    tmp = sumsFile() + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(data, f, indent=2)
-    os.replace(tmp, sumsFile())
+    ## Two runs writing at once would each replace the file with a copy lacking the other's new entries, so the file is read, updated and replaced under one lock. The lock file stays, since removing it lets a waiting run lock a file nobody else sees.
+    with open(sumsFile() + ".lock", "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        data = loadSums()
+        entry = _addEntry(data, sampleName, measured, genEvents)
+        tmp = sumsFile() + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp, sumsFile())
     return entry
 
 
