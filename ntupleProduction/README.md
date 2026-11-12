@@ -21,7 +21,7 @@ The submission code is in `python/kamui/submit/`.
 
 ## Choosing a Backend
 
-- Use condor for a fast answer: a new preset, a handful of files, or a private dataset CRAB is awkward about. It asks DAS for the file list up front, reads the inputs through `sourceRedirector` from `config/sites.json`, and has no automatic retries. It cannot apply a data sample's lumi mask, so data with a mask goes through CRAB.
+- Use condor for a fast answer: a new preset, a handful of files, or a private dataset CRAB is awkward about. It asks DAS for the file list up front, reads the inputs through `sourceRedirector` from `config/sites.json`, and has no automatic retries.
 - Use CRAB for a full production. It makes one CRAB task per sample, runs the jobs at sites that already hold the data, and splits and retries them by itself.
 
 ## Running One Job by Hand
@@ -35,7 +35,7 @@ cmsRun ntupleProduction/cmssw/ntuple_cfg.py content=/tmp/dvSignal.json isMC=True
 
 Setting `maxEvents` adds it to the output name, so this writes `test_numEvent1000.root`.
 
-Content with the vertexing collections also needs `globalTag=`, set to the era's tag from `config/sites.json`.
+Content with the vertexing collections also needs `globalTag=`, set to the era's tag from `config/sites.json`. Data with a lumi mask also needs `lumiMask=`, set to the mask JSON.
 
 ## What a Job Area Contains
 
@@ -49,6 +49,7 @@ Everything below sits in `jobs/<task>/`.
 | `crabConfig_<sample>.py` | CRAB | One per sample |
 | `crab/crab_<task>__<sample>/` | CRAB | The work area you point `crab status` and `crab resubmit` at |
 | `fileLists.json` | condor | For each sample, the input files each job reads |
+| `lumiMasks.json`, `lumiMask<n>.json` | condor | Which lumi mask each masked sample's jobs apply, and the masks themselves. Written only when a sample has one |
 | `jobList.txt` | condor | One `sample,index,script` row per job |
 | `runJob_<preset>_<mc\|data>_<era>.sh` | condor | The script a worker runs. One per content file above |
 | `cmsswArea.tar.gz` | condor | The compiled code of your CMSSW area (`lib/`, `python/`, `cfipython/`). Each worker unpacks it into its fresh release |

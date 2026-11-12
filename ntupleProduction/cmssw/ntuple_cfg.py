@@ -11,6 +11,7 @@ import sys
 ## CMSSW modules
 import FWCore.ParameterSet.Config as cms
 from FWCore.ParameterSet.VarParsing import VarParsing
+from FWCore.PythonUtilities.LumiList import LumiList
 
 ## Local modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -25,6 +26,7 @@ opts.register("isMC", True, SINGLETON, VarParsing.varType.bool, "MC (True) or da
 opts.register("globalTag", "", SINGLETON, VarParsing.varType.string, "Conditions global tag")
 opts.register("nThreads", 1, SINGLETON, VarParsing.varType.int, "Number of cmsRun threads")
 opts.register("reportEvery", 1000, SINGLETON, VarParsing.varType.int, "MessageLogger reporting interval")
+opts.register("lumiMask", "", SINGLETON, VarParsing.varType.string, "Lumi mask JSON, such as the golden JSON. Only the lumi sections it lists are read")
 opts.setDefault("outputFile", "kamuiNtuple.root")
 opts.setDefault("maxEvents", -1)
 opts.parseArguments()
@@ -44,6 +46,8 @@ process.source = cms.Source(
     fileNames=cms.untracked.vstring(*opts.inputFiles),
     duplicateCheckMode=cms.untracked.string("noDuplicateCheck"),
 )
+if opts.lumiMask:
+    process.source.lumisToProcess = LumiList(filename=opts.lumiMask).getVLuminosityBlockRange()
 process.options = cms.untracked.PSet(
     numberOfThreads=cms.untracked.uint32(opts.nThreads),
     numberOfStreams=cms.untracked.uint32(opts.nThreads),
@@ -113,6 +117,8 @@ process.endNtuple = cms.EndPath(process.out)
 
 print("[kamui] content preset : %s (isMC=%s)" % (content.get("name"), content.get("isMC")))
 print("[kamui] output         : %s" % opts.outputFile)
+if opts.lumiMask:
+    print("[kamui] lumi mask      : %s" % opts.lumiMask)
 print("[kamui] collections    : %s" % ", ".join(sorted(content["collections"])))
 if skimFilter is not None:
     print("[kamui] HLT skim       : %s" % ", ".join(content["skim"]["hltPaths"]))

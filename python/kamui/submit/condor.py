@@ -9,8 +9,10 @@ import datetime
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
+import urllib.request
 
 ## Kamui modules
 from ..configReaders.sites import loadSites
@@ -39,15 +41,18 @@ eval `scramv1 runtime -sh`
 cd $_CONDOR_SCRATCH_DIR
 
 python3 - "$SAMPLE" "$IDX" <<'PY'
-import json, sys
+import json, os, sys
 sample, idx = sys.argv[1], sys.argv[2]
 files = json.load(open("fileLists.json"))[sample][int(idx)]
 open("inputs.txt", "w").write(",".join(files))
+masks = json.load(open("lumiMasks.json")) if os.path.exists("lumiMasks.json") else {{}}
+open("lumiMask.txt", "w").write(masks.get(sample, ""))
 PY
 INPUTS=$(cat inputs.txt)
+MASK=$(cat lumiMask.txt)
 
 cmsRun ntuple_cfg.py content={contentJson} isMC={isMC} {globalTagArg}\
-    inputFiles=$INPUTS outputFile=out.root maxEvents={maxEvents}
+    inputFiles=$INPUTS outputFile=out.root maxEvents={maxEvents} ${{MASK:+lumiMask=$MASK}}
 
 xrdfs {eosRedirector} mkdir -p {outDir}
 DEST={eosRedirector}/{outDir}/${{SAMPLE}}_ntuple_${{IDX}}.root
@@ -86,10 +91,6 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxFiles
     """Write a complete condor submission area. Returns the directory, the job count and the output base. maxFiles is the cap the file lists were cut to, recorded so a selection pass knows they cover only part of a dataset."""
     sites = sites or loadSites()
     checkTaskName(taskName)
-    ## A condor job reads every lumi section of its files, so a masked sample would keep the ones its mask leaves out
-    masked = [s["name"] for s in samples if s.get("lumiMask")]
-    if masked:
-        raise ValueError(f"Condor jobs do not apply a lumiMask, so they would keep lumi sections the mask leaves out. Submit these samples with --backend crab: {', '.join(masked)}")
     base = outputBase(sites, "condor", base)
     eosDir = outputDir(base, taskName)
     # The release lives in config/sites.json
@@ -98,6 +99,22 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxFiles
     area = checkLocalArea(cmsswVersion, scramArch)
     d = resolveTaskDir(taskName, sites, eosDir)
     os.makedirs(os.path.join(d, "logs"), exist_ok=True)
+
+    staged, masks = {}, {}
+    for s in samples:
+        mask = s.get("lumiMask")
+        if mask and mask not in staged:
+            staged[mask] = f"lumiMask{len(staged)}.json"
+            dest = os.path.join(d, staged[mask])
+            if re.match(r"https?://", mask):
+                with urllib.request.urlopen(mask, timeout=120) as r, open(dest, "wb") as f:
+                    f.write(r.read())
+            else:
+                shutil.copyfile(mask, dest)
+            with open(dest) as f:
+                json.load(f)
+        if mask:
+            masks[s["name"]] = staged[mask]
 
     contentCache = {}
     chunked, jobRows = {}, []
@@ -127,6 +144,9 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxFiles
         json.dump(chunked, f, indent=1)
     with open(os.path.join(d, "jobList.txt"), "w") as f:
         f.write("\n".join(jobRows) + "\n")
+    if masks:
+        with open(os.path.join(d, "lumiMasks.json"), "w") as f:
+            json.dump(masks, f, indent=1)
 
     # A task may mix content presets and MC with data, so each combination gets its own run script
     for (preset, isMC, era), contentJson in contentCache.items():
@@ -147,7 +167,7 @@ def prepare(samples, taskName, fileLists, sites=None, filesPerJob=None, maxFiles
             f.write(script)
         os.chmod(p, os.stat(p).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
-    inputFiles = ["fileLists.json", packLocalArea(d, area)] + copyNtupleCode(d) + list(contentCache.values())
+    inputFiles = ["fileLists.json", packLocalArea(d, area)] + copyNtupleCode(d) + list(contentCache.values()) + (["lumiMasks.json"] + sorted(set(masks.values())) if masks else [])
     jdlName = "submit.jdl"
     with open(os.path.join(d, jdlName), "w") as f:
         f.write(JDL.format(jdlName=jdlName, inputFiles=",".join(inputFiles), memoryMB=memoryMB, diskKB=diskKB, logDir="logs", jobListName="jobList.txt"))

@@ -50,7 +50,7 @@ A grid may also carry any sample field from the table below, and applies it to e
 | `content` (optional, default `dvBase`) | The content preset, which sets the branches written |
 | `tags` (optional, default `[]`) | Free-form labels, as a list, for picking samples with `--tag` |
 | `unitsPerJob` (optional) | Input files per job for this sample, a positive integer. `--filesPerJob` overrides it |
-| `lumiMask` (optional) | A lumi mask JSON, such as the golden JSON, that limits processing to the lumi sections it lists. Data only. CRAB applies it, and `submit` refuses a sample that has one on condor |
+| `lumiMask` (optional) | A lumi mask JSON, as a path or URL, such as the golden JSON, that limits processing to the lumi sections it lists. Data only. Both backends apply it |
 
 ## Writing a JSON Sample Family File
 
