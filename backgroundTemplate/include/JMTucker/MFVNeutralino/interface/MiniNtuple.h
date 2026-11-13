@@ -1,0 +1,197 @@
+#ifndef JMTucker_MFVNeutralino_interface_MiniNtuple_h
+#define JMTucker_MFVNeutralino_interface_MiniNtuple_h
+
+#include "Math/SMatrix.h"
+#include "TLorentzVector.h"
+#include "TTree.h"
+#include "JMTucker/MFVNeutralinoFormats/interface/VertexAux.h"
+#define JMT_STANDALONE_BTAGGING
+#include "JMTucker/Tools/interface/BTagging.h"
+
+namespace mfv {
+  typedef ROOT::Math::SMatrix<double, 5, 5, ROOT::Math::MatRepSym<double, 5> >  TrackCovarianceMatrix;
+
+  struct MiniNtuple {
+    MiniNtuple();
+    void clear();
+
+    unsigned run;
+    unsigned lumi;
+    unsigned long long event;
+    unsigned char gen_flavor_code;
+    unsigned int pass_hlt;
+    float l1_htt;
+    float l1_myhtt;
+    float l1_myhttwbug;
+    float hlt_ht;
+    float met;
+    float bsx;
+    float bsy;
+    float bsz;
+    float bsdxdz;
+    float bsdydz;
+    float bsx_at_z(float z) const { return bsx + bsdxdz * (z - bsz); }
+    float bsy_at_z(float z) const { return bsy + bsdydz * (z - bsz); }
+    unsigned char npv;
+    float pvx;
+    float pvy;
+    float pvz;
+    unsigned char npu;
+    float weight;
+    float ren_weight_up;
+    float ren_weight_dn;
+    float fac_weight_up;
+    float fac_weight_dn;
+    unsigned char njets;
+    float jet_pt[50];
+    float jet_eta[50];
+    float jet_phi[50];
+    float jet_energy[50];
+    unsigned char jet_id[50];
+    float jet_bdisc_csv[50];
+    float jet_bdisc_deepcsv[50];
+    float jet_bdisc_deepflav[50];
+    float pf_offline_jet_hlt_pt[50];
+    float pf_offline_jet_hlt_eta[50];
+    float pf_offline_jet_hlt_phi[50];
+    float pf_offline_jet_hlt_energy[50];
+    bool pf_offline_jet_hlt_match(int i, float min_jet_pt=20.) const {
+      // an offline jet with a successful HLT match will have a nonzero pf_offline_jet_hlt_pt;
+      // all others have the default value of 0
+      return pf_offline_jet_hlt_pt[i] > min_jet_pt;
+    }
+    float pf_offline_displaced_jet_hlt_pt[50];
+    float pf_offline_displaced_jet_hlt_eta[50];
+    float pf_offline_displaced_jet_hlt_phi[50];
+    float pf_offline_displaced_jet_hlt_energy[50];
+    bool pf_offline_displaced_jet_hlt_match(int i, float min_jet_pt=20.) const {
+      // an offline jet with a successful HLT match will have a nonzero pf_offline_displaced_jet_hlt_pt;
+      // all others have the default value of 0
+      return pf_offline_displaced_jet_hlt_pt[i] > min_jet_pt;
+    }
+    unsigned char ncalojets;
+    float calo_jet_pt[100];
+    float calo_jet_eta[100];
+    float calo_jet_phi[100];
+    float calo_jet_energy[100];
+    float calo_offline_displaced_jet_hlt_pt[100];
+    float calo_offline_displaced_jet_hlt_eta[100];
+    float calo_offline_displaced_jet_hlt_phi[100];
+    float calo_offline_displaced_jet_hlt_energy[100];
+    bool calo_offline_displaced_jet_hlt_match(int i, float min_jet_pt=20.) const {
+      // an offline jet with a successful HLT match will have a nonzero calo_offline_displaced_jet_hlt_pt;
+      // all others have the default value of 0
+      // NOTE be sure to keep the calojet and PF jet indices separate! mixing them up will be a big problem
+      return calo_offline_displaced_jet_hlt_pt[i] > min_jet_pt;
+    }
+    float ht(float min_jet_pt=40.) const;
+    float caloht(float min_jet_pt=40.) const;
+    bool is_btagged(int i, float min_bdisc=jmt::BTagging::discriminator_min(jmt::BTagging::tight)) const;
+    int nbtags_(float min_bdisc, int tagger, float min_pt) const;
+    int nbtags_old(float min_bdisc, float min_pt) const { return nbtags_(min_bdisc, 2, min_pt); } // DeepJet
+    int nbtags(float min_bdisc, float min_pt) const { return nbtags_(min_bdisc, 0, min_pt); } // CSVv2
+
+    int nbtags_tight(float min_pt=-1) const { return nbtags(jmt::BTagging::discriminator_min(jmt::BTagging::tight), min_pt); }
+    int nbtags_medium(float min_pt=-1) const { return nbtags(jmt::BTagging::discriminator_min(jmt::BTagging::medium), min_pt); }
+    int nbtags_loose(float min_pt=-1) const { return nbtags(jmt::BTagging::discriminator_min(jmt::BTagging::loose), min_pt); }
+    
+    float gen_pv_x0;
+    float gen_pv_y0;
+    float gen_pv_z0;
+    float gen_x[2];
+    float gen_y[2];
+    float gen_z[2];
+    float gen_lsp_pt[2];
+    float gen_lsp_eta[2];
+    float gen_lsp_phi[2];
+    float gen_lsp_mass[2];
+    std::vector<TLorentzVector> gen_daughters;
+    std::vector<int> gen_daughter_id;
+    std::vector<TLorentzVector> gen_bquarks;
+    std::vector<TLorentzVector> gen_leptons;
+    float gen_jet_ht;
+    float gen_jet_ht40;
+    std::vector<TLorentzVector>* p_gen_daughters;
+    std::vector<int>* p_gen_daughter_id;
+    std::vector<TLorentzVector>* p_gen_bquarks;
+    std::vector<TLorentzVector>* p_gen_leptons;
+    
+    //MFVVertexAuxCollection vertices;
+
+    unsigned char nvtx;
+    unsigned char ntk0;
+    std::vector<double> tk0_qchi2;
+    std::vector<double> tk0_ndof;
+    std::vector<double> tk0_vx;
+    std::vector<double> tk0_vy;
+    std::vector<double> tk0_vz;
+    std::vector<double> tk0_px;
+    std::vector<double> tk0_py;
+    std::vector<double> tk0_pz;
+    std::vector<short>  tk0_inpv;
+    std::vector<TrackCovarianceMatrix> tk0_cov;
+    std::vector<double>* p_tk0_qchi2;
+    std::vector<double>* p_tk0_ndof;
+    std::vector<double>* p_tk0_vx;
+    std::vector<double>* p_tk0_vy;
+    std::vector<double>* p_tk0_vz;
+    std::vector<double>* p_tk0_px;
+    std::vector<double>* p_tk0_py;
+    std::vector<double>* p_tk0_pz;
+    std::vector<short>*  p_tk0_inpv;
+    std::vector<TrackCovarianceMatrix>* p_tk0_cov;
+    bool genmatch0;
+    float costhtkonlymombs0;
+    float costhtksjetsntkmombs0;
+    float x0;
+    float y0;
+    float z0;
+    float bs2derr0;
+    float rescale_bs2derr0;
+
+    unsigned char ntk1;
+    std::vector<double> tk1_qchi2;
+    std::vector<double> tk1_ndof;
+    std::vector<double> tk1_vx;
+    std::vector<double> tk1_vy;
+    std::vector<double> tk1_vz;
+    std::vector<double> tk1_px;
+    std::vector<double> tk1_py;
+    std::vector<double> tk1_pz;
+    std::vector<short>  tk1_inpv;
+    std::vector<TrackCovarianceMatrix> tk1_cov;
+    std::vector<double>* p_tk1_qchi2;
+    std::vector<double>* p_tk1_ndof;
+    std::vector<double>* p_tk1_vx;
+    std::vector<double>* p_tk1_vy;
+    std::vector<double>* p_tk1_vz;
+    std::vector<double>* p_tk1_px;
+    std::vector<double>* p_tk1_py;
+    std::vector<double>* p_tk1_pz;
+    std::vector<short>*  p_tk1_inpv;
+    std::vector<TrackCovarianceMatrix>* p_tk1_cov;
+    bool genmatch1;
+    float costhtkonlymombs1;
+    float costhtksjetsntkmombs1;
+    float x1;
+    float y1;
+    float z1;
+    float bs2derr1;
+    float rescale_bs2derr1;
+
+    std::vector<float> misc_weights;
+    std::vector<float>* p_misc_weights;
+
+    bool satisfiesTrigger(size_t trig) const;
+    bool satisfiesTriggerAndOffline(size_t trig) const;
+    bool satisfiesBjetOrDisplacedDijetTrigger() const;
+    bool satisfiesBjetOrDisplacedDijetTriggerAndOffline() const;
+  };
+
+  void write_to_tree(TTree* tree, MiniNtuple& nt);
+  void read_from_tree(TTree* tree, MiniNtuple& nt);
+  MiniNtuple* clone(const MiniNtuple& nt);
+  long long loop(const char* fn, const char* tree_path, bool (*)(long long, long long, const mfv::MiniNtuple&));
+}
+
+#endif

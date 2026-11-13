@@ -32,8 +32,9 @@ Cross sections, filter efficiencies, generator weight sums and luminosities live
 | `ntupleProduction/` | Step 1: DAS datasets to ntuples |
 | `ntupleSelection/` | Step 2: Selections applied to ntuples. `select` creates it when it runs, with `jobs/` for condor passes and `out/` for local passes, and `.gitignore` keeps both out of git |
 | `vertexing/` | DV reconstruction |
+| `backgroundTemplate/` | The 2V background template, built from 1V events. It runs on its own in CMSSW_10_6, outside the `kamui` CLI |
 | `tools/` | Standalone scripts that inspect the framework's inputs and outputs |
-| `Bugs/` | Known bugs and open issues, one file each saying where the problem lives and how to fix it. `jmtucker/adapted/` holds bugs in JMTucker code that Kamui ports, some copied on purpose so the two match. `jmtucker/notPorted/` holds bugs in JMTucker code that Kamui has no counterpart to. `backgroundTemplate/` holds bugs in Alec's background-template code. Each file's Template code line cites his uncommitted version, snapshotted in `/uscms/home/gdecastr/nobackup/work/BackgroundTemplateRebuild/alecSnapshot_2026-11-05_1640`, and the standalone rewrite of that code is in `/uscms/home/gdecastr/nobackup/work/BackgroundTemplateRebuild/rewrite` until it moves into Kamui. `openIssues/` holds problems in Kamui itself |
+| `Bugs/` | Known bugs and open issues, one file each saying where the problem lives and how to fix it. `jmtucker/adapted/` holds bugs in JMTucker code that Kamui ports, some copied on purpose so the two match. `jmtucker/notPorted/` holds bugs in JMTucker code that Kamui has no counterpart to. `backgroundTemplate/` holds bugs in Alec's background-template code. Each file's Template code line cites his uncommitted version, snapshotted in `/uscms/home/gdecastr/nobackup/work/BackgroundTemplateRebuild/alecSnapshot_2026-11-05_1640`, and Kamui's version of that code is in `backgroundTemplate/`. `openIssues/` holds problems in Kamui itself |
 | `slides/` | The v0.1 slides, as a PDF |
 | `CLAUDE.md` | Conventions for the AI |
 

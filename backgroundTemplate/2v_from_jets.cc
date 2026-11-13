@@ -1,4750 +1,1081 @@
-/*
- * This program constructs the background template from one-vertex events.
- * Set the input parameters at the top of the method construct_dvvc().
- * Set which combinations of input parameters to run in main().
- * To run: compile with the Makefile (make); execute (./2v_from_jets.exe); delete the .exe (make clean).
- *
- * Here are details on each of the input parameters:
- * which filepath?
- *  - Provide the filepath to the MiniTree directory.
- *
- * which samples?
- *  - The MC and data samples and weights are set in static arrays; edit nbkg if necessary.
- *  - For the 2017 MC samples the weights calculated assume an integrated luminosity of 41.53 fb^-1 and the number of events run on for each sample:
-samples -i <<EOF
-for sample in qcd_samples_2017 + ttbar_samples_2017:
-    nevents = sample.nevents('/uscms_data/d2/tucker/crab_dirs/MiniTreeV22m/%s.root' % sample.name)
-    print '%20s %6.1f %9d %10.3g' % (sample.name, sample.xsec, nevents, 41530.*sample.xsec/nevents)
-EOF
- *  - For the background template only the relative weights are relevant because we only construct the shape; the normalization comes from the fit.
- *  - Todo: MC weights and data samples for 2018.
- *  - If the samples array is modified, ibkg_begin and ibkg_end should also be modified.
- *
- * which ntracks?
- *  - This sets the treepath and shouldn't need to be modified.  (For Ntk3or4 two-vertex event is considered to be 4-track x 3-track if ntk0==4 and ntk1==3.)
- *
- * deltaphi input
- *  - Run fit_jetpairdphi.py to get the values of dphi_pdf_c, dphi_pdf_a.
- *  - Todo: update for 2017 (the current values are from 2015+2016 data).
- *
- * efficiency input
- *  - Run vertexer_eff.py to get the .root file with the efficiency curve.
- *  - vpeffs_version refers to the version of VertexerPairEffs.
- */
+// Builds the 2V background template from 1V events.
+//
+// Every 1V event whose DV passes the track sum pT and mass cuts goes into a pool, split into 8 categories by b tagging and number of reconstructed PVs (category()). Each anchor DV is paired with a random partner DV from its own category. The partner's tracks are moved so that both DVs share the anchor's PV, the ported JMTucker vertexer runs on the union of the two track lists, and the pair fills the template when two DVs with the right track counts come back. The template is h_c1v_sumdbv_revertexed_w_errorbars, filled at the sum of the two input dBVs.
+//
+// In 5x5 only the DVs with >= 5 tracks are anchors, and each one is paired twice: with any DV of its category, then with a >= 5-track DV. Every other mode pairs every pooled DV once, with any DV of its category.
+//
+// The outputs reproduce Alec's 2v_from_jets.cc bit for bit, known bugs included. Each kept bug is marked "Kept for the bit-identical check", with its file in Kamui's Bugs/ folder when it has one. Run with --help for the options.
 
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdio>
 #include <cstdlib>
-#include <math.h>
-#include <TChain.h>
-#include <iostream>
 #include <fstream>
-#include <vector>
+#include <functional>
+#include <iostream>
+#include <map>
 #include <random>
+#include <set>
+#include <sstream>
 #include <string>
-//#include <Python.h>
+#include <vector>
+// addOneVertexEvent, fillOneVertexHistograms and fillTwoVertexEvent take sqrt and atan2 of MiniNtuple floats through the float overloads of math.h, as the original does. std::hypot or a cast to double there changes the output.
+#include <math.h>
+
 #include "TCanvas.h"
+#include "TChain.h"
 #include "TF1.h"
 #include "TFile.h"
-#include "TH2F.h"
-#include "TH3F.h"
-#include "TLegend.h"
-#include "TMath.h"
-#include "TRandom3.h"
-#include "TRatioPlot.h"
-#include "TStyle.h"
-#include "TTree.h"
-#include "TVector2.h"
-#include "JMTucker/MFVNeutralino/interface/MiniNtuple.h"
-#include "JMTucker/MFVNeutralinoFormats/interface/VertexAux.h" //Alec added from here
+#include "TH1.h"
 #include "TH2.h"
-#include "TMath.h"
-#include <math.h>
-#include "JMTucker/MFVNeutralino/interface/NtupleFiller.h" //fails without lboost added to the Makefile
-#include "JMTucker/MFVNeutralino/interface/Ntuple.h"
-#include "TrackingTools/TrajectoryState/interface/TrajectoryStateOnSurface.h"
-#include "TrackingTools/GeomPropagators/interface/AnalyticalTrajectoryExtrapolatorToLine.h"
-#include "TrackingTools/GeomPropagators/interface/AnalyticalImpactPointExtrapolator.h"
-#include "RecoVertex/VertexPrimitives/interface/ConvertToFromReco.h"
-#include "CommonTools/UtilAlgos/interface/TFileService.h"
+#include "TLegend.h"
+#include "TROOT.h"
+#include "TStyle.h"
+#include "TSystem.h"
+#include "TVector2.h"
+
 #include "DataFormats/Math/interface/deltaPhi.h"
-#include "DataFormats/Math/interface/deltaR.h"
-#include "DataFormats/JetReco/interface/PFJetCollection.h"
-#include "DataFormats/PatCandidates/interface/Jet.h"
-#include "DataFormats/PatCandidates/interface/PackedCandidate.h"
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
-#include "DataFormats/TrackReco/interface/TrackBase.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
 #include "DataFormats/VertexReco/interface/VertexFwd.h"
-#include "FWCore/Framework/interface/EDProducer.h"
-#include "FWCore/Framework/interface/Event.h"
-#include "FWCore/Framework/interface/MakerMacros.h" //fails without lboost added to the Makefile
-#include "FWCore/ServiceRegistry/interface/Service.h"
+#include "JMTucker/MFVNeutralino/interface/MiniNtuple.h"
+#include "MagneticField/UniformEngine/interface/UniformMagneticField.h"
 #include "RecoVertex/KalmanVertexFit/interface/KalmanVertexFitter.h"
 #include "RecoVertex/VertexTools/interface/VertexDistance3D.h"
 #include "RecoVertex/VertexTools/interface/VertexDistanceXY.h"
 #include "TrackingTools/IPTools/interface/IPTools.h"
-#include "TrackingTools/Records/interface/TransientTrackRecord.h"
 #include "TrackingTools/TransientTrack/interface/TransientTrack.h"
-#include "TrackingTools/TransientTrack/interface/TransientTrackBuilder.h"
-#include "MagneticField/Engine/interface/MagneticField.h"
-#include "MagneticField/UniformEngine/interface/UniformMagneticField.h"
-#include "JMTucker/MFVNeutralinoFormats/interface/VertexerPairEff.h"
-#include "JMTucker/MFVNeutralino/interface/VertexerParams.h"
-#include "JMTucker/Tools/interface/Utilities.h"
-#include "JMTucker/Tools/interface/TrackRescaler.h"
-#include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h"
-#include "FWCore/ParameterSet/interface/ParameterSet.h"
-#include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
-#include <TRandom3.h> //Alec added to here
 
-int dvv_nbins = 100;
-double dvv_bin_width = 0.01;
-std::vector<TString> cb_cbbar_vector = {};
-const std::string ulversion = "ULV30Lepm"; //Use for Lepton triggered samples
-//const std::string ulversion = "ULV30BvetoLHTm"; //Use for bjet triggered samples
-bool use_signal = false;
-bool use_dvv3D = true;
-bool c1v_vertexer = true;
-bool invert_sumpt_m5_cuts = false;
-bool vertices_w_5tracks = true;
-bool use_alltrkmultiplicities = true; //1-vtx histograms will have all track multiplicities! When false, does not account for trk multiplicity cross contamination when revertexing
-bool signal_contamination = false;
-bool verbose = false;
+// ---------------------------------------------------------------- Constants
 
-struct ConstructDvvcParameters {
-  int ibkg_begin_;
-  int ibkg_end_;
-  bool is_mc_;
-  bool only_20pc_;
-  bool inject_signal_;
-  std::string year_;
-  int ntracks_;
-  int bquarks_;
-  int btags_;
-  bool vary_dphi_;
-  bool clearing_from_eff_;
-  bool vary_eff_;
-  int min_npu_;
-  int max_npu_;
+// 1V selection, on the tracks of the DV
+constexpr double minTrackSumPt = 10;  // GeV
+constexpr double minTrackMass = 5.5;  // GeV, every track taken as a pion
+// Kept for the bit-identical check: Bugs/backgroundTemplate/templatePionMassDiffers.md (the 1V and 2V cuts use different pion masses)
+constexpr double pionMass1v = 0.13957;
+constexpr double pionMass2v = 0.1396;
 
-  ConstructDvvcParameters()
-    : ibkg_begin_(-999),
-      ibkg_end_(-999),
-      is_mc_(false),
-      only_20pc_(false),
-      inject_signal_(false),
-      year_("run2"), //change depending on year run
-      ntracks_(5),
-      bquarks_(-1),
-      btags_(-1),
-      vary_dphi_(false),
-      clearing_from_eff_(true),
-      //clearing_from_eff_(true),
-      vary_eff_(false),
-      min_npu_(0),
-      max_npu_(255)
-  {
-  }
+// Pool categories: b-tagged events, then untagged ones, each split into the npv bins of category()
+constexpr int nNpvBins = 4;
+constexpr int nCategories = 2 * nNpvBins;
 
-  int ibkg_begin() const { return ibkg_begin_; }
-  int ibkg_end() const { return ibkg_end_; }
-  bool is_mc() const { return is_mc_; }
-  bool only_20pc() const { return only_20pc_; }
-  bool inject_signal() const { return inject_signal_; }
-  std::string year() const { return year_; }
-  int ntracks() const { return ntracks_; }
-  int bquarks() const { return bquarks_; }
-  int btags() const { return btags_; }
-  bool vary_dphi() const { return vary_dphi_; }
-  bool clearing_from_eff() const { return clearing_from_eff_; }
-  bool vary_eff() const { return vary_eff_; }
-  int min_npu() const { return min_npu_; }
-  int max_npu() const { return max_npu_; }
+// Random-number seeds of the two pairing passes
+constexpr unsigned anyPartnerSeed = 73;
+constexpr unsigned fivePlusPartnerSeed = 86;
 
-  ConstructDvvcParameters ibkg_begin(bool x)        { ConstructDvvcParameters y(*this); y.ibkg_begin_        = x; return y; }
-  ConstructDvvcParameters ibkg_end(bool x)          { ConstructDvvcParameters y(*this); y.ibkg_end_          = x; return y; }
-  ConstructDvvcParameters is_mc(bool x)             { ConstructDvvcParameters y(*this); y.is_mc_             = x; return y; }
-  ConstructDvvcParameters only_20pc(bool x)         { ConstructDvvcParameters y(*this); y.only_20pc_         = x; return y; }
-  ConstructDvvcParameters inject_signal(bool x)     { ConstructDvvcParameters y(*this); y.inject_signal_     = x; return y; }
-  ConstructDvvcParameters year(std::string x)       { ConstructDvvcParameters y(*this); y.year_              = x; return y; }
-  ConstructDvvcParameters ntracks(int x)            { ConstructDvvcParameters y(*this); y.ntracks_           = x; return y; }
-  ConstructDvvcParameters bquarks(int x)            { ConstructDvvcParameters y(*this); y.bquarks_           = x; return y; }
-  ConstructDvvcParameters btags(int x)              { ConstructDvvcParameters y(*this); y.btags_             = x; return y; }
-  ConstructDvvcParameters vary_dphi(bool x)         { ConstructDvvcParameters y(*this); y.vary_dphi_         = x; return y; }
-  ConstructDvvcParameters clearing_from_eff(bool x) { ConstructDvvcParameters y(*this); y.clearing_from_eff_ = x; return y; }
-  ConstructDvvcParameters vary_eff(bool x)          { ConstructDvvcParameters y(*this); y.vary_eff_          = x; return y; }
-  ConstructDvvcParameters min_npu(int x)            { ConstructDvvcParameters y(*this); y.min_npu_           = x; return y; }
-  ConstructDvvcParameters max_npu(int x)            { ConstructDvvcParameters y(*this); y.max_npu_           = x; return y; }
+// 2V dVV histograms; larger values go into the last bin
+constexpr int dvvNbins = 100;
+constexpr double dvvBinWidth = 0.01;
 
-  void print() const {
-     printf("ibkg_begin-end = %d-%d, is_mc = %d, only_20pc = %d, inject_signal = %d, year = %s, ntracks = %d, bquarks = %d, btags = %d, vary_dphi = %d, clearing_from_eff = %d, vary_eff = %d, min_npu = %d, max_npu = %d", ibkg_begin(), ibkg_end(), is_mc(), only_20pc(), inject_signal(), year_.c_str(), ntracks(), bquarks(), btags(), vary_dphi(), clearing_from_eff(), vary_eff(), min_npu(), max_npu());
-  }
+// npu is stored in one byte, so this range keeps every event
+constexpr int defaultMinNpu = 0;
+constexpr int defaultMaxNpu = 255;
 
-  //This is a coarse parameterization of the vertex pair reconstruction efficiency after vertex refinement step, this needs to be used in conjunction with vertexer_eff.py outputs
-  float extra_eff_2d(float dvv) {
-    if (dvv < 0.08) return 0.60;
-    if (dvv > 0.20) return 0.84;
-    else return (0.213 + 6.00*dvv - 14.4*dvv*dvv);
-  }
+// Vertexer settings, named as in Kamui's DVProducer
+constexpr double maxChi2PerDof = 5;                // Seeds and every refit
+constexpr double sharedTracksMergeBelowSigma = 4;  // Two DVs sharing a track merge when their 3D distance is less significant than this
+constexpr double sharedTracksKeepBelowSigma = 5;   // A shared track leaves any DV it is this many sigma or more from (3D impact parameter)
+constexpr double sharedTracksTieBelowSigma = 1.5;  // Within this many sigma of both DVs, the shared track stays in the DV with more tracks
+// mergeNearby: two DVs at about the same azimuth, close in xy and away from the beamspot
+constexpr double mergeNearbyDeltaPhiBelow = 0.5;
+constexpr double mergeNearbyDistance2dBelow = 0.0300;  // cm
+constexpr double mergeNearbyDbvAbove = 0.0100;         // cm
+const GlobalVector magneticField(0.0, 0.0, 3.8);       // Tesla, uniform
 
+const std::string minitreeBase = "/uscms_data/d3/joeyr/crabdirs/";
+// cb_vals.csv for bquark_fraction.py goes in this folder inside --outDir
+const std::string cbValuesDir = "cb_vals";
+
+// ---------------------------------------------------------------- Tables
+
+// A trigger channel: its label in file names and the MiniTree folders it reads
+struct Channel {
+  std::string name, label, dataDir, data20pcDir, data20pcSuffix, mcDir;
+};
+// Kept for the bit-identical check (the weight helper normalizes lepton MC with MiniTree_tag001Lepm, while the events come from MiniTree_tag004Lepm). The displacement channel has no 20% MiniTrees, so, as in the original, --only20pc reads the per-era data files of its MC folder.
+const Channel channels[] = {
+    {"lepton", "ULV30Lepm", "MiniTree_tag004Lepm4_unblind_5trk_1vtx", "MiniTree_tag001Lepm", "_20pc", "MiniTree_tag004Lepm"},
+    {"displacement", "ULV30BvetoLHTm", "MiniTree_tag004BvetoLHTm4_unblind_5trk_1vtx", "MiniTree_tag004BvetoLHTm", "", "MiniTree_tag004BvetoLHTm"},
 };
 
-std::string callPythonAndGetOutput(const std::string& argument) { //Alec added this command to call python commands that find the sample scale factor
-  //std::string command = "python /uscms/homes/a/alecduqu/mfv_ScaleFactors/src/JMTucker/MFVNeutralino/test/One2Two/2v_from_jets_new.py " + argument + " " + ulversion;
-  std::string command = "python 2v_from_jets_new.py " + argument + " " + ulversion;
-  //std::cout << command << std::endl;
-  std::array<char, 128> buffer;
-  std::string result;
-  // Open a pipe to the command
+// A template mode: the track counts of the two DVs of the 2V region it stands for, ntk0 being the larger, and for 3x4, 3x5 and 4x5 the tree of their exact-count 2V events. The code is the original's number for the mode, used in file names.
+struct NtracksMode {
+  int code;
+  std::string name;
+  int ntk0, ntk1;
+  std::string extraTree;
+};
+const NtracksMode ntracksModes[] = {
+    {3, "3x3", 3, 3, ""}, {4, "4x4", 4, 4, ""}, {5, "5x5", 5, 5, ""},
+    {7, "3x4", 4, 3, "mfvMiniTreeNtk3or4exact/t"}, {8, "3x5", 5, 3, "mfvMiniTreeNtk3or5exact/t"}, {9, "4x5", 5, 4, "mfvMiniTreeNtk4or5exact/t"},
+};
+
+// Which single years a --year value reads, in reading order. 20161 and 20162 are 2016 preVFP and postVFP.
+const std::map<std::string, std::vector<std::string>> yearParts = {
+    {"20161", {"20161"}}, {"20162", {"20162"}}, {"2017", {"2017"}}, {"2018", {"2018"}}, {"2017p8", {"2017", "2018"}}, {"run2", {"20161", "20162", "2017", "2018"}},
+};
+
+// Tight DeepJet working point per year, from BTagging.cc. The original finds the year in the sample name, which gives the same value for every sample listed here.
+float bdiscCut(const std::string& year) { return year == "20161" ? 0.6502 : year == "20162" ? 0.6377 : year == "2017" ? 0.7476 : 0.7100; }
+
+// Sample names, in reading order; the order fixes the pool indices and so the pairing. A {a,b} group expands to one name per entry, and MC names get "_<year>" appended.
+struct SampleSet {
+  std::string channel;
+  bool mc;
+  std::vector<std::string> years;
+  std::string names;
+};
+const SampleSet sampleSets[] = {
+    {"lepton", false, {"20161"}, "SingleMuon20161{B,C,D,E,F} SingleElectron20161{B,C,D,E,F}"},
+    {"lepton", false, {"20162"}, "SingleMuon20162{F,G,H} SingleElectron20162{F,G,H}"},
+    // Kept for the bit-identical check: Bugs/backgroundTemplate/templateSingleMuon2017BMissing.md
+    {"lepton", false, {"2017"}, "SingleElectron2017{B,D,F} SingleMuon2017{D,F} SingleElectron2017{C,E} SingleMuon2017{C,E}"},
+    {"lepton", false, {"2018"}, "SingleMuon2018{A,B,C,D} EGamma2018{A,B,C,D}"},
+    {"displacement", false, {"20161"}, "BTagCSV20161{B,C,D,E,F} DisplacedJet20161{B,C,D,E,F}"},
+    {"displacement", false, {"20162"}, "BTagCSV20162{F,G,H} DisplacedJet20162{F,G,H}"},
+    {"displacement", false, {"2017"}, "BTagCSV2017{B,C,D,E,F} DisplacedJet2017{C,D,E,F}"},
+    {"displacement", false, {"2018"}, "DisplacedJet2018{A,B,C,D} JetHT2018{A,B,C,D}"},
+    {"lepton", true, {"20161", "20162"}, "dyjetstollM{10,50} qcdbctoept{020,030,080,170,250} qcdempt{015,020,030,050,080,120,170,300} qcdmupt15 ttbar wjetstolnu_{0j,1j,2j} ww wz zz"},
+    {"lepton", true, {"2017"}, "dyjetstollM{10,50} qcdbctoept{015,020,030,080,170,250} qcdempt{020,030,050,080,120,170,300} qcdpt{15,20,30,50,80,120,170,300,470,600,800,1000}mupt5 ttbar wjetstolnu_{0j,1j,2j} ww wz zz"},
+    {"lepton", true, {"2018"}, "dyjetstollM{10,50} qcdbctoept{015,020,030,080,170,250} qcdempt{015,020,030,050,080,120,170,300} qcdmupt15 ttbar wjetstolnu_{0j,1j,2j} ww wz zz"},
+    {"displacement", true, {"20161", "20162"}, "qcdht{0100,0200,0300,0500,0700,1000,1500,2000} ttbar"},
+    {"displacement", true, {"2017", "2018"}, "ttbar qcdht{0200,0300,0500,0700,1000,1500,2000}"},
+};
+
+// Every histogram of the output file, in writing order
+struct HistogramSpec {
+  std::string type;  // TH1D, TH1F, TH2D or TH2F; "again" writes an earlier histogram a second time
+  const char* name;
+  const char* title;
+  int nx;
+  double xlo, xhi;
+  int ny;
+  double ylo, yhi;
+};
+const HistogramSpec histogramSpecs[] = {
+    {"TH1D", "h_1v_dbv", "only-one-vertex events;d_{BV} (cm);events", 200, 0, 2.0},
+    // Written empty, like h_1v_dbv_dz
+    {"TH1D", "h_1v_dbv_npult20", "only-one-vertex events;d_{BV} (cm);events", 200, 0, 2.0},
+    {"TH1D", "h_1v_dbv_npugt20lt30", "only-one-vertex events;d_{BV} (cm);events", 200, 0, 2.0},
+    {"TH1D", "h_1v_dbv_npugt30lt40", "only-one-vertex events;d_{BV} (cm);events", 200, 0, 2.0},
+    {"TH1D", "h_1v_dbv_npugt40", "only-one-vertex events;d_{BV} (cm);events", 200, 0, 2.0},
+    {"TH1F", "h_1v_costh2_onlytks0", "only-one-vertex events;cos(angle2{flight,momentum}) (only tracks, no jets);events", 302, -1.001, 1.001},
+    {"TH1F", "h_1v_costh20", "only-one-vertex events;cos(angle2{flight,momentum});events", 302, -1.001, 1.001},
+    {"TH1D", "h_1v_bs2derr", "#sigma(dist2d(SV, beamspot)) (cm)", 100, 0, 0.005},
+    {"TH1D", "h_1v_rescale_bs2derr", "rescaled #sigma(dist2d(SV, beamspot)) (cm)", 100, 0, 0.005},
+    {"TH1D", "h_1v__w", ";event weight;events", 100, 0, 10},
+    {"TH1D", "h_1v_z", ";z (cm);events", 250, -1, 1},
+    {"TH1D", "h_1v_dz", "only-one-vertex events;z distance from pv to sv (cm);events", 1000, -10, 10},
+    {"TH1F", "h_1v_dpvsv", "only-one-vertex events;3D distance from pv to sv (cm);events", 500, 0, 10},
+    {"TH2D", "h_1v_xy", "only-one-vertex events;x0 (cm);y0 (cm)", 250, -1.0, 1.0, 250, -1.0, 1.0},
+    // Kept for the bit-identical check (titled dBV, filled with the distance to the PV)
+    {"TH1D", "h_1v_dbv0", "only-one-vertex events;d_{BV}^{0} (cm);events", 1000, 0, 2.0},
+    {"TH1D", "h_1v_dbv1", "only-one-vertex events;d_{BV}^{1} (cm);events", 1000, 0, 2.0},
+    {"TH2D", "h_1v_dbv_dz", "only-one-vertex events;d_{BV} (cm); d_{z} (cm)", 1000, 0, 2.0, 1000, 0, 2.0},
+    {"TH2D", "h_1v_dbv_bs2derr", "only-one-vertex events;d_{BV} (cm); #sigma(dist2d(SV, beamspot)) (cm)", 1000, 0, 2.0, 100, 0, 0.005},
+    {"TH1F", "h_1v_phiv", "only-one-vertex events;vertex #phi;events", 50, -3.15, 3.15},
+    {"TH1D", "h_1v_npu", "only-one-vertex events;# PU interactions;events", 100, 0, 100},
+    {"TH1D", "h_1v_npv", "only-one-vertex events;# reconstructed pv;events", 100, 0, 100},
+    {"TH1F", "h_1v_njets", "only-one-vertex events;number of jets;events", 20, 0, 20},
+    {"TH1F", "h_1v_ht40", "only-one-vertex events;H_{T} of jets with p_{T} > 40 GeV;events", 200, 0, 5000},
+    {"TH1F", "h_1v_phij", "only-one-vertex events;jets #phi;jets", 50, -3.15, 3.15},
+    {"TH1F", "h_1v_dphijj", "only-one-vertex events;#Delta#phi_{JJ};jet pairs", 100, -3.1416, 3.1416},
+    {"TH1F", "h_1v_dphijv", "only-one-vertex events;#Delta#phi_{JV};jet-vertex pairs", 100, -3.1416, 3.1416},
+    {"TH1F", "h_1v_dphijvpt", "only-one-vertex events;p_{T}-weighted #Delta#phi_{JV};jet-vertex pairs", 100, -3.1416, 3.1416},
+    {"TH1F", "h_1v_dphijvmin", "only-one-vertex events;#Delta#phi_{JV}^{min};events", 50, 0, 3.1416},
+    {"TH1F", "h_2v_dbv", "two-vertex events;d_{BV} (cm);vertices", 1250, 0, 2.5},
+    {"TH2F", "h_2v_dbv1_dbv0", "two-vertex events;d_{BV}^{0} (cm);d_{BV}^{1} (cm)", 1250, 0, 2.5, 1250, 0, 2.5},
+    {"TH1F", "h_2v_dvv", "two-vertex events;d_{VV} (cm);events", dvvNbins, 0, dvvNbins * dvvBinWidth},
+    {"TH1F", "h_2v_dvv3D", "two-vertex events;3D d_{VV} (cm);events", dvvNbins, 0, dvvNbins * dvvBinWidth},
+    {"TH1F", "h_2v_sumdbv", "two-vertex events; #Sigma(d_{BV})  (cm);events", 200, 0., 4.0},
+    {"TH1F", "h_2v_dphivv", "two-vertex events;#Delta#phi_{VV};events", 10, -3.15, 3.15},
+    {"TH1F", "h_2v_absdphivv", "two-vertex events;|#Delta#phi_{VV}|;events", 5, 0, 3.15},
+    {"TH1D", "h_2v_npu", "two-vertex events;# PU interactions;events", 100, 0, 100},
+    {"TH1D", "h_2v_npv", "two-vertex events;# reconstructed pv;events", 100, 0, 100},
+    {"TH1F", "h_c1v_dvv3D_w_errorbars", "constructed from only-one-vertex events;3D d_{VV} (cm);events", 800, 0, 4},
+    {"TH1F", "h_c1v_dvv3D_revertexed_w_errorbars", "constructed from only-one-vertex events;3D d_{VV} (cm);events", 800, 0, 4},
+    {"TH1F", "h_c1v_sumdbv_revertexed_w_errorbars", "constructed from only-one-vertex events;#Sigma(d_{BV}) (cm);events", 200, 0, 4.0},
+    {"TH1F", "h_c1v_absdphivv_revertexed_w_errorbars", "constructed from only-one-vertex events;|#Delta#phi_{VV}|;events", 5, 0, 3.15},
+    {"TH1F", "h_c1v_sumdbv_w_errorbars", "constructed from only-one-vertex events;#Sigma(d_{BV}) (cm);events", 200, 0, 4.0},
+    // Kept for the bit-identical check: the original writes this histogram twice
+    {"again", "h_c1v_absdphivv_revertexed_w_errorbars"},
+    {"TH2F", "h_c1v_ntrk0_ntrk1", "constructed from only-one-vertex events;# vtx0 trks;# vtx1 trks", 11, 0, 11, 11, 0, 11},
+};
+
+// ---------------------------------------------------------------- Small helpers
+
+// Stops on a mistake in the command line
+[[noreturn]] void usageError(const std::string& message) {
+  std::cerr << "Error: " << message << "\nRun with --help for the options." << std::endl;
+  exit(1);
+}
+
+// Stops on a problem while running
+[[noreturn]] void fail(const std::string& message) {
+  std::cerr << "Error: " << message << std::endl;
+  exit(1);
+}
+
+std::vector<std::string> split(const std::string& s, char separator) {
+  std::vector<std::string> parts;
+  std::istringstream in(s);
+  for (std::string part; std::getline(in, part, separator);)
+    parts.push_back(part);
+  return parts;
+}
+
+// Expands "qcdht{0100,0200}" into qcdht0100 and qcdht0200; names are separated by spaces
+std::vector<std::string> expandNames(const std::string& spec) {
+  std::vector<std::string> names;
+  for (const std::string& token : split(spec, ' ')) {
+    const size_t open = token.find('{'), close = token.find('}');
+    if (open == std::string::npos) {
+      names.push_back(token);
+      continue;
+    }
+    for (const std::string& entry : split(token.substr(open + 1, close - open - 1), ','))
+      names.push_back(token.substr(0, open) + entry + token.substr(close + 1));
+  }
+  return names;
+}
+
+// The MC weight of a sample (cross section times luminosity over generated events) from 2v_from_jets_new.py. The helper imports JMTucker modules, so it runs with the python2 of the CMSSW_10_6 environment.
+float mcWeight(const std::string& helper, const std::string& sample, const std::string& label) {
+  const std::string command = "python '" + helper + "' " + sample + " " + label;
   FILE* pipe = popen(command.c_str(), "r");
-  if (!pipe) throw std::runtime_error("popen() failed!");
+  if (!pipe) fail("Cannot run " + command);
+  std::string output;
+  char buffer[128];
+  while (fgets(buffer, sizeof buffer, pipe))
+    output += buffer;
+  if (pclose(pipe) != 0) fail("The weight helper failed: " + command);
   try {
-    // Read the output line by line
-    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
-      result += buffer.data();
-    }
-  } catch (...) {
-    pclose(pipe);
-    throw;
+    return std::stof(output);
+  } catch (const std::exception&) {
+    fail("The weight helper printed no number: " + command);
   }
-  pclose(pipe);
-  return result;
 }
 
-//functions for the revertexing of constructed events, only used if c1v_vertexer = true
-typedef std::set<reco::TrackRef> track_set;
-typedef std::vector<reco::TrackRef> track_vec;
-const int n_tracks_per_seed_vertex = 2; //This is what is defined in Vertexer_cfi.py
-const double max_seed_vertex_chi2 = 5;
-const bool order_seed_vertex = false;
-const double merge_shared_dist = -1;
-const double max_track_vertex_dist = -1;
-const double max_track_vertex_sig = 5;
-const double min_track_vertex_sig_to_remove = 1.5;
-const bool remove_one_track_at_a_time = true;
-const bool resolve_split_vertices_tight = true;
-const bool investigate_merged_vertices = false;
-const bool use_2d_vertex_dist = false;
-const bool use_2d_track_dist = false;
-const double merge_shared_sig = 4;
+// ---------------------------------------------------------------- Configuration
 
-VertexDistanceXY vertex_dist_2d;
-VertexDistance3D vertex_dist_3d;
-
-struct produce_vertices {
-  //int number_of_vertices;
-  std::vector<int> numbers_of_vertex_tracks;
-  //std::vector<math::XYZPoint> positions;
-  std::vector<reco::Vertex::Point> positions; 
+// One run of the program, written to one output file
+struct Config {
+  const Channel* channel = nullptr;
+  std::string year;
+  const NtracksMode* mode = nullptr;
+  int btags = -1;    // -1 keeps every event, 1 only b-tagged ones, 0 only untagged ones
+  int bquarks = -1;  // Same, for MC events with a generated b hadron
+  bool mc = false;
+  bool only20pc = false;
+  int minNpu = defaultMinNpu;
+  int maxNpu = defaultMaxNpu;
+  std::string outDir;
+  std::string weightHelper;
 };
 
-//std::unique_ptr<KalmanVertexFitter> kv_reco;
-/*edm::ParameterSetDescription kvr_desc;
-kvr_desc.add<double>("maxDistance", 0.01);
-kvr_desc.add<int>("maxNbrOfIterations", 10);
-edm::ParameterSet kvr_params;
-kvr_desc.validate(kvr_params);
-bool doSmoothing = true;
-KalmanVertexFitter kv_reco(kvr_params, doSmoothing);*/
-//std::unique_ptr<KalmanVertexFitter> kv_reco = std::make_unique<KalmanVertexFitter>(kvr_params, true);
-//std::unique_ptr<KalmanVertexFitter> kv_reco = std::make_unique<KalmanVertexFitter>(true);
-
-//bool is_track_subset(const track_set & a, const track_set & b) const { //Alec had to remove const here
-bool is_track_subset(const track_set & a, const track_set & b) {
-  bool is_subset = true;
-  const track_set& smaller = a.size() <= b.size() ? a : b;
-  const track_set& bigger = a.size() <= b.size() ? b : a;
-
-  for (auto t : smaller)
-    if (bigger.count(t) < 1) {
-      is_subset = false;
-      break;
-    }
-
-  return is_subset;
+// For example 2v_from_jets_run2_5track_btags_ULV30Lepm.root
+std::string outputName(const Config& cfg) {
+  std::vector<std::string> parts;
+  if (cfg.btags >= 0) parts.push_back(cfg.btags ? "btags" : "nobtags");
+  if (cfg.bquarks >= 0) parts.push_back(cfg.bquarks ? "bquarks" : "nobquarks");
+  if (cfg.minNpu != defaultMinNpu || cfg.maxNpu != defaultMaxNpu) parts.push_back("npu" + std::to_string(cfg.minNpu) + "to" + std::to_string(cfg.maxNpu));
+  std::string selection = parts.empty() ? "default" : parts[0];
+  for (size_t i = 1; i < parts.size(); ++i)
+    selection += "_" + parts[i];
+  return "2v_from_jets_" + cfg.year + "_" + std::to_string(cfg.mode->code) + "track_" + selection + "_" + cfg.channel->label + ".root";
 }
 
-//track_set vertex_track_set(const reco::Vertex & v, const double min_weight = mfv::track_vertex_weight_min) const { //Alec had to remove const here
-track_set vertex_track_set(const reco::Vertex & v, const double min_weight = mfv::track_vertex_weight_min) {
-  //std::cout << "start of vertex_track_set function" << std::endl;
-  track_set result;
-  if (verbose) std::cout << "generated vertex # of tracks: " << v.tracksSize() << ", position: " << v.position() << ", chi^2: " << v.chi2() << ", chi^2/ndf: " << v.normalizedChi2() << std::endl;
-  //if (verbose) std::cout << "cov matrix: " << std::endl;
-  //if (verbose) std::cout << v.covariance(0, 0) << ", " << v.covariance(0, 1) << ", " << v.covariance(0, 2) << std::endl;
-  //if (verbose) std::cout << v.covariance(1, 0) << ", " << v.covariance(1, 1) <<	", " <<	v.covariance(1, 2) << std::endl;
-  //if (verbose) std::cout << v.covariance(2, 0) << ", " << v.covariance(2, 1) <<	", " <<	v.covariance(2, 2) << std::endl;
-
-  for (auto it = v.tracks_begin(), ite = v.tracks_end(); it != ite; ++it) {
-    //std::cout << "start of vertex loop iteration in vertex_track_set" << std::endl;
-    //std::cout << &(it) << std::endl;
-    //std::cout << &(*it) << std::endl;
-    //std::cout << &(**it) << std::endl;
-    double pt = (*it)->pt();
-    double eta = (*it)->eta();
-    if (verbose) std::cout << "pt: " << (*it)->pt() << ", eta: " << (*it)->eta() << ", phi: " << (*it)->phi() << ", dxy: " << (*it)->dxy() << ", dxyerr: " << (*it)->dxyError() << ", dz: " << (*it)->dz() << ", dzerr: " << (*it)->dzError() << std::endl;
-    const double w = v.trackWeight(*it);
-    //std::cout << "w = " << w << std::endl;
-    const bool use = w >= min_weight;
-    //std::cout << "use = " << use << std::endl;
-    assert(use);
-    if (use)
-      result.insert(it->castTo<reco::TrackRef>());
-    //std::cout << "current size of track set being made by vertex_track_set function: " << result.size() << std::endl; 
-  }
-  //std::cout << "end of vertex_track_set function" <<std::endl;
-  return result;
-}
-
-//track_vec vertex_track_vec(const reco::Vertex & v, const double min_weight = mfv::track_vertex_weight_min) const { //Alec had to remove const here
-track_vec vertex_track_vec(const reco::Vertex & v, const double min_weight = mfv::track_vertex_weight_min) {
-  track_set s = vertex_track_set(v, min_weight);
-  return track_vec(s.begin(), s.end());
-}
-
-//Measurement1D vertex_dist(const reco::Vertex & v0, const reco::Vertex & v1) const { //Alec had to remove const here 
-Measurement1D vertex_dist(const reco::Vertex & v0, const reco::Vertex & v1) {
-  if (use_2d_vertex_dist)
-    return vertex_dist_2d.distance(v0, v1);
-  else
-    return vertex_dist_3d.distance(v0, v1);
-}
-
-//std::pair<bool, Measurement1D> track_dist(const reco::TransientTrack & t, const reco::Vertex & v) const { //Alec had to remove const here
-std::pair<bool, Measurement1D> track_dist(const reco::TransientTrack & t, const reco::Vertex & v) {
-  if (use_2d_track_dist)
-    return IPTools::absoluteTransverseImpactParameter(t, v);
-  else
-    return IPTools::absoluteImpactParameter3D(t, v);
-}
-
-
-//std::pair<bool, Measurement1D> track_dist2d(const reco::TransientTrack & t, const reco::Vertex & v) const { //Alec had to remove const here 
-std::pair<bool, Measurement1D> track_dist2d(const reco::TransientTrack & t, const reco::Vertex & v) { 
-  return IPTools::absoluteTransverseImpactParameter(t, v);
-}
-
-//VertexDistanceXY vertex_dist_2d;
-//VertexDistance3D vertex_dist_3d;
-//std::unique_ptr<KalmanVertexFitter> kv_reco;
-
-std::vector<TransientVertex> kv_reco_dropin(std::vector<reco::TransientTrack>& ttks, double chi2=5) {
-  edm::ParameterSetDescription kvr_desc; //Alec added from here
-  kvr_desc.add<double>("maxDistance", 0.01);
-  kvr_desc.add<int>("maxNbrOfIterations", 10);
-  edm::ParameterSet kvr_params;
-  kvr_desc.validate(kvr_params);
-  bool doSmoothing = true;
-  std::unique_ptr<KalmanVertexFitter> kv_reco = std::make_unique<KalmanVertexFitter>(kvr_params, doSmoothing); //Alec added to here
-
-  //if (ttks.size() < 2) std::cout << "vertex no longer has 2 or more tracks kv_reco_dropin: " << std::endl;
-  if (ttks.size() < 2)
-    return std::vector<TransientVertex>();
-  std::vector<TransientVertex> v(1, kv_reco->vertex(ttks));
-  if (verbose) std::cout << "chi2/ndf of attempted kv_reco_dropin: " << v[0].normalisedChiSquared() << std::endl;
-  //if (v[0].normalisedChiSquared() > chi2) std::cout << "vertex normalized chi2 was >5 kv_reco_dropin: " << std::endl;
-  if (v[0].normalisedChiSquared() > chi2) //15
-    return std::vector<TransientVertex>();
-  return v;
-}
-
-std::vector<TransientVertex> kv_reco_dropin_nocut(std::vector<reco::TransientTrack> & ttks) {
-  edm::ParameterSetDescription kvr_desc; //Alec added from here
-  kvr_desc.add<double>("maxDistance", 0.01);
-  kvr_desc.add<int>("maxNbrOfIterations", 10);
-  edm::ParameterSet kvr_params;
-  kvr_desc.validate(kvr_params);
-  bool doSmoothing = true;
-  std::unique_ptr<KalmanVertexFitter> kv_reco = std::make_unique<KalmanVertexFitter>(kvr_params, doSmoothing); //Alec added to here
-  
-  if (ttks.size() < 2)
-    return std::vector<TransientVertex>();
-  std::vector<TransientVertex> v(1, kv_reco->vertex(ttks));
-  return v;
-}
-
-struct order_seed_vtx_pt {
-  int operator()(const reco::Vertex& a, const reco::Vertex& b) {
-    return a.p4().pt() > b.p4().pt();
-  };
+// An input file with its weight and b-tag threshold
+struct Sample {
+  std::string path;
+  float weight;
+  float bdiscCut;
 };
 
-produce_vertices finish(reco::Vertex::Point bs_pos, double bssigma_x, double bssigma_y, double bssigma_z, const std::vector<reco::TransientTrack>& seed_tracks, std::unique_ptr<reco::VertexCollection> vertices, std::unique_ptr<VertexerPairEffs> vpeffs, const std::vector<std::pair<track_set, track_set>>& vpeffs_tracks) { //only used if we are revertexing the constructed events
-  std::unique_ptr<reco::TrackCollection> tracks_seed      (new reco::TrackCollection);
-  std::unique_ptr<reco::TrackCollection> tracks_missseed (new reco::TrackCollection);
-  std::unique_ptr<reco::TrackCollection> tracks_all(new reco::TrackCollection);
-  std::unique_ptr<reco::TrackCollection> tracks_inVertices(new reco::TrackCollection);
-
-  std::map<std::pair<unsigned, unsigned>, unsigned char> seed_track_ref_map;
-  unsigned char itk = 0;
-  for (const reco::TransientTrack& ttk : seed_tracks) {
-    tracks_seed->push_back(ttk.track());
-    const reco::TrackBaseRef& tk(ttk.trackBaseRef());
-    seed_track_ref_map[std::make_pair(tk.id().id(), tk.key())] = uint2uchar_clamp(itk++);
-  }
-
-  //edm::Handle<reco::BeamSpot> beamspot;       //these lines are in Vertexer.cc but it is not used in finish(), so I do not know why this is here
-  //event.getByToken(beamspot_token, beamspot);
-
-  assert(vpeffs->size() == vpeffs_tracks.size());
-  for (size_t i = 0, ie = vpeffs->size(); i < ie; ++i) {
-    for (auto tk : vpeffs_tracks[i].first)  (*vpeffs)[i].tracks_push_back(0, seed_track_ref_map[std::make_pair(tk.id().id(), tk.key())]);
-    for (auto tk : vpeffs_tracks[i].second) (*vpeffs)[i].tracks_push_back(1, seed_track_ref_map[std::make_pair(tk.id().id(), tk.key())]);
-  }
-
-  int count_3trk_vertices = 0;
-  int count_5trk_vertices = 0;
-  for (const reco::Vertex& v : *vertices) {
-    for (auto it = v.tracks_begin(), ite = v.tracks_end(); it != ite; ++it) {
-      reco::TrackRef tk = it->castTo<reco::TrackRef>();
-      tracks_inVertices->push_back(*tk);
-    }
-    if (v.nTracks() >= 3)
-      ++count_3trk_vertices;
-    if (v.nTracks() >= 5)
-      ++count_5trk_vertices;
-  }
-
-  /*event.put(std::move(vertices));
-  event.put(std::move(vpeffs));
-  event.put(std::move(tracks_seed),       "seed");
-  event.put(std::move(tracks_missseed),       "seed");
-  event.put(std::move(tracks_all),        "all");
-  event.put(std::move(tracks_inVertices), "inVertices");*/
-  //std::cout << "check if 0.5: " << bssigma_x << std::endl;
-  //std::cout << "pt of first track of first vertex after revertexing: " << seed_tracks[0].track().pt() << std::endl;
-  if (verbose) std::cout << "final vertex position(s) after revertexing: " << std::endl;
-  //int number_of_vertices = 0;
-  std::vector<int> numbers_of_vertex_tracks;
-  std::vector<reco::Vertex::Point> positions;
-  for (const reco::Vertex& v : *vertices) {
-    //number_of_vertices += 1;
-    numbers_of_vertex_tracks.push_back(v.tracksSize());
-    positions.push_back(v.position());
-    if (verbose) std::cout << v.position() << " with " << v.tracksSize() << " tracks and " << " chi^2=" << v.chi2() <<  " and chi^2/ndf=" << v.normalizedChi2() << std::endl;
-    for (auto it = v.tracks_begin(), ite = v.tracks_end(); it != ite; ++it) {
-      reco::TrackRef tk = it->castTo<reco::TrackRef>();
-      if (verbose) std::cout << "pt: " << tk->pt() << ", eta: " << tk->eta() << ", phi: " << tk->phi() << ", dxy: " << tk->dxy() << ", dxyerr: " << tk->dxyError() << ", dz: " << tk->dz() << ", dzerr: " << tk->dzError() << std::endl;
-      //std::cout << "reco::Track parameters output by produce():: chi^2: " << tk->chi2() << ", ndf: " << tk->ndof() << ", reference point: " << tk->vertex() << ", p: (" << tk->px() << "," << tk->py() << "," << tk->pz() << ", charge: " << tk->charge() << ", cov matrix:" << std::endl << tk->covariance()<< std::endl;
-    }
-  }
-  //return v.position();
-  produce_vertices output = {numbers_of_vertex_tracks,positions};
-  return output;
-}
-
-produce_vertices produce(std::vector<double> bs_pos, double bssigma_x, double bssigma_y, double bssigma_z, std::vector<reco::TransientTrack> seed_tracks, reco::TrackCollection track_collection) { //only used if we are revertexing the constructed events
-  const double bsx = bs_pos[0];
-  const double bsy = bs_pos[1];
-  const double bsz = bs_pos[2];   //do some sanity checks for this later!!!!!!!!!!!
-  reco::Vertex::Point bsposition(bsx, bsy, bsz);
-  reco::Vertex::Error bscovariance; //reco::Vertex::Error or CovarianceMatrix, either should work
-  bscovariance(0, 0) = bssigma_x * bssigma_x; //this information is currently not stored in the minitrees
-  bscovariance(1, 1) = bssigma_y * bssigma_y; //we may need to rerun them to properly define
-  bscovariance(2, 2) = bssigma_z * bssigma_z; //these variables
-  const reco::Vertex fake_bs_vtx(bsposition, bscovariance);
-  //std::cout << "beamspot variables reformatted" << std::endl;
-
-  edm::ParameterSetDescription kvr_desc;
-  kvr_desc.add<double>("maxDistance", 0.01);
-  kvr_desc.add<int>("maxNbrOfIterations", 10);
-  edm::ParameterSet kvr_params;
-  kvr_desc.validate(kvr_params);
-  bool doSmoothing = true;
-  //KalmanVertexFitter kv_reco(kvr_params, doSmoothing);
-  //std::unique_ptr<KalmanVertexFitter> kv_reco(kvr_params, doSmoothing);
-  std::unique_ptr<KalmanVertexFitter> kv_reco = std::make_unique<KalmanVertexFitter>(kvr_params, doSmoothing);
-  
-  //edm::ESHandle<TransientTrackBuilder> tt_builder;
-  //setup.get<TransientTrackRecord>().get("TransientTrackBuilder", tt_builder);
-
-  //edm::Handle<std::vector<reco::TrackRef>> quality_track_refs;
-  //if (track_attachment)
-  //  event.getByToken(quality_tracks_token, quality_track_refs);
-
-  //reco::TrackCollection track_collection;
-  //for (int i = 0; i < seed_tracks.size(); ++i) {
-    //track_collection.push_back(seed_tracks[i]); //reco::Tracks must fill a reco::TrackCollection
-  //}
-  
-  //std::map<reco::TrackRef, size_t> seed_track_ref_map;
-  std::map<unsigned int, size_t> seed_track_ref_map;
-  for (int i = 0; i < seed_tracks.size(); ++i) {
-    reco::TrackRef tk(&track_collection, i);
-    //seed_track_ref_map[tk.key()] = i;
-    seed_track_ref_map[tk.key()] = i;   //double check this!!!!!!!
-    if (verbose) std::cout << "Starting track mapped to " << i << " in seed_track_ref_map with pt " << seed_tracks[seed_track_ref_map.at(tk.key())].track().pt() << std::endl;
-  }
-
-  const size_t ntk = seed_tracks.size();
-  //std::cout << "track ndof: " << seed_tracks[0].ndof() << ", track charge: " << seed_tracks[0].charge() << ", track pt: " << seed_tracks[0].track().pt() << std::endl;
-  //std::cout << "track variables defined" << std::endl;
-
-  //////////////////////////////////////////////////////////////////////
-  // Form seed vertices from all pairs of tracks whose vertex fit
-  // passes cuts.
-  //////////////////////////////////////////////////////////////////////
-
-  std::unique_ptr<reco::VertexCollection> vertices(new reco::VertexCollection);
-  std::unique_ptr<VertexerPairEffs> vpeffs(new VertexerPairEffs);
-  std::vector<std::pair<track_set, track_set>> vpeffs_tracks;
-
-  if (ntk == 0) {
-    //finish(event, seed_tracks, std::move(vertices), std::move(vpeffs), vpeffs_tracks); //original Vertexer.cc finish() inputs
-    return finish(bsposition, bssigma_x, bssigma_y, bssigma_z, seed_tracks, std::move(vertices), std::move(vpeffs), vpeffs_tracks);
-    //return;
-  }
-
-  std::vector<size_t> itks(n_tracks_per_seed_vertex, 0);
-  auto try_seed_vertex = [&]() {
-    std::vector<reco::TransientTrack> ttks(n_tracks_per_seed_vertex);
-    for (int i = 0; i < n_tracks_per_seed_vertex; ++i)
-      ttks[i] = seed_tracks[itks[i]];
-    //std::cout << "after first use of the seed_tracks variable" << std::endl;
-
-    TransientVertex seed_vertex = kv_reco->vertex(ttks);
-    if (verbose) std::cout << "Initial vertex pairing" << std::endl;
-    if (seed_vertex.isValid() && seed_vertex.normalisedChiSquared() < max_seed_vertex_chi2) { //Alec added seed_vertex.normalisedChiSquared() > 0 to fix the bug where occasionally vertices with extreme negative chi^2 were taken to be valid vertices
-      if (verbose) std::cout << "vertex # of tracks: " << reco::Vertex(seed_vertex).tracksSize() << ", position: " << reco::Vertex(seed_vertex).position() << std::endl;
-      vertices->push_back(reco::Vertex(seed_vertex));
-    }
-    //std::cout << "after try_seed_vertex" << std::endl;    
-  };
-  
-  // ha
-  for (size_t itk = 0; itk < ntk; ++itk) {
-    itks[0] = itk;
-    for (size_t jtk = itk + 1; jtk < ntk; ++jtk) {
-      itks[1] = jtk;
-      if (n_tracks_per_seed_vertex == 2) { try_seed_vertex(); continue; }
-      for (size_t ktk = jtk + 1; ktk < ntk; ++ktk) {
-        itks[2] = ktk;
-        if (n_tracks_per_seed_vertex == 3) { try_seed_vertex(); continue; }
-        for (size_t ltk = ktk + 1; ltk < ntk; ++ltk) {
-          itks[3] = ltk;
-          if (n_tracks_per_seed_vertex == 4) { try_seed_vertex(); continue; }
-          for (size_t mtk = ltk + 1; mtk < ntk; ++mtk) {
-            itks[4] = mtk;
-            try_seed_vertex();
-          }
-        }
+std::vector<Sample> sampleList(const Config& cfg) {
+  const Channel& ch = *cfg.channel;
+  const std::string dir = minitreeBase + (cfg.mc ? ch.mcDir : cfg.only20pc ? ch.data20pcDir : ch.dataDir);
+  std::vector<Sample> samples;
+  for (const std::string& year : yearParts.at(cfg.year))
+    for (const SampleSet& set : sampleSets) {
+      if (set.channel != ch.name || set.mc != cfg.mc || std::find(set.years.begin(), set.years.end(), year) == set.years.end()) continue;
+      for (std::string name : expandNames(set.names)) {
+        name += cfg.mc ? "_" + year : cfg.only20pc ? ch.data20pcSuffix : "";
+        samples.push_back({dir + "/" + name + ".root", cfg.mc ? mcWeight(cfg.weightHelper, name, ch.label) : 1, bdiscCut(year)});
       }
     }
+  return samples;
+}
+
+// Trees chained per input file: the 4-track and >= 5-track 1V trees always, the 3-track tree in every mode but 5x5 (so 4x4 and 4x5 pool 3-track DVs too), and the mode's exact-count 2V tree
+std::vector<std::string> treeNames(const NtracksMode& mode) {
+  std::vector<std::string> trees;
+  if (mode.code != 5) trees.push_back("mfvMiniTreeNtk3/t");
+  trees.push_back("mfvMiniTreeNtk4/t");
+  trees.push_back("mfvMiniTree/t");
+  if (!mode.extraTree.empty()) trees.push_back(mode.extraTree);
+  return trees;
+}
+
+// ---------------------------------------------------------------- Histograms
+
+struct Histos {
+  std::map<std::string, TH1*> byName;
+  std::vector<TH1*> writeOrder;
+  TH1* operator[](const std::string& name) const { return byName.at(name); }
+  TH2* twoD(const std::string& name) const { return static_cast<TH2*>(byName.at(name)); }
+};
+
+// Books every histogram of histogramSpecs, each with weighted errors
+Histos bookHistograms() {
+  TH1::SetDefaultSumw2();
+  Histos h;
+  for (const HistogramSpec& s : histogramSpecs) {
+    if (s.type == "again") {
+      h.writeOrder.push_back(h[s.name]);
+      continue;
+    }
+    TH1* hist = nullptr;
+    if (s.type == "TH1D")
+      hist = new TH1D(s.name, s.title, s.nx, s.xlo, s.xhi);
+    else if (s.type == "TH1F")
+      hist = new TH1F(s.name, s.title, s.nx, s.xlo, s.xhi);
+    else if (s.type == "TH2D")
+      hist = new TH2D(s.name, s.title, s.nx, s.xlo, s.xhi, s.ny, s.ylo, s.yhi);
+    else if (s.type == "TH2F")
+      hist = new TH2F(s.name, s.title, s.nx, s.xlo, s.xhi, s.ny, s.ylo, s.yhi);
+    else
+      fail("Unknown histogram type " + s.type + " for " + s.name);
+    h.byName[s.name] = hist;
+    h.writeOrder.push_back(hist);
+  }
+  return h;
+}
+
+// ---------------------------------------------------------------- Reading the 1V pool
+
+// One accepted 1V DV with what pairing and revertexing need
+struct VertexRecord {
+  double dbv;                    // Distance from the beamspot in xy
+  double x, y, z;                // Position relative to the PV
+  double weight;
+  std::array<double, 3> bs, pv;  // Beamspot, and PV relative to the beamspot
+  int category;
+  reco::TrackCollection tracks;
+};
+
+// Every accepted 1V DV and, per category, the indices of all of them, the indices of those with >= 5 tracks (5x5 only), and how many DVs have each track count
+struct VertexPool {
+  std::vector<VertexRecord> records;
+  std::vector<int> all[nCategories], fivePlus[nCategories];
+  std::map<size_t, size_t> ntracksCount[nCategories];
+};
+
+// b-tagged events first, then untagged ones, each split at npv 20, 30 and 40
+int category(bool btagged, int npv) { return (btagged ? 0 : nNpvBins) + (npv <= 20 ? 0 : npv <= 30 ? 1 : npv <= 40 ? 2 : 3); }
+
+// Track-only sum pT and invariant mass of one DV
+struct TrackSums {
+  double sumPt, mass;
+};
+TrackSums trackSums(const std::vector<double>* px, const std::vector<double>* py, const std::vector<double>* pz, int n, double pionMass) {
+  double sumPt = 0, sumPx = 0, sumPy = 0, sumPz = 0, sumE = 0;
+  for (int k = 0; k < n; ++k) {
+    const double x = px->at(k), y = py->at(k), z = pz->at(k);
+    sumPt += sqrt(x * x + y * y);
+    sumPx += x;
+    sumPy += y;
+    sumPz += z;
+    sumE += sqrt(x * x + y * y + z * z + pionMass * pionMass);
+  }
+  return {sumPt, sqrt(sumE * sumE - sumPx * sumPx - sumPy * sumPy - sumPz * sumPz)};
+}
+
+// The pool record of a 1V event's DV, with its tracks rebuilt from the MiniTree
+VertexRecord makeRecord(const mfv::MiniNtuple& nt, float dbv, float w, bool btagged) {
+  VertexRecord r{dbv, nt.x0 - nt.pvx, nt.y0 - nt.pvy, nt.z0 - nt.pvz, w, {nt.bsx, nt.bsy, nt.bsz}, {nt.pvx, nt.pvy, nt.pvz}, category(btagged, nt.npv), {}};
+  for (int k = 0; k < nt.ntk0; ++k) {
+    // The sign of qchi2 is the charge; signbit also reads -0.0 as negative
+    const int charge = std::signbit(nt.p_tk0_qchi2->at(k)) ? -1 : 1;
+    const reco::TrackBase::Point referencePoint(nt.p_tk0_vx->at(k), nt.p_tk0_vy->at(k), nt.p_tk0_vz->at(k));
+    const math::XYZVector momentum(nt.p_tk0_px->at(k), nt.p_tk0_py->at(k), nt.p_tk0_pz->at(k));
+    r.tracks.push_back(reco::Track(fabs(nt.p_tk0_qchi2->at(k)), nt.p_tk0_ndof->at(k), referencePoint, momentum, charge, nt.p_tk0_cov->at(k)));
+  }
+  return r;
+}
+
+// The 1V histograms of a pooled DV
+void fillOneVertexHistograms(const mfv::MiniNtuple& nt, float dbv, float w, const NtracksMode& mode, Histos& h) {
+  const float dbvPv = sqrt((nt.x0 - nt.pvx) * (nt.x0 - nt.pvx) + (nt.y0 - nt.pvy) * (nt.y0 - nt.pvy));
+  h["h_1v_dbv"]->Fill(dbv, w);
+  h["h_1v_bs2derr"]->Fill(nt.bs2derr0, w);
+  h["h_1v_rescale_bs2derr"]->Fill(nt.rescale_bs2derr0, w);
+  h["h_1v__w"]->Fill(nt.weight);
+  h["h_1v_z"]->Fill(nt.z0, w);
+  h["h_1v_dz"]->Fill(nt.z0 - nt.pvz, w);
+  h["h_1v_dpvsv"]->Fill(sqrt((nt.x0 - nt.pvx) * (nt.x0 - nt.pvx) + (nt.y0 - nt.pvy) * (nt.y0 - nt.pvy) + (nt.z0 - nt.pvz) * (nt.z0 - nt.pvz)), w);
+  h.twoD("h_1v_xy")->Fill(nt.x0, nt.y0, w);
+  h.twoD("h_1v_dbv_bs2derr")->Fill(dbv, nt.bs2derr0, w);
+  h["h_1v_costh2_onlytks0"]->Fill(nt.costhtkonlymombs0, w);
+  h["h_1v_costh20"]->Fill(nt.costhtksjetsntkmombs0, w);
+  if (nt.ntk0 == mode.ntk0) h["h_1v_dbv0"]->Fill(dbvPv, w);
+  if (nt.ntk0 == mode.ntk1) h["h_1v_dbv1"]->Fill(dbvPv, w);
+  h["h_1v_phiv"]->Fill(atan2(nt.y0, nt.x0), w);
+  h["h_1v_npu"]->Fill(nt.npu, w);
+  h["h_1v_npv"]->Fill(nt.npv, w);
+  h["h_1v_njets"]->Fill(nt.njets, w);
+  h["h_1v_ht40"]->Fill(nt.ht(40.), w);
+  double dphijvMin = M_PI;
+  for (int k = 0; k < nt.njets; ++k) {
+    const double dphijv = TVector2::Phi_mpi_pi(atan2(nt.y0, nt.x0) - nt.jet_phi[k]);
+    h["h_1v_phij"]->Fill(nt.jet_phi[k], w);
+    h["h_1v_dphijv"]->Fill(dphijv, w);
+    h["h_1v_dphijvpt"]->Fill(dphijv, w * (nt.jet_pt[k] / nt.ht(0.)));
+    if (fabs(dphijv) < dphijvMin) dphijvMin = fabs(dphijv);
+    for (int l = k + 1; l < nt.njets; ++l)
+      h["h_1v_dphijj"]->Fill(TVector2::Phi_mpi_pi(nt.jet_phi[k] - nt.jet_phi[l]), w);
+  }
+  h["h_1v_dphijvmin"]->Fill(dphijvMin, w);
+}
+
+// Pools a 1V event's DV when it passes the track cuts, and fills the 1V histograms
+void addOneVertexEvent(const mfv::MiniNtuple& nt, float w, bool btagged, const Config& cfg, VertexPool& pool, Histos& h) {
+  const TrackSums sums = trackSums(nt.p_tk0_px, nt.p_tk0_py, nt.p_tk0_pz, nt.ntk0, pionMass1v);
+  if (sums.sumPt < minTrackSumPt || sums.mass < minTrackMass) return;
+  const float dbv = sqrt(nt.x0 * nt.x0 + nt.y0 * nt.y0);
+  VertexRecord r = makeRecord(nt, dbv, w, btagged);
+  const int index = pool.records.size();
+  pool.all[r.category].push_back(index);
+  if (cfg.mode->code == 5 && r.tracks.size() >= 5) pool.fivePlus[r.category].push_back(index);
+  ++pool.ntracksCount[r.category][r.tracks.size()];
+  pool.records.push_back(std::move(r));
+  fillOneVertexHistograms(nt, dbv, w, *cfg.mode, h);
+}
+
+// Fills the observed 2V histograms of an event in the mode's 2V region. Azimuths are measured from the beamspot.
+void fillTwoVertexEvent(const mfv::MiniNtuple& nt, float w, Histos& h) {
+  const TrackSums sums0 = trackSums(nt.p_tk0_px, nt.p_tk0_py, nt.p_tk0_pz, nt.ntk0, pionMass2v);
+  const TrackSums sums1 = trackSums(nt.p_tk1_px, nt.p_tk1_py, nt.p_tk1_pz, nt.ntk1, pionMass2v);
+  if (sums0.sumPt < minTrackSumPt || sums1.sumPt < minTrackSumPt) return;
+  if (sums0.mass < minTrackMass || sums1.mass < minTrackMass) return;
+  const double dvvMax = dvvNbins * dvvBinWidth - 0.5 * dvvBinWidth;
+  const double dbv0 = sqrt(nt.x0 * nt.x0 + nt.y0 * nt.y0);
+  const double dbv1 = sqrt(nt.x1 * nt.x1 + nt.y1 * nt.y1);
+  double dvv = sqrt((nt.x0 - nt.x1) * (nt.x0 - nt.x1) + (nt.y0 - nt.y1) * (nt.y0 - nt.y1));
+  double dvv3D = sqrt((nt.x0 - nt.x1) * (nt.x0 - nt.x1) + (nt.y0 - nt.y1) * (nt.y0 - nt.y1) + (nt.z0 - nt.z1) * (nt.z0 - nt.z1));
+  if (dvv > dvvMax) dvv = dvvMax;
+  if (dvv3D > dvvMax) dvv3D = dvvMax;
+  const double dphi = TVector2::Phi_mpi_pi(atan2(nt.y0, nt.x0) - atan2(nt.y1, nt.x1));
+  h["h_2v_dbv"]->Fill(dbv0, w);
+  h["h_2v_dbv"]->Fill(dbv1, w);
+  h.twoD("h_2v_dbv1_dbv0")->Fill(dbv0, dbv1, w);
+  h["h_2v_dvv"]->Fill(dvv, w);
+  h["h_2v_dvv3D"]->Fill(dvv3D, w);
+  h["h_2v_sumdbv"]->Fill(dbv0 + dbv1, w);
+  h["h_2v_dphivv"]->Fill(dphi, w);
+  h["h_2v_absdphivv"]->Fill(fabs(dphi), w);
+  h["h_2v_npu"]->Fill(nt.npu, w);
+  h["h_2v_npv"]->Fill(nt.npv, w);
+}
+
+// Reads every input file of the configuration, fills the 1V and 2V histograms and returns the 1V pool
+VertexPool readInputs(const Config& cfg, Histos& h) {
+  VertexPool pool;
+  for (const Sample& sample : sampleList(cfg)) {
+    std::cout << sample.path << std::endl;
+    mfv::MiniNtuple nt;
+    TFile* file = TFile::Open(sample.path.c_str());
+    if (!file || !file->IsOpen()) fail("Cannot open input file " + sample.path);
+    TChain* chain = new TChain("t");
+    for (const std::string& tree : treeNames(*cfg.mode))
+      chain->Add((sample.path + "/" + tree).c_str());
+    mfv::read_from_tree(chain, nt);
+
+    for (int j = 0, je = chain->GetEntries(); j < je; ++j) {
+      if (chain->LoadTree(j) < 0) break;
+      if (chain->GetEntry(j) <= 0) continue;
+      // Blinding: in data, events with two >= 5-track DVs are skipped before anything is filled
+      if (!cfg.mc && nt.nvtx >= 2 && nt.ntk0 >= 5 && nt.ntk1 >= 5) continue;
+      // gen_flavor_code is 2 for events with a generated b hadron (1 for a c hadron only, 0 for neither)
+      if ((cfg.bquarks == 0 && nt.gen_flavor_code == 2) || (cfg.bquarks == 1 && nt.gen_flavor_code != 2)) continue;
+      // DeepJet tags at the year's tight working point; the -1 pT threshold counts every jet
+      const bool btagged = nt.nbtags_old(sample.bdiscCut, -1) >= 1;
+      if ((cfg.btags == 0 && btagged) || (cfg.btags == 1 && !btagged)) continue;
+      if (nt.npu < cfg.minNpu || nt.npu > cfg.maxNpu) continue;
+      const float w = sample.weight * nt.weight;
+      if (nt.nvtx == 1) addOneVertexEvent(nt, w, btagged, cfg, pool, h);
+      // Kept for the bit-identical check (the observed 5x5 region takes exactly 5 tracks per DV)
+      if (nt.nvtx >= 2 && nt.ntk0 == cfg.mode->ntk0 && nt.ntk1 == cfg.mode->ntk1) fillTwoVertexEvent(nt, w, h);
+    }
+    delete chain;
+    file->Close();
+    delete file;
   }
 
-  int count_3trk_vertices = 0;
+  // Negative MC weights can leave negative bins
+  for (const char* name : {"h_1v_dbv0", "h_1v_dbv1"})
+    for (int bin = 0; bin <= h[name]->GetNbinsX() + 1; ++bin)
+      if (h[name]->GetBinContent(bin) < 0) h[name]->SetBinContent(bin, 0);
+  return pool;
+}
 
-  //if (histos) {
-  //  for (std::vector<reco::Vertex>::const_iterator v0 = vertices->begin(); v0 != vertices->end(); ++v0) {
-  //    const double v0x = v0->position().x() - bsx;
-  //    const double v0y = v0->position().y() - bsy;
-  //    const double phi0 = atan2(v0y, v0x);
-  //    const int ntracks = v0->nTracks();
-  //    if (ntracks >= 3)
-  //      count_3trk_vertices++;
-  //    for (std::vector<reco::Vertex>::const_iterator v1 = v0 + 1; v1 != vertices->end(); ++v1) {
-  //      const double v1x = v1->position().x() - bsx;
-  //      const double v1y = v1->position().y() - bsy;
-  //      const double phi1 = atan2(v1y, v1x);
-  //      //h_seed_vertex_paird2d->Fill(mag(v0x - v1x, v0y - v1y));
-  //      //h_seed_vertex_pairdphi->Fill(reco::deltaPhi(phi0, phi1));
-  //    }
-  //  }
-  //}
+// ---------------------------------------------------------------- Vertexer port
+// The JMTucker Vertexer steps on one constructed event, under Kamui's step names: two-track seeds, sharedTracks and mergeNearby; zRefit and sharedJets are skipped (revertexPair). The control flow is JMTucker's, as in Kamui's DVProducer, so the vertexer bugs of Kamui's Bugs/ folder marked below apply here too.
 
-  //if (histos){
-  //  h_n_at_least_3trk_seed_vertices->Fill(count_3trk_vertices);
-  //  h_n_seed_vertices->Fill(vertices->size());
-  //}
+typedef std::set<reco::TrackRef> TrackSet;
+typedef std::vector<reco::Vertex>::iterator VertexIter;
 
-  if (order_seed_vertex){
-    //order vertices by pt 
-    std::sort(vertices->begin(), vertices->end(), order_seed_vtx_pt());
-  }
-  //std::cout << "before start of vertex shared track mitigation" << std::endl;
-  
-  //////////////////////////////////////////////////////////////////////
-  // Take care of track sharing. If a track is in two vertices, and
-  // the vertices are "close", refit the tracks from the two together
-  // as one vertex. If the vertices are not close, keep the track in
-  // the vertex to which it is "closer".
-  //////////////////////////////////////////////////////////////////////
-  track_set discarded_tracks;
-  int n_resets = 0;
-  int n_onetracks = 0;
-  std::vector<reco::Vertex>::iterator v[2];
-  size_t ivtx[2];  
+// The fitter of every seed and refit: KalmanVertexFitter's default settings (maxDistance 0.01, at most 10 iterations), with smoothing
+const KalmanVertexFitter& fitter() {
+  static const KalmanVertexFitter instance(true);
+  return instance;
+}
 
-  //std::cout << "Before deciding to merge, refit, or erase" << std::endl;
-  for (v[0] = vertices->begin(); v[0] != vertices->end(); ++v[0]) {
-    track_set tracks[2];
-    //std::cout << "after defining track_set" << std::endl;
-    ivtx[0] = v[0] - vertices->begin();
-    tracks[0] = vertex_track_set(*v[0]);
-    if (verbose) std::cout << "after defining tracks[0]" << std::endl;
+TrackSet vertexTrackSet(const reco::Vertex& v) {
+  TrackSet result;
+  for (auto it = v.tracks_begin(), ite = v.tracks_end(); it != ite; ++it)
+    result.insert(it->castTo<reco::TrackRef>());
+  return result;
+}
 
+bool isTrackSubset(const TrackSet& a, const TrackSet& b) {
+  const TrackSet& smaller = a.size() <= b.size() ? a : b;
+  const TrackSet& bigger = a.size() <= b.size() ? b : a;
+  for (auto tk : smaller)
+    if (bigger.count(tk) < 1) return false;
+  return true;
+}
+
+// Track keys index the constructed event's track collection, which is also the order of seedTracks
+std::vector<reco::TransientTrack> transientTracks(const TrackSet& tracks, const std::vector<reco::TransientTrack>& seedTracks) {
+  std::vector<reco::TransientTrack> ttks;
+  for (const reco::TrackRef& tk : tracks)
+    ttks.push_back(seedTracks.at(tk.key()));
+  return ttks;
+}
+
+// False for fewer than 2 tracks or chi2/dof above the cut. Like JMTucker's kv_reco_dropin it never checks validity, so a failed fit comes back as an invalid DV, and a negative chi2 passes (Bugs/jmtucker/adapted/negativeChi2PassesCuts.md).
+bool fitVertex(const std::vector<reco::TransientTrack>& ttks, reco::Vertex& out) {
+  if (ttks.size() < 2) return false;
+  const TransientVertex tv = fitter().vertex(ttks);
+  if (tv.normalisedChiSquared() > maxChi2PerDof) return false;
+  out = reco::Vertex(tv);
+  return true;
+}
+
+// Every pair of tracks whose fit is valid with chi2/dof below the cut. The cut is strict here and inclusive in fitVertex.
+reco::VertexCollection seedVertices(const std::vector<reco::TransientTrack>& seedTracks) {
+  reco::VertexCollection vertices;
+  for (size_t i = 0; i < seedTracks.size(); ++i)
+    for (size_t j = i + 1; j < seedTracks.size(); ++j) {
+      const TransientVertex seed = fitter().vertex(std::vector<reco::TransientTrack>{seedTracks[i], seedTracks[j]});
+      if (seed.isValid() && seed.normalisedChiSquared() < maxChi2PerDof) vertices.push_back(reco::Vertex(seed));
+    }
+  return vertices;
+}
+
+// sharedTracks: two DVs that share a track merge when they are close. Otherwise the track leaves the DV it fits worse, and also any DV it is too far from, so it can leave both. Any change restarts the scan.
+void resolveSharedTracks(reco::VertexCollection& vertices, const std::vector<reco::TransientTrack>& seedTracks) {
+  const VertexDistance3D vertexDist3d;
+  VertexIter v[2];
+  for (v[0] = vertices.begin(); v[0] != vertices.end(); ++v[0]) {
+    TrackSet tracks[2];
+    tracks[0] = vertexTrackSet(*v[0]);
     if (tracks[0].size() < 2) {
-      v[0] = vertices->erase(v[0]) - 1;
-      ++n_onetracks;
+      // Steps before begin() when v[0] is the first DV
+      v[0] = vertices.erase(v[0]) - 1;
       continue;
     }
 
-    //std::cout << "before defining bools for merge and fit" << std::endl;
-    bool duplicate = false;
-    bool merge = false;
-    bool refit = false;
-    track_set tracks_to_remove_in_refit[2];
-    VertexerPairEff* vpeff = 0;
-    const size_t max_vpeffs_size = 20000; // enough for 200 vertices to share tracks
-
-    for (v[1] = v[0] + 1; v[1] != vertices->end(); ++v[1]) {
-      ivtx[1] = v[1] - vertices->begin();
-      tracks[1] = vertex_track_set(*v[1]);
-      if (verbose) std::cout << "after defining tracks[1]" << std::endl;
-
+    bool duplicate = false, merge = false, refit = false;
+    TrackSet toRemove[2];
+    for (v[1] = v[0] + 1; v[1] != vertices.end(); ++v[1]) {
+      tracks[1] = vertexTrackSet(*v[1]);
       if (tracks[1].size() < 2) {
-        v[1] = vertices->erase(v[1]) - 1;
-        ++n_onetracks;
+        v[1] = vertices.erase(v[1]) - 1;
         continue;
       }
-
-      //std::cout << "before deciding if just a duplicate vertices" << std::endl;
-      if (is_track_subset(tracks[0], tracks[1])) {
-	//std::cout << "duplicate vertices!" << std::endl;
+      if (isTrackSubset(tracks[0], tracks[1])) {
         duplicate = true;
         break;
       }
 
-      if (vpeffs->size() < max_vpeffs_size) {
-        std::pair<track_set, track_set> vpeff_tracks(tracks[0], tracks[1]);
-        auto it = std::find(vpeffs_tracks.begin(), vpeffs_tracks.end(), vpeff_tracks);
-        if (it != vpeffs_tracks.end()) {
-          vpeffs->at(it - vpeffs_tracks.begin()).inc_weight();
-          vpeff = 0;
-        }
-        else {
-          vpeffs->push_back(VertexerPairEff());
-          vpeff = &vpeffs->back();
-          vpeff->set_vertices(*v[0], *v[1]);
-          vpeffs_tracks.push_back(vpeff_tracks);
-        }
-      }
+      // Only the first shared track is arbitrated per pass
+      const auto shared = std::find_if(tracks[0].begin(), tracks[0].end(), [&](const reco::TrackRef& tk) { return tracks[1].count(tk) > 0; });
+      if (shared == tracks[0].end()) continue;
+      if (vertexDist3d.distance(*v[0], *v[1]).significance() < sharedTracksMergeBelowSigma)
+        merge = true;
       else
-        vpeff = 0;
-
-      //std::cout << "before defining shared tracks" << std::endl;
-      reco::TrackRefVector shared_tracks;
-      for (auto tk : tracks[0])
-        if (tracks[1].count(tk) > 0)
-          shared_tracks.push_back(tk);
-
-      if (shared_tracks.size() > 0) {
-        if (vpeff)
-          vpeff->kind(VertexerPairEff::share);
-
-        Measurement1D v_dist = vertex_dist(*v[0], *v[1]);
-
-        if (v_dist.value() < merge_shared_dist || v_dist.significance() < merge_shared_sig) {
-          merge = true;
-        }
-        else
-          refit = true;
-
-	//std::cout << "before looping over shared tracks" << std::endl;
-        for (auto tk : shared_tracks) {
-          const reco::TransientTrack& ttk = seed_tracks[seed_track_ref_map.at(tk.key())]; //ALEC CHANGED THE VERTEXING ALGORITHM HERE!!!!! was const reco::TransientTrack& ttk = seed_tracks[seed_track_ref_map[tk]];
-          std::pair<bool, Measurement1D> t_dist_0 = track_dist(ttk, *v[0]);
-          std::pair<bool, Measurement1D> t_dist_1 = track_dist(ttk, *v[1]);
-
-          t_dist_0.first = t_dist_0.first && (t_dist_0.second.value() < max_track_vertex_dist || t_dist_0.second.significance() < max_track_vertex_sig);
-          t_dist_1.first = t_dist_1.first && (t_dist_1.second.value() < max_track_vertex_dist || t_dist_1.second.significance() < max_track_vertex_sig);
-	  if (verbose) std::cout << "Fit of track to vertex 0 passed?: " << t_dist_0.first << ", dist: " << t_dist_0.second.value() << ", significance: " << t_dist_0.second.significance() << std::endl;
-	  if (verbose) std::cout << "Fit of track to vertex 1 passed?: " << t_dist_1.first << ", dist: " << t_dist_1.second.value() << ", significance: " << t_dist_1.second.significance() << std::endl;
-          bool remove_from_0 = !t_dist_0.first;
-          bool remove_from_1 = !t_dist_1.first;
-	  if (verbose && remove_from_0 && remove_from_1) std::cout << "Remove track from both vertice since dist sig is " << t_dist_0.second.significance() << " for v[0] and " << t_dist_1.second.significance() << " for v[1]" << std::endl;
-	  else if (verbose && remove_from_0) std::cout << "remove from first vertex because track failed to fit" << std::endl;
-	  else if (verbose && remove_from_1) std::cout << "remove from second vertex because track failed to fit" << std::endl;
-	  //std::cout << "before deciding which vertex the track does not belong to" <<std::endl;
-          if (t_dist_0.second.significance() < min_track_vertex_sig_to_remove && t_dist_1.second.significance() < min_track_vertex_sig_to_remove) {
-            if (tracks[0].size() > tracks[1].size())
-              remove_from_1 = true;
-            else
-              remove_from_0 = true;
-          }
-          else if (t_dist_0.second.significance() < t_dist_1.second.significance())
-            remove_from_1 = true;
-          else
-            remove_from_0 = true;
-
-	  if (verbose && t_dist_0.second.significance() < min_track_vertex_sig_to_remove && t_dist_1.second.significance() < min_track_vertex_sig_to_remove) {
-            if (tracks[0].size() > tracks[1].size())
-	      std::cout << "remove from second vertex set to true since both vertices plausible but first has more tracks" << std::endl;
-            else
-              std::cout << "remove from first vertex set to true since both vertices plausible but second has more or equal # of tracks" << std::endl;
-          }
-	  else if (verbose && t_dist_0.second.significance() < t_dist_1.second.significance())
-            std::cout << "remove from second vertex set to true since dist significance less for first" << std::endl;
-	  else if (verbose)
-            std::cout << "remove from first vertex set to true since dist significance less for second" << std::endl;
-
-          if (remove_from_0) tracks_to_remove_in_refit[0].insert(tk);
-          if (remove_from_1) tracks_to_remove_in_refit[1].insert(tk);
-
-	  if (verbose && remove_from_0) std::cout << "Track with pt " << ttk.track().pt() << " to be removed from the first vertex" << std::endl;
-          if (verbose && remove_from_1) std::cout << "Track with pt " << ttk.track().pt() << " to be removed from the second vertex" << std::endl;
-
-          if (remove_one_track_at_a_time) {
-            break;
-          }
-        }
-        break;
-      }
-    }
-    //std::cout << "After deciding merge, refit, or erase" << std::endl;
-
-    if (verbose) std::cout << "tracks[0] size: " << tracks[0].size() << ", tracks[1] size: " << tracks[1].size() << std::endl;
-    if (verbose) std::cout << "duplicate: " << duplicate << ", merge: " << merge << ", refit: " << refit << std::endl;
-    if (duplicate) {
-      vertices->erase(v[1]);
-    }
-    else if (merge) {
-      //std::cout << "attempting to merge vertices" << std::endl;
-      track_set tracks_to_fit;
-      for (int i = 0; i < 2; ++i)
-        for (auto tk : tracks[i])
-          tracks_to_fit.insert(tk);
-
-      //for (const auto& test : tracks_to_fit)      //This prints incorrect values for unknown reasons, I don't think it matters but figure out later!!!
-      //  std::cout << "pt of track added to tracks_to_fit for merge step: " << test->pt() << std::endl;
-
-      std::vector<reco::TransientTrack> ttks;
-      for (auto tk : tracks_to_fit)
-        ttks.push_back(seed_tracks[seed_track_ref_map.at(tk.key())]); //ALEC CHANGED THE VERTEXING ALGORITHM HERE!!!!! was ttks.push_back(seed_tracks[seed_track_ref_map[tk]]);
-
-      if (verbose) std::cout << "size of track vector to be merged into 1 vertex: " << ttks.size() << std::endl;
-      for (int test = 0; test < ttks.size(); ++test) {
-        if (verbose) std::cout << "pt of track " << test << " in track vector to be merged into 1 vertex: " << ttks[test].track().pt() << std::endl;
-      }
-
-      reco::VertexCollection new_vertices;
-
-      //std::cout << "before merge revertexing" << std::endl;
-      for (const TransientVertex& tv : kv_reco_dropin(ttks))
-        new_vertices.push_back(reco::Vertex(tv));
-
-      //std::cout << "after merge revertexing, new_vertices.size() = " << new_vertices.size() << std::endl;
-      //std::cout << vertex_track_set(new_vertices[0], 0).size() << " should equal " << tracks_to_fit.size() << ", otherwise refit" << std::endl;
-
-      // If we got two new vertices, maybe it took A B and A C D and made a better one from B C D, and left a broken one A B! C! D!.
-      // If we get one that is truly the merger of the track lists, great. If it is just something like A B , A C -> A B C!, or we get nothing, then default to arbitration.
-      if (new_vertices.size() > 1) {
-        assert(new_vertices.size() == 2);
-        *v[1] = reco::Vertex(new_vertices[1]);
-        *v[0] = reco::Vertex(new_vertices[0]);
-      }
-      else if (new_vertices.size() == 1 && vertex_track_set(new_vertices[0], 0) == tracks_to_fit) {
-        if (vpeff)
-          vpeff->kind(VertexerPairEff::merge);
-
-        vertices->erase(v[1]);
-        *v[0] = reco::Vertex(new_vertices[0]); // ok to use v[0] after the erase(v[1]) because v[0] is by construction before v[1]
-	//std::cout << "vertices merged!" << std::endl;
-      }
-      else {
         refit = true;
-      }
+
+      const reco::TransientTrack& ttk = seedTracks.at(shared->key());
+      const std::pair<bool, Measurement1D> dist0 = IPTools::absoluteImpactParameter3D(ttk, *v[0]);
+      const std::pair<bool, Measurement1D> dist1 = IPTools::absoluteImpactParameter3D(ttk, *v[1]);
+      bool removeFrom0 = !(dist0.first && dist0.second.significance() < sharedTracksKeepBelowSigma);
+      bool removeFrom1 = !(dist1.first && dist1.second.significance() < sharedTracksKeepBelowSigma);
+      if (dist0.second.significance() < sharedTracksTieBelowSigma && dist1.second.significance() < sharedTracksTieBelowSigma) {
+        if (tracks[0].size() > tracks[1].size())
+          removeFrom1 = true;
+        else
+          removeFrom0 = true;
+      } else if (dist0.second.significance() < dist1.second.significance())
+        removeFrom1 = true;
+      else
+        removeFrom0 = true;
+      if (removeFrom0) toRemove[0].insert(*shared);
+      if (removeFrom1) toRemove[1].insert(*shared);
+      break;
+    }
+
+    // Erases the second DV even when it holds more tracks
+    if (duplicate)
+      vertices.erase(v[1]);
+    else if (merge) {
+      TrackSet toFit(tracks[0]);
+      toFit.insert(tracks[1].begin(), tracks[1].end());
+      reco::Vertex merged;
+      if (fitVertex(transientTracks(toFit, seedTracks), merged) && vertexTrackSet(merged) == toFit) {
+        vertices.erase(v[1]);
+        *v[0] = merged;
+      } else
+        refit = true;
     }
 
     if (refit) {
-      //std::cout << "attempting to refit vertices" << std::endl;
-      bool erase[2] = { false };
-      reco::Vertex vsave[2] = { *v[0], *v[1] };
-
+      bool erase[2] = {false, false};
       for (int i = 0; i < 2; ++i) {
-        if (tracks_to_remove_in_refit[i].empty())
-          continue;
-
-        std::vector<reco::TransientTrack> ttks;
+        if (toRemove[i].empty()) continue;
+        TrackSet kept;
         for (auto tk : tracks[i])
-          if (tracks_to_remove_in_refit[i].count(tk) == 0)
-            ttks.push_back(seed_tracks[seed_track_ref_map.at(tk.key())]); ////ALEC CHANGED THE VERTEXING ALGORITHM HERE!!!!! was ttks.push_back(seed_tracks[seed_track_ref_map[tk]]);
-
-	if (verbose) std::cout << "# of tracks to be input to kv_reco_dropin in refit step: " << ttks.size() << std::endl;
-	if (verbose && ttks.size() == 1) std::cout << "only one input track with pt: " << ttks[0].track().pt();
-        reco::VertexCollection new_vertices;
-        for (const TransientVertex& tv : kv_reco_dropin(ttks))
-          new_vertices.push_back(reco::Vertex(tv));
-	if (verbose) std::cout << "new_vertices size in refit step: " << new_vertices.size() << std::endl;
-        if (new_vertices.size() == 1)
-          * v[i] = new_vertices[0];
+          if (toRemove[i].count(tk) == 0) kept.insert(tk);
+        reco::Vertex refitted;
+        if (fitVertex(transientTracks(kept, seedTracks), refitted))
+          *v[i] = refitted;
         else
           erase[i] = true;
-
-	//if (new_vertices.size() == 1) std::cout << "vertex refit!" << std::endl;
-	//else std::cout << "vertex erased!" << std::endl;
       }
-
-      if (vpeff && (erase[0] || erase[1]))
-        vpeff->kind(VertexerPairEff::erase);
-
-      if (erase[1]) vertices->erase(v[1]);
-      if (erase[0]) vertices->erase(v[0]);
+      if (erase[1]) vertices.erase(v[1]);
+      if (erase[0]) vertices.erase(v[0]);
     }
 
-    // If we changed the vertices at all, start loop over completely.
-    if (duplicate || merge || refit) {
-      v[0] = vertices->begin() - 1;  // -1 because about to ++sv
-      ++n_resets;
-      if (verbose) std::cout << "resetting looping through merge, refit, erase because vertices were merged, refit, or erased." << std::endl;
-      //if (n_resets == 3000)
-      //  throw "I'm dumb";
-    }
+    // Restarts the scan from before begin()
+    if (duplicate || merge || refit) v[0] = vertices.begin() - 1;
   }
-  //std::cout << "End of merge, refit, or erase code" << std::endl;
-
-  // Debugging plots for track refinement and noshare histos: 
-  // These steps are sequential within the loop, but nested in their own `if` statements below.
-  // (useful e.g. if one wants to look at the noshare plots during the track refinement)
-  /*
-  if (do_track_refinement || histos_noshare) {  //Alec found, we have not been using this which remove tracks + trim out tracks with IP significance larger than trackrefine_sigmacut and trackrefine_trimmax, respectively 
-    std::map<reco::TrackRef, int> track_use;
-    for (size_t i = 0, ie = vertices->size(); i < ie; ++i) {
-      reco::Vertex& v_trf = vertices->at(i);
-      const int ntracks = v_trf.nTracks();
-      const double vmass = v_trf.p4().mass();
-      const double vchi2 = v_trf.normalizedChi2();
-      const double vndof = v_trf.ndof();
-      const double vx = v_trf.position().x() - bsx;
-      const double vy = v_trf.position().y() - bsy;
-      const double vz = v_trf.position().z() - bsz;
-      const double rho = mag(vx, vy);
-      const double phi = atan2(vy, vx);
-      const double r = mag(vx, vy, vz);
-      for (const auto& tk : vertex_track_set(v_trf)) {
-        if (track_use.find(tk) != track_use.end())
-          track_use[tk] += 1;
-        else
-          track_use[tk] = 1;
-      }
-
-      if (do_track_refinement) {
-
-        track_set set_trackrefine_sigmacut_tks;
-        std::vector<reco::TransientTrack> trackrefine_sigmacut_ttks;
-        track_set set_trackrefine_trimmax_tks;
-        std::vector<reco::TransientTrack> trackrefine_trimmax_ttks;
-        std::vector<double> trackrefine_trim_ttks_missdist_sig;
-        for (auto it = v_trf.tracks_begin(), ite = v_trf.tracks_end(); it != ite; ++it) {
-
-          reco::TransientTrack seed_track;
-          seed_track = tt_builder->build(*it.operator*());
-          std::pair<bool, Measurement1D> tk_vtx_dist = track_dist(seed_track, v_trf);
-
-          //h_noshare_vertex_tkvtxdist_before_do_track_refinement->Fill(tk_vtx_dist.second.value());
-          //h_noshare_vertex_tkvtxdisterr_before_do_track_refinement->Fill(tk_vtx_dist.second.error());
-          //h_noshare_vertex_tkvtxdistsig_before_do_track_refinement->Fill(tk_vtx_dist.second.significance());
-
-          if (tk_vtx_dist.second.significance() < trackrefine_sigmacut) {
-            set_trackrefine_sigmacut_tks.insert(it->castTo<reco::TrackRef>());
-          }
-        }
-
-        for (auto tk : set_trackrefine_sigmacut_tks) {
-          trackrefine_sigmacut_ttks.push_back(tt_builder->build(tk));
-        }
-
-        // if tracks's miss distance significance is larger than trackrefine_sigmacut, we first remove all those tracks and refit a new vertex
-        double trackrefine_sigmacut_v0x = v_trf.position().x() - bsx;
-        double trackrefine_sigmacut_v0y = v_trf.position().y() - bsy;
-        double trackrefine_sigmacut_v0r = mag(trackrefine_sigmacut_v0x, trackrefine_sigmacut_v0y);
-
-        reco::Vertex trackrefine_sigmacut_v;
-        for (const TransientVertex& tv : kv_reco_dropin(trackrefine_sigmacut_ttks))
-          trackrefine_sigmacut_v = reco::Vertex(tv);
-        double trackrefine_sigmacut_vchi2 = trackrefine_sigmacut_v.normalizedChi2();
-        //h_noshare_trackrefine_sigmacut_vertex_chi2->Fill(trackrefine_sigmacut_vchi2);
-
-        double trackrefine_sigmacut_v1x = trackrefine_sigmacut_v.position().x() - bsx;
-        double trackrefine_sigmacut_v1y = trackrefine_sigmacut_v.position().y() - bsy;
-        double trackrefine_sigmacut_v1r = mag(trackrefine_sigmacut_v1x, trackrefine_sigmacut_v1y);
-
-        // just to check how the new vertex is shifted by removing tracks by trackrefine_sigmacut
-        double sigmacut_vertex_distr = trackrefine_sigmacut_v1r - trackrefine_sigmacut_v0r;
-        //h_noshare_trackrefine_sigmacut_vertex_distr_shift->Fill(sigmacut_vertex_distr);
-
-        for (auto it = trackrefine_sigmacut_v.tracks_begin(), ite = trackrefine_sigmacut_v.tracks_end(); it != ite; ++it) {
-          reco::TransientTrack trackrefine_sigmacut_track;
-          trackrefine_sigmacut_track = tt_builder->build(*it.operator*());
-          std::pair<bool, Measurement1D> tk_vtx_dist = track_dist(trackrefine_sigmacut_track, trackrefine_sigmacut_v);
-          //h_noshare_trackrefine_sigmacut_vertex_tkvtxdistsig->Fill(tk_vtx_dist.second.significance());
-          trackrefine_trim_ttks_missdist_sig.push_back(tk_vtx_dist.second.significance());
-          set_trackrefine_trimmax_tks.insert(it->castTo<reco::TrackRef>());
-        }
-
-        int n_trackrefine_trimmax = 0;
-        reco::Vertex trackrefine_trimmax_v = trackrefine_sigmacut_v;
-
-        for (auto tk : set_trackrefine_trimmax_tks) {
-          trackrefine_trimmax_ttks.push_back(tt_builder->build(tk));
-        }
-
-        while (trackrefine_trimmax_ttks.size() > 2 && *std::max_element(trackrefine_trim_ttks_missdist_sig.begin(), trackrefine_trim_ttks_missdist_sig.end()) > trackrefine_trimmax) {
-          ++n_trackrefine_trimmax;
-
-          int max_missdist_sig_idx = std::max_element(trackrefine_trim_ttks_missdist_sig.begin(), trackrefine_trim_ttks_missdist_sig.end()) - trackrefine_trim_ttks_missdist_sig.begin();
-          // trimmax only one track with the largest miss distance significance at a time
-          trackrefine_trimmax_ttks.erase(trackrefine_trimmax_ttks.begin() + max_missdist_sig_idx);
-          double trackrefine_trimmax_v0x = trackrefine_trimmax_v.position().x() - bsx;
-          double trackrefine_trimmax_v0y = trackrefine_trimmax_v.position().y() - bsy;
-          double trackrefine_trimmax_v0r = mag(trackrefine_trimmax_v0x, trackrefine_trimmax_v0y);
-
-          // while we still find a track with max miss distance significance larger than trackrefine_trimmax, we trim it out, namely trimmax, and refit a new vertex until the max miss distance significance is under trackrefine_trimmax
-          for (const TransientVertex& tv : kv_reco_dropin(trackrefine_trimmax_ttks))
-            trackrefine_trimmax_v = reco::Vertex(tv);
-
-          double trackrefine_trimmax_v1x = trackrefine_trimmax_v.position().x() - bsx;
-          double trackrefine_trimmax_v1y = trackrefine_trimmax_v.position().y() - bsy;
-          double trackrefine_trimmax_v1r = mag(trackrefine_trimmax_v1x, trackrefine_trimmax_v1y);
-
-          // just to check how the new vertex is shifted by removing a trimmax track
-          double trimmax_vertex_distr = trackrefine_trimmax_v1r - trackrefine_trimmax_v0r;
-          //h_noshare_trackrefine_trimmax_vertex_distr_shift->Fill(trimmax_vertex_distr);
-
-          trackrefine_trim_ttks_missdist_sig.clear();
-
-          for (auto it = trackrefine_trimmax_v.tracks_begin(), ite = trackrefine_trimmax_v.tracks_end(); it != ite; ++it) {
-            reco::TransientTrack trackrefine_trimmax_track;
-            trackrefine_trimmax_track = tt_builder->build(*it.operator*());
-            std::pair<bool, Measurement1D> tk_vtx_dist = track_dist(trackrefine_trimmax_track, trackrefine_trimmax_v);
-            trackrefine_trim_ttks_missdist_sig.push_back(tk_vtx_dist.second.significance());
-          }
-
-        }
-
-        double trackrefine_trimmax_vchi2 = trackrefine_trimmax_v.normalizedChi2();
-        //h_noshare_trackrefine_trimmax_vertex_chi2->Fill(trackrefine_trimmax_vchi2);
-
-        //for (unsigned int j = 0, je = trackrefine_trim_ttks_missdist_sig.size(); j < je; ++j) {
-        //  h_noshare_trackrefine_trimmax_vertex_tkvtxdistsig->Fill(trackrefine_trim_ttks_missdist_sig[j]);
-        //}
-
-        // the end of track refinement in two steps -- (1) sigmacut and (2) trimmax
-        // we replace the noshare vertex by the vertex after the track refinement
-        v_trf = trackrefine_trimmax_v;
-      }
-
-    }
-
-    int max_noshare_track_multiplicity = 0;
-    for (const auto& p : track_use) {
-      if (p.second > max_noshare_track_multiplicity)
-        max_noshare_track_multiplicity = p.second;
-    }
-  }
-  */
-
-
-  //////////////////////////////////////////////////////////////////////////////////////////////
-  // Merge vertices that are still "close" in 2D, aka "loose" merging (typically off by default)
-  //////////////////////////////////////////////////////////////////////////////////////////////
-  //Alec found that we do not use this, instead we have been using resolve_split_vertices_tight which is a merging routine based on vtx dphi and dVV instead of merging vertices within a given dist or significance
-  /*
-  if (resolve_split_vertices_loose) {
-
-    if (merge_anyway_sig > 0 || merge_anyway_dist > 0) {
-      double v0x;
-      double v0y;
-      double phi0;
-
-      for (v[0] = vertices->begin(); v[0] != vertices->end(); ++v[0]) {
-        ivtx[0] = v[0] - vertices->begin();
-
-        double v1x;
-        double v1y;
-        double phi1;
-
-        for (v[1] = v[0] + 1; v[1] != vertices->end(); ++v[1]) {
-
-          ivtx[1] = v[1] - vertices->begin();
-
-          Measurement1D v_dist = vertex_dist(*v[0], *v[1]);
-          v0x = v[0]->x() - bsx;
-          v0y = v[0]->y() - bsy;
-          phi0 = atan2(v0y, v0x);
-          v1x = v[1]->x() - bsx;
-          v1y = v[1]->y() - bsy;
-          phi1 = atan2(v1y, v1x);
-
-          if (v_dist.value() < merge_anyway_dist || v_dist.significance() < merge_anyway_sig) {
-            std::vector<reco::TransientTrack> ttks;
-
-            for (int i = 0; i < 2; ++i) {
-              for (auto tk : vertex_track_set(*v[i])) {
-                ttks.push_back(tt_builder->build(tk));
-              }
-            }
-
-            reco::VertexCollection merged_vertices;
-            for (const TransientVertex& tv : kv_reco_dropin(ttks)) {
-              merged_vertices.push_back(reco::Vertex(tv));
-
-              for (auto it = merged_vertices[0].tracks_begin(), ite = merged_vertices[0].tracks_end(); it != ite; ++it) {
-                reco::TransientTrack seed_track;
-                seed_track = tt_builder->build(*it.operator*());
-                std::pair<bool, Measurement1D> tk_vtx_dist = track_dist(seed_track, merged_vertices[0]);
-              }
-            }
-
-            if (merged_vertices.size() == 1) {
-              *v[0] = merged_vertices[0];
-
-              v[1] = vertices->erase(v[1]) - 1;
-            }
-          }
-        }
-      }
-
-      // Printouts of new vertex distance when using verbose mode
-      //if (verbose) {
-      //  std::vector<reco::Vertex>::iterator nv[2];
-      //  for (nv[0] = vertices->begin(); nv[0] != vertices->end(); ++nv[0]) {
-      //    for (nv[1] = nv[0] + 1; nv[1] != vertices->end(); ++nv[1]) {
-
-      //      Measurement1D nv_dist = vertex_dist(*nv[0], *nv[1]);
-      //      printf("  new vertex dist (2d? %i) %7.3f  sig %7.3f\n", use_2d_vertex_dist, nv_dist.value(), nv_dist.significance());
-      //    }
-      //  }
-      //}
-    }
-  }
-
-  if (histos_output_beforedzfit){
-    fillCommonOutputHists(vertices, fake_bs_vtx, tt_builder, stepEnum::beforedzfit);
-  }
-  */
-  //////////////////////////////////////////////////////////////////////
-  // Drop tracks that "move" the vertex too much by refitting without each track.
-  //////////////////////////////////////////////////////////////////////
-  //Alec we do not need to apply the delta z refitting if we are looking at pairs of vertices, this is a 1-vertex quantity that should be already passed by vertices we are using
-  /*
-  if (max_nm1_refit_dist3 > 0 || max_nm1_refit_distz > 0 || max_nm1_refit_distz_sig > 0) { 
-    std::vector<int> refit_count(vertices->size(), 0);
-    int iv = 0;
-    for (v[0] = vertices->begin(); v[0] != vertices->end(); ++v[0], ++iv) {
-      if (max_nm1_refit_count > 0 && refit_count[iv] >= max_nm1_refit_count)
-        continue;
-
-      const track_vec tks = vertex_track_vec(*v[0]);
-      const size_t ntks = tks.size();
-      if (ntks < 3)
-        continue;
-
-      std::vector<reco::TransientTrack> ttks(ntks - 1);
-      for (size_t i = 0; i < ntks; ++i) {
-        float tkpt_todrop = tks[i]->pt();
-        float tkphi_todrop = tks[i]->phi();
-
-        std::vector<float> track_dphis;
-        for (size_t j = 0; j < ntks; ++j) {
-          if (j != i) { 
-            ttks[j - (j >= i)] = tt_builder->build(tks[j]);
-            track_dphis.push_back(fabs(tkphi_todrop - tks[j]->phi()));
-          }
-        }
-        double sum_dphi = std::accumulate(track_dphis.begin(), track_dphis.end(), 0.0);
-        double dphi_avg = sum_dphi / track_dphis.size();
-
-        reco::Vertex vnm1(TransientVertex(kv_reco->vertex(ttks)));
-        const double dist3_2 = mag2(vnm1.x() - v[0]->x(), vnm1.y() - v[0]->y(), vnm1.z() - v[0]->z());
-        const double distz = vnm1.z() - v[0]->z();
-	const double tkv_distz = (tks[i]->vz() - v[0]->z()) - ((tks[i]->vx() -  v[0]->x()) * tks[i]->px() + (tks[i]->vy() -  v[0]->y()) * tks[i]->py()) / tks[i]->pt() * tks[i]->pz() / tks[i]->pt();
-        const double err_tkv_distz = sqrt(tks[i]->covariance(4,4) * (tks[i]->p()*tks[i]->p())) / tks[i]->pt(); //same as dzErr() 
-        std::pair<bool, Measurement1D> tkbs_dist_2d = track_dist2d(tt_builder->build(tks[i]), *v[0]);
-        const double vchi2 = v[0]->normalizedChi2();
-        Measurement1D dBV_Meas1D = vertex_dist_2d.distance(*v[0], fake_bs_vtx);
-        double dBV = dBV_Meas1D.value();
-        double bs2derr = dBV_Meas1D.error();
-        reco::TrackRef tk = tks[i];
-        std::pair<bool, Measurement1D> tk_vtx_dist = track_dist(tt_builder->build(tks[i]), vnm1);
-
-        const double distz_sig = distz/sqrt(mag(vnm1.covariance(2,2) - v[0]->covariance(2,2)));  
-
-        if (vnm1.chi2() < 0 ||
-            (max_nm1_refit_dist3 > 0 && mag2(vnm1.x() - v[0]->x(), vnm1.y() - v[0]->y(), vnm1.z() - v[0]->z()) > pow(max_nm1_refit_dist3, 2)) || (max_nm1_refit_distz_sig > 0 && fabs(distz_sig) > max_nm1_refit_distz_sig) 
-  || (max_nm1_refit_distz > 0 && fabs(distz) > max_nm1_refit_distz)) 
-        { 
-          
-          *v[0] = vnm1;
-          ++refit_count[iv];
-          --v[0], --iv;
-          break;
-        }
-      }
-    }
-    iv = 0; //some vertices after dz refiting have normalized chi2 > 5
-    for (v[0] = vertices->begin(); v[0] != vertices->end(); ++v[0], ++iv) {
-      h_dz_vertex_chi2->Fill((*v[0]).normalizedChi2());
-      if ((*v[0]).normalizedChi2() > 5) {
-         v[0] = vertices->erase(v[0]) - 1;
-         continue;
-       }
-    }
-  
-  }
-  */
-  //if (histos_output_afterdzfit){
-  //  fillCommonOutputHists(vertices, fake_bs_vtx, tt_builder, stepEnum::afterdzfit);
-  //}
-  /////////////////////////////////////////////////////////////////////////////////////////////////////
-  // Merge every pair of output vertices that satisfy the following criteria to resolve split-vertices:
-  //   - >=2trk/vtx
-  //   - dBV > 100 um
-  //   - |dPhi(vtx0,vtx1)| < 0.5 
-  //   - svdist2d < 300 um
-  // Note that the merged vertex must pass chi2/dof < 5
-  ////////////////////////////////////////////////////////////////////////////////////////////////////
-  if (resolve_split_vertices_tight) {
-    reco::VertexCollection potential_merged_vertices;
-
-    for (v[0] = vertices->begin(); v[0] != vertices->end(); ++v[0]) {
-
-      track_set tracks[2];
-      tracks[0] = vertex_track_set(*v[0]);
-
-      bool merge = false;
-      for (v[1] = v[0] + 1; v[1] != vertices->end(); ++v[1]) {
-        if (vertices->size() >= 2 && v[0]->nTracks() >= 2 && v[1]->nTracks() >= 2) {
-
-          tracks[1] = vertex_track_set(*v[1]);
-
-          Measurement1D v_dist = vertex_dist_2d.distance(*v[0], *v[1]);
-
-          Measurement1D dBV0_Meas1D = vertex_dist_2d.distance(*v[0], fake_bs_vtx);
-          double dBV0 = dBV0_Meas1D.value();
-
-          Measurement1D dBV1_Meas1D = vertex_dist_2d.distance(*v[1], fake_bs_vtx);
-          double dBV1 = dBV1_Meas1D.value();
-
-          double v0x = v[0]->x() - bsx;
-          double v0y = v[0]->y() - bsy;
-
-          double phi0 = atan2(v0y, v0x);
-
-          double v1x = v[1]->x() - bsx;
-          double v1y = v[1]->y() - bsy;
-
-          double phi1 = atan2(v1y, v1x);
-
-          if (fabs(reco::deltaPhi(phi0, phi1)) < 0.5 && v_dist.value() < 0.0300 && dBV0 > 0.0100 && dBV1 > 0.0100) {
-	    if (verbose) std::cout << "Implementing split vertex mitigation!" << std::endl;
-            track_set tracks_to_fit;
-            for (int i = 0; i < 2; ++i)
-              for (auto tk : tracks[i])
-                tracks_to_fit.insert(tk);
-	    for (const auto& test : tracks_to_fit)
-	      if (verbose) std::cout << "Track added to tracks_to_fit for split vertex step: " << test->pt() << std::endl;
-            std::vector<reco::TransientTrack> ttks;
-            for (auto tk : tracks_to_fit)
-              ttks.push_back(seed_tracks[seed_track_ref_map.at(tk.key())]); //ALEC CHANGED THE VERTEXING ALGORITHM HERE!!!!! was ttks.push_back(seed_tracks[seed_track_ref_map[tk]]);
-
-            if (investigate_merged_vertices) {
-              std::vector<TransientVertex> tv(1, kv_reco->vertex(ttks));
-              potential_merged_vertices.push_back(reco::Vertex(tv[0]));
-              //std::cout << "ntrack in potental merged: " << potential_merged_vertices.back().nTracks() << std::endl;
-            }
-	    if (verbose) std::cout << "reco vertices in split vertex mitigation" << std::endl;
-            reco::VertexCollection merged_vertices;
-            for (const TransientVertex& tv : kv_reco_dropin(ttks)) {
-              merged_vertices.push_back(reco::Vertex(tv));
-            }
-
-            if (merged_vertices.size() == 1 && vertex_track_set(merged_vertices[0], 0) == tracks_to_fit) {
-
-              merge = true;
-
-              v[1] = vertices->erase(v[1]) - 1; // (1) erase and point the iterator at the previous entry
-              *v[0] = reco::Vertex(merged_vertices[0]); // (2) updated v[0] (ok to use v[0] after the erase(v[1]) because v[0] is by construction before v[1])
-            }
-          }
-        }
-      }
-	  // going through all the pairs of of v[1] and a fixed v[0] for merging, if merge happens (1) each v[1] is erased (2) v[0] is updated (recurring until exit loop) (3) reset the combination again
-	  if (merge)
-		  v[0] = vertices->begin() - 1; // (3) reset the combination if a valid merge happens 
-    }
-
-    if (investigate_merged_vertices) {
-      for (size_t i = 0, ie = potential_merged_vertices.size(); i < ie; ++i) {
-        reco::Vertex vpm = potential_merged_vertices[i];
-        const int ntracks = vpm.nTracks();
-        const double vchi2 = vpm.normalizedChi2();
-        Measurement1D dBV_Meas1D = vertex_dist_2d.distance(vpm, fake_bs_vtx);
-        double dBV = dBV_Meas1D.value();
-        double bs2derr = dBV_Meas1D.error();
-
-        // n-1 plots of the various cuts used (ntk, dBV, bs2derr, chi2)
-        //if (ntracks >= 5 && dBV > 0.01 && bs2derr < 0.0050) {
-        //  h_output_aftermerge_potential_merged_vertex_nm1_chi2->Fill(vchi2);
-        //}
-        //if (vchi2 < 5 && dBV > 0.01 && bs2derr < 0.0050) {
-        //  h_output_aftermerge_potential_merged_vertex_nm1_ntracks->Fill(ntracks);
-        //}
-        //if (vchi2 < 5 && ntracks >= 5 && bs2derr < 0.0050) {
-        //  h_output_aftermerge_potential_merged_vertex_nm1_bsbs2ddist->Fill(dBV);
-        //}
-        //if (vchi2 < 5 && ntracks >= 5 && dBV > 0.01) {
-        //  h_output_aftermerge_potential_merged_vertex_nm1_bs2derr->Fill(bs2derr);
-        //}
-      }
-    }
-  }
-
-  //if (histos_output_aftermerge) {
-  //  fillCommonOutputHists(vertices, fake_bs_vtx, tt_builder, stepEnum::aftermerge);
-  //}
-
-  //////////////////////////////////////////////////////////////////////
-  // Shared-jet mitigation with the following procedure:
-  //   -   make a set of vertices that have been sorted by ascending number of tracks per vertex
-  //   -   loop thru a pair of >=3trk vertices and check whether they share {1,1} and {1,n} shared jets or not 
-  //   -   In the double loop: check one vertex at a time (sv0) and remove a lone track to the jet if it is pointing backward from its vertex (apply dphi < pi/2)
-  //   -   In the double loop: assign a new fitted vertex to the one resolving shared jets
-  //   -   loop thru a set of vertices after the mitigation to clean up a vertex with just one track
-  // Note that:
-  //   - {1,1} shared jets have exactly one track to the jet from both vertices
-  //   - {1,n} shared jets have one of the two vertices contributing exactly one track to the jet
-  //////////////////////////////////////////////////////////////////////
-  /*if (resolve_shared_jets) {
-    edm::Handle<pat::JetCollection> jets;
-    event.getByToken(shared_jet_token, jets);
-
-    std::vector<std::vector<size_t> > sv_total_track_which_trkidx; // a vector of each sv's track indx
-    // we need ascending vectors of vertices based on their total tracks in order to speed up the shared-jet algorithm because the less-track vertex is more likely to be removed first after a single shared-jet track is removed, reducing the size of vertices to loop thru.  
-    std::vector<unsigned int> sv_ascending_total_ntrack; // a vector of ascending number of total tracks per vertex 
-    std::vector<size_t> sv_ascending_vtxidx; // a vector of vertex index corresponding to the order of ascending total tracks in sv_ascending_total_ntrack 
-
-
-    std::vector<std::vector<size_t> > sv_match_trkidx; // a vector of each sv's track indx to keep a record of a track matching with a jet  
-    std::vector<std::vector<size_t> > sv_match_jetidx; // a vector of each sv's jet indx to keep a record of a jet that matches with a track at the same iterator  
-
-    std::vector<track_vec> sv_total_track_which_trk_vec; // a vector of each sv's track_vec object 
-
-    int n_output_aftersharedjets_onetracks = 0;
-
-    size_t vtxidx = 0;
-    for (v[0] = vertices->begin(); v[0] != vertices->end(); ++v[0]) {
-      std::vector<size_t> track_idx;
-      std::vector<size_t> tracktojet_which_trkidx;
-      std::vector<size_t> tracktojet_which_jetidx;
-      track_vec tks = vertex_track_vec(*v[0]);
-      sv_total_track_which_trk_vec.push_back(tks);
-      for (size_t i = 0; i < tks.size(); ++i) {
-        const reco::TrackRef& itk = tks[i];
-        track_idx.push_back(i);
-        for (size_t j = 0; j < jets->size(); ++j) {
-          if (match_track_jet(*itk, (*jets)[j], *jets, j)) {
-            tracktojet_which_trkidx.push_back(i);
-            tracktojet_which_jetidx.push_back(j);
-            if (verbose)
-              printf(" track %u matched with a jet %lu \n", tks[i].key(), j);
-          }
-        }
-      }
-
-      unsigned int ntracks = track_idx.size();
-
-      if (vtxidx == 0) { // start creating the ascening vector of sorted number of total tracks and its corresponding vertex index
-        sv_ascending_total_ntrack.push_back(ntracks);
-        sv_ascending_vtxidx.push_back(vtxidx);
-      }
-      else { // the algorithm continues after the first vertex is added to the vector 
-
-        std::vector<unsigned int>::iterator it_ntracks = sv_ascending_total_ntrack.end();
-        std::vector<size_t>::iterator it_vtx = sv_ascending_vtxidx.end();
-        // finding an iterator that points to a position that ntrack is just less than or equal to itself from the back to the front
-        while (it_ntracks != sv_ascending_total_ntrack.begin() && ntracks <= sv_ascending_total_ntrack[std::distance(sv_ascending_total_ntrack.begin(), it_ntracks)-1])
-        {
-          --it_ntracks;
-          --it_vtx;
-        }
-        // adding a vertex at the end if it has higher ntrack. otherwise, insert it before an iterator pointing to a position that this ntrack is smaller than itself 
-        if (it_ntracks == sv_ascending_total_ntrack.end() && ntracks > sv_ascending_total_ntrack[std::distance(sv_ascending_total_ntrack.begin(), it_ntracks)]) {
-          sv_ascending_total_ntrack.push_back(ntracks);
-          sv_ascending_vtxidx.push_back(vtxidx);
-        }
-
-        else {
-          sv_ascending_total_ntrack.insert(it_ntracks, ntracks);
-          sv_ascending_vtxidx.insert(it_vtx, vtxidx);
-        }
-      }
-
-      sv_total_track_which_trkidx.push_back(track_idx);
-      sv_match_trkidx.push_back(tracktojet_which_trkidx);
-      sv_match_jetidx.push_back(tracktojet_which_jetidx);
-      vtxidx++;
-    }
-
-
-    if (vertices->size() >= 2) {
-      // double for loops to double counts the sv0 and sv1 pairing. The code always remove 'lone shared tracks' from (multiple) special shared jets to sv0 in each round as long as they are not compatible to sv0. Otherwise, the sv1 from the earlier round will be considered again (double count) to have the tracks being removed or not. 
-      for (size_t vtxi = 0; vtxi < sv_ascending_vtxidx.size(); vtxi++) {
-        const size_t vtxidx0 = sv_ascending_vtxidx[vtxi];
-        reco::Vertex& sv0 = vertices->at(vtxidx0);
-        double sv0x = sv0.x() - bsx;
-        double sv0y = sv0.y() - bsy;
-        double phi0 = atan2(sv0y, sv0x);
-        for (size_t vtxj = 0; vtxj < sv_ascending_vtxidx.size(); vtxj++) {
-          if (vtxi == vtxj) continue;
-          const size_t vtxidx1 = sv_ascending_vtxidx[vtxj];
-          reco::Vertex& sv1 = vertices->at(vtxidx1);
-
-          // only consider a pair with at least 3 tracks per vertex
-          if (sv0.nTracks() > 2 && sv1.nTracks() > 2) {
-
-            std::pair<bool, std::vector<std::vector<size_t>>> sharedjet_tool = sharedjets(vtxidx0, vtxidx1, sv_match_jetidx, sv_match_trkidx);
-
-            // loop thru {1,1}+{1,n} nsharedjets and remove just one shared track from v0 if a |dPhi(v0,one shared track)| > pi/2
-            if (sharedjet_tool.first) {
-              std::vector<std::vector<size_t>> sv_lonesharedtrack_trkidx = sharedjet_tool.second;
-              std::vector<size_t> sv0_lonesharedtrack_trkidx = sv_lonesharedtrack_trkidx[0];
-              std::vector<size_t> sv1_lonesharedtrack_trkidx = sv_lonesharedtrack_trkidx[1];
-              for (size_t k = 0; k < sv0_lonesharedtrack_trkidx.size(); k++) {
-                track_vec tks_sv0 = sv_total_track_which_trk_vec[vtxidx0];
-                size_t idx = sv0_lonesharedtrack_trkidx[k];
-                h_resolve_shared_jets_lonetrkvtx_dphi->Fill(fabs(reco::deltaPhi(tks_sv0[idx]->phi(), phi0)));
-
-                // drop the lone track pointing backwards from the vertex direction!
-                if (fabs(reco::deltaPhi(tks_sv0[idx]->phi(), phi0)) > M_PI / 2) {
-                  eraseElement(sv_total_track_which_trkidx[vtxidx0], idx);
-                }
-              }
-              track_set  sv0_resolved_sharedtracks_trkset;
-              for (unsigned int trk0_i = 0; trk0_i < sv_total_track_which_trkidx[vtxidx0].size(); ++trk0_i) {
-                size_t idx = sv_total_track_which_trkidx[vtxidx0][trk0_i];
-                track_vec tks_sv0 = sv_total_track_which_trk_vec[vtxidx0];
-                sv0_resolved_sharedtracks_trkset.insert(tks_sv0[idx]);
-
-              }
-              std::vector<reco::TransientTrack> sv0_resolved_sharedtracks_ttks;
-              for (auto tk : sv0_resolved_sharedtracks_trkset)
-                sv0_resolved_sharedtracks_ttks.push_back(tt_builder->build(tk));
-
-              reco::Vertex sv0_resolved_sharedtracks;
-
-              for (const TransientVertex& tv : kv_reco_dropin(sv0_resolved_sharedtracks_ttks))
-                sv0_resolved_sharedtracks = reco::Vertex(tv);
-
-              sv0 = sv0_resolved_sharedtracks; // update sv0 after non-compatible 'lone shared tracks' from some special shared jets are removed 
-            }
-          }
-        }
-      }
-    }
-
-    for (v[0] = vertices->begin(); v[0] != vertices->end(); ++v[0]) {
-      track_set tracks[2];
-      ivtx[0] = v[0] - vertices->begin();
-      tracks[0] = vertex_track_set(*v[0]);
-
-      if (tracks[0].size() < 2) {
-        if (verbose)
-          throw cms::Exception("1-trk vtx in Vertexer") << "at vertex index: " << ivtx[0];
-        v[0] = vertices->erase(v[0]) - 1;
-        ++n_output_aftersharedjets_onetracks;
-        continue;
-      }
-
-      if (tracks[0].size() < v[0]->nTracks()) {
-        throw cms::Exception("inconsistent total tracks per vertex in Vertexer") << "please check for duplicated tracks ";
-        std::vector<reco::TransientTrack> sv_nonduplicate_ttks;
-        for (const reco::TrackRef& itk : vertex_track_set(*v[0])) {
-          if (itk.isNonnull())
-            sv_nonduplicate_ttks.push_back(tt_builder->build(itk));
-        }
-
-        for (const TransientVertex& tv : kv_reco_dropin(sv_nonduplicate_ttks))
-          *v[0] = reco::Vertex(tv);
-      }
-    }
-
-    if (histos_output_aftersharedjets) {
-      fillCommonOutputHists(vertices, fake_bs_vtx, tt_builder, stepEnum::aftersharedjets);
-      h_output_aftersharedjets_n_onetracks->Fill(n_output_aftersharedjets_onetracks);
-    }
-  }*/ //ADD THIS BACK IN FOR SHARED JET MITIGATION!!!!!!
-																					  
-  // track attachment
-  /* Alec not sure what this is, but it is not used in Vertexer_cfi.py
-  if (track_attachment) {
-	  // build transient tracks from quality tracks (not included in seed tracks)
-	  std::vector<reco::TransientTrack> quality_tracks;
-	  std::map<reco::TrackRef, size_t> quality_track_ref_map;
-	  track_set all_quality_tracks;
-	  for (const reco::TrackRef& tk : *quality_track_refs) {
-		  all_quality_tracks.insert(tk);
-		  quality_tracks.push_back(tt_builder->build(tk));
-		  quality_track_ref_map[tk] = quality_tracks.size() - 1;
-	  }
-	  //start track attachment, attach tracks to vertices if dist(track, vertex)<5 sigma, if a track is close to more than one vertices, attach to the closer one, if a tracks has distance with more than one vertices <=1.5 sigma, attach it to the vertex with more tracks
-	  bool refit = true;
-	  while (refit) {
-		  refit = false;
-		  for (const reco::TrackRef& itk : all_quality_tracks) {
-			  const reco::TransientTrack& ttk = quality_tracks[quality_track_ref_map[itk]];
-			  int v_assign = -1;
-			  double v_assign_dist_sig = 999;
-			  unsigned int v_assign_ntk = 0;
-
-			  for (size_t i = 0; i < vertices->size(); ++i) {
-				  const reco::Vertex& v = vertices->at(i);
-				  std::pair<bool, Measurement1D> t_dist = track_dist(ttk, v);
-				  t_dist.first = t_dist.first && (t_dist.second.value() < max_track_vertex_dist || t_dist.second.significance() < max_track_vertex_sig); // whether it is too far away from the vtx
-				  if (t_dist.first) {
-					  if ((t_dist.second.significance() < min_track_vertex_sig_to_remove) && (v_assign_dist_sig < min_track_vertex_sig_to_remove)) {
-						  if (v_assign_ntk < v.nTracks()) {
-							  v_assign = i;
-							  v_assign_dist_sig = t_dist.second.significance();
-							  v_assign_ntk = v.nTracks();
-						  }
-					  }
-					  else if (t_dist.second.significance() < v_assign_dist_sig) {
-						  v_assign = i;
-						  v_assign_dist_sig = t_dist.second.significance();
-						  v_assign_ntk = v.nTracks();
-					  }
-				  }
-
-			  }
-			  if (v_assign >= 0) {
-				  refit = true;
-				  all_quality_tracks.erase(itk);
-				  std::vector<reco::TransientTrack> ttks;
-				  for (auto tk : vertex_track_set((*vertices)[v_assign])) {
-					  ttks.push_back(tt_builder->build(tk));
-				  }
-				  ttks.push_back(ttk);
-				  reco::VertexCollection new_vertices;
-				  for (const TransientVertex& tv : kv_reco_dropin(ttks))
-					  new_vertices.push_back(reco::Vertex(tv));
-				  if (new_vertices.size() == 1)
-					  (*vertices)[v_assign] = new_vertices[0];
-				  break;
-			  }
-		  }
-	  }
-
-	  if (histos_output_aftertrackattach) {
-		  fillCommonOutputHists(vertices, fake_bs_vtx, tt_builder, stepEnum::aftertrackattach);
-	  }
-  }
-  */
-  //finish(event, seed_tracks, std::move(vertices), std::move(vpeffs), vpeffs_tracks); //original Vertexer.cc inputs
-  return finish(bsposition, bssigma_x, bssigma_y, bssigma_z, seed_tracks, std::move(vertices), std::move(vpeffs), vpeffs_tracks);
 }
 
+// mergeNearby: merges two DVs at about the same azimuth, close in xy and away from the beamspot, when the merged fit keeps all their tracks. tracks[0] keeps the first DV's set from before any merge in the inner loop, as in JMTucker (Bugs/jmtucker/adapted/mergeNearbyStaleTrackList.md).
+void mergeNearby(reco::VertexCollection& vertices, const std::vector<reco::TransientTrack>& seedTracks, const reco::Vertex& beamspot) {
+  const VertexDistanceXY vertexDist2d;
+  VertexIter v[2];
+  for (v[0] = vertices.begin(); v[0] != vertices.end(); ++v[0]) {
+    TrackSet tracks[2];
+    tracks[0] = vertexTrackSet(*v[0]);
+    bool merged = false;
+    for (v[1] = v[0] + 1; v[1] != vertices.end(); ++v[1]) {
+      if (v[0]->nTracks() < 2 || v[1]->nTracks() < 2) continue;
+      tracks[1] = vertexTrackSet(*v[1]);
+      const double dist2d = vertexDist2d.distance(*v[0], *v[1]).value();
+      const double dbv0 = vertexDist2d.distance(*v[0], beamspot).value();
+      const double dbv1 = vertexDist2d.distance(*v[1], beamspot).value();
+      const double phi0 = atan2(v[0]->y() - beamspot.y(), v[0]->x() - beamspot.x());
+      const double phi1 = atan2(v[1]->y() - beamspot.y(), v[1]->x() - beamspot.x());
+      if (!(fabs(reco::deltaPhi(phi0, phi1)) < mergeNearbyDeltaPhiBelow && dist2d < mergeNearbyDistance2dBelow && dbv0 > mergeNearbyDbvAbove && dbv1 > mergeNearbyDbvAbove)) continue;
 
-//constructs the background template
-void construct_dvvc(ConstructDvvcParameters p, const char* out_fn) {
-
-  //p.print(); printf(", out_fn = %s\n", out_fn);
-  //std::string print_output = callPythonAndGetOutput("qcdht0700_2017");
-  //std::cout << "C++ received from Python: " << print_output << std::endl;
-
-  const char* file_path; //which filepath?
-  const char* file_path_20161;
-  const char* file_path_20162;
-  const char* file_path_2017;
-  const char* file_path_2018;
-  if (p.is_mc()) {
-    if (ulversion == "ULV30BvetoLHTm") {
-      file_path_20161 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm";
-      file_path_20162 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm";
-      file_path_2017 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm";
-      file_path_2018 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm";
+      TrackSet toFit(tracks[0]);
+      toFit.insert(tracks[1].begin(), tracks[1].end());
+      reco::Vertex mergedVertex;
+      if (fitVertex(transientTracks(toFit, seedTracks), mergedVertex) && vertexTrackSet(mergedVertex) == toFit) {
+        merged = true;
+        v[1] = vertices.erase(v[1]) - 1;
+        *v[0] = mergedVertex;
+      }
     }
-    else { 
-      file_path_20161 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm";
-      file_path_20162 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm";
-      file_path_2017 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm";
-      file_path_2018 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm";
-    }
-  } else if (p.only_20pc()) {
-    if (ulversion == "ULV30BvetoLHTm") {
-      file_path_20161 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm";
-      file_path_20162 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm";
-      file_path_2017 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm";
-      file_path_2018 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm";
-    }
-    else { 
-      file_path_20161 = "/uscms/home/joeyr/crabdirs/MiniTree_tag001Lepm";
-      file_path_20162 = "/uscms/home/joeyr/crabdirs/MiniTree_tag001Lepm";
-      file_path_2017 = "/uscms/home/joeyr/crabdirs/MiniTree_tag001Lepm";
-      file_path_2018 = "/uscms/home/joeyr/crabdirs/MiniTree_tag001Lepm";
-    }
-  } else if (vertices_w_5tracks) {
-    if (ulversion == "ULV30BvetoLHTm") {
-      file_path_20161 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm4_unblind_5trk_1vtx";
-      file_path_20162 ="/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm4_unblind_5trk_1vtx";
-      file_path_2017 ="/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm4_unblind_5trk_1vtx";
-      file_path_2018 ="/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm4_unblind_5trk_1vtx";
-      //USE THESE IF WANT INVERTED SUMPT AND M5 CUTS 
-      //file_path_20161 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm5_unblind_5trk_1vtx_inverted_mass_and_sumpt";
-      //file_path_20162 ="/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm5_unblind_5trk_1vtx_inverted_mass_and_sumpt";
-      //file_path_2017 ="/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm5_unblind_5trk_1vtx_inverted_mass_and_sumpt";
-      //file_path_2018 ="/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm5_unblind_5trk_1vtx_inverted_mass_and_sumpt";
-    }
-    else {
-      file_path_20161 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm4_unblind_5trk_1vtx";
-      file_path_20162 ="/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm4_unblind_5trk_1vtx";
-      file_path_2017 ="/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm4_unblind_5trk_1vtx";
-      file_path_2018 ="/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm4_unblind_5trk_1vtx";
-      //USE THESE IF WANT INVERTED SUMPT AND M5 CUTS
-      //file_path_20161 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm5_unblind_5trk_1vtx_inverted_mass_and_sumpt";
-      //file_path_20162 ="/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm5_unblind_5trk_1vtx_inverted_mass_and_sumpt";
-      //file_path_2017 ="/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm5_unblind_5trk_1vtx_inverted_mass_and_sumpt";
-      //file_path_2018 ="/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm5_unblind_5trk_1vtx_inverted_mass_and_sumpt";
-    }
-  } else { //These only have 3 and 4-track vertices for now, no 5-track
-    if (ulversion == "ULV30BvetoLHTm") {
-      file_path_20161 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm2_100pc_3and4trk";
-      file_path_20162 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm2_100pc_3and4trk";
-      file_path_2017 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm2_100pc_3and4trk";
-      file_path_2018 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm2_100pc_3and4trk";
-      //USE THESE IF WANT INVERTED SUMPT AND M5 CUTS
-      //file_path_20161 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm3_100pc_3and4trk_inverted_mass_and_sumpt";
-      //file_path_20162 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm3_100pc_3and4trk_inverted_mass_and_sumpt";
-      //file_path_2017 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm3_100pc_3and4trk_inverted_mass_and_sumpt";
-      //file_path_2018 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004BvetoLHTm3_100pc_3and4trk_inverted_mass_and_sumpt";
-    }
-    else { 
-      file_path_20161 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm2_100pc_3and4trk";
-      file_path_20162 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm2_100pc_3and4trk";
-      file_path_2017 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm2_100pc_3and4trk";
-      file_path_2018 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm2_100pc_3and4trk";
-      //USE THESE IF WANT INVERTED SUMPT AND M5 CUTS
-      //file_path_20161 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm3_100pc_3and4trk_inverted_mass_and_sumpt";
-      //file_path_20162 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm3_100pc_3and4trk_inverted_mass_and_sumpt";
-      //file_path_2017 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm3_100pc_3and4trk_inverted_mass_and_sumpt";
-      //file_path_2018 = "/uscms/home/joeyr/crabdirs/MiniTree_tag004Lepm3_100pc_3and4trk_inverted_mass_and_sumpt";
-    }
+    // Restarts the scan from before begin()
+    if (merged) v[0] = vertices.begin() - 1;
   }
-
-  std::vector<const char*>  samples;
-  std::vector<float>  weights;
-
-  std::cout << "The year is: " << p.year() << std::endl;
-
-  bool use_20161 = p.year() == "20161" or p.year() == "20161"   or p.year() == "run2";
-  bool use_20162 = p.year() == "20162" or p.year() == "20162"   or p.year() == "run2";
-  bool  use_2017 = p.year() == "2017"  or p.year() == "2017p8" or p.year() == "run2";
-  bool  use_2018 = p.year() == "2018"  or p.year() == "2017p8" or p.year() == "run2";
-  // FIXME these weights are based off of the number of finished ntuples (which is
-  // close to, but not necessarily 100% of ntuples). When it comes time to do the
-  // final studies, we'll need to make sure ALL ntuples/minitrees finish, and then
-  // update some of the weights             std::string command = "python " + filepath + "ttbar_20161.root"; system(command.c_str());
-  //Py_Initialize();
-  //PyRun_SimpleString('sys.path.append("path/to/my/module/")');
-  if (ulversion == "ULV30BvetoLHTm"){
-    if (p.is_mc()) {
-      if (use_20161) {
-	if (use_signal) {
-	  //samples.push_back("ggHToSSTodddd_tau100mm_M55_20161"); weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau100mm_M55_20161")));
-	  //samples.push_back("ggHToSSTodddd_tau10mm_M55_20161"); weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau10mm_M55_20161")));
-	  //samples.push_back("ggHToSSTodddd_tau1mm_M55_20161"); weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau1mm_M55_20161")));
-
-	  /*samples.push_back("mfv_neu_tau000100um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0200_20161")));
-	  samples.push_back("mfv_neu_tau000100um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0300_20161")));
-	  samples.push_back("mfv_neu_tau000100um_M0400_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0400_20161")));
-	  samples.push_back("mfv_neu_tau000100um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0600_20161")));
-	  samples.push_back("mfv_neu_tau000100um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0800_20161")));
-	  samples.push_back("mfv_neu_tau000100um_M1200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M1200_20161")));
-	  samples.push_back("mfv_neu_tau000100um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M1600_20161")));
-	  samples.push_back("mfv_neu_tau000100um_M3000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M3000_20161")));
-	  samples.push_back("mfv_neu_tau000300um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0200_20161")));
-	  samples.push_back("mfv_neu_tau000300um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0300_20161")));
-	  samples.push_back("mfv_neu_tau000300um_M0400_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0400_20161")));
-	  samples.push_back("mfv_neu_tau000300um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0600_20161")));
-	  samples.push_back("mfv_neu_tau000300um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0800_20161")));
-	  samples.push_back("mfv_neu_tau000300um_M1200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M1200_20161")));
-	  samples.push_back("mfv_neu_tau000300um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M1600_20161")));
-	  samples.push_back("mfv_neu_tau001000um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0200_20161")));
-	  samples.push_back("mfv_neu_tau001000um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0300_20161")));
-	  samples.push_back("mfv_neu_tau001000um_M0400_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0400_20161")));
-	  samples.push_back("mfv_neu_tau001000um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0600_20161")));
-	  samples.push_back("mfv_neu_tau001000um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0800_20161")));
-	  samples.push_back("mfv_neu_tau001000um_M1200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M1200_20161")));
-	  samples.push_back("mfv_neu_tau001000um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M1600_20161")));
-	  samples.push_back("mfv_neu_tau001000um_M3000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M3000_20161")));
-	  samples.push_back("mfv_neu_tau010000um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0200_20161")));
-	  samples.push_back("mfv_neu_tau010000um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0300_20161")));
-	  samples.push_back("mfv_neu_tau010000um_M0400_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0400_20161")));
-	  samples.push_back("mfv_neu_tau010000um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0600_20161")));
-	  samples.push_back("mfv_neu_tau010000um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0800_20161")));
-	  samples.push_back("mfv_neu_tau010000um_M1200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M1200_20161")));
-	  samples.push_back("mfv_neu_tau010000um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M1600_20161")));
-	  samples.push_back("mfv_neu_tau010000um_M3000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M3000_20161")));
-	  samples.push_back("mfv_neu_tau030000um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0200_20161")));
-	  samples.push_back("mfv_neu_tau030000um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0300_20161")));
-	  samples.push_back("mfv_neu_tau030000um_M0400_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0400_20161")));
-	  samples.push_back("mfv_neu_tau030000um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0600_20161")));
-	  samples.push_back("mfv_neu_tau030000um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0800_20161")));
-	  samples.push_back("mfv_neu_tau030000um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M1600_20161")));
-	  samples.push_back("mfv_neu_tau030000um_M3000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M3000_20161")));*/
-
-	  /*samples.push_back("mfv_stopbbarbbar_tau000100um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0200_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000100um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0300_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000100um_M0400_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0400_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000100um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0600_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000100um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0800_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000100um_M1200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M1200_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000100um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M1600_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000100um_M3000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M3000_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0200_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0300_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M0400_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0400_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0600_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0800_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M1200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M1200_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M1600_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M3000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M3000_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0200_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0300_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M0400_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0400_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0600_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0800_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M1200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M1200_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M1600_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M3000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M3000_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0200_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0300_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M0400_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0400_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0600_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0800_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M1200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M1200_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M1600_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M3000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M3000_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0200_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0300_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M0400_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0400_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0600_2016AP1));*/
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0800_20161")));
-	  /*samples.push_back("mfv_stopbbarbbar_tau030000um_M1200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M1200_2016")));
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M1600_20161")));
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M3000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M3000_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0200_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0300_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M0400_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0400_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0600_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0800_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M1200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M1200_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M1600_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M3000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M3000_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0200_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0300_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M0400_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0400_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0600_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0800_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M1200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M1200_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M1600_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M3000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M3000_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0200_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0300_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0600_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0800_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M1200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M1200_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M1600_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M3000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M3000_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0200_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0300_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M0400_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0400_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0600_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0800_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M1200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M1200_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M1600_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M3000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M3000_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0200_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0300_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M0400_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0400_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M0600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0600_2016AP1));*/
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M0800_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0800_20161")));
-	  /*samples.push_back("mfv_stopdbardbar_tau030000um_M1200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M1200_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M1600_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M1600_20161")));
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M3000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M3000_20161")));*/
-	}
-	else {
-	  samples.push_back("qcdht0100_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht0100_20161")));
-	  samples.push_back("qcdht0200_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht0200_20161")));
-	  samples.push_back("qcdht0300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht0300_20161")));
-	  samples.push_back("qcdht0500_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht0500_20161")));
-	  samples.push_back("qcdht0700_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht0700_20161")));
-	  samples.push_back("qcdht1000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht1000_20161")));
-	  samples.push_back("qcdht1500_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht1500_20161")));
-	  samples.push_back("qcdht2000_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht2000_20161")));
-	  samples.push_back("ttbar_20161"); weights.push_back(std::stof(callPythonAndGetOutput("ttbar_20161")));
-	  //samples.push_back("ttbar_20161");    weights.push_back(0.35);
-	  //samples.push_back("qcdht0100_20161");    weights.push_back(12658.82);
-	  //samples.push_back("qcdht0200_20161");    weights.push_back(1408.45);
-	  //samples.push_back("qcdht0300_20161");    weights.push_back(277.09);
-	  //samples.push_back("qcdht0500_20161");    weights.push_back(22.53);
-	  //samples.push_back("qcdht0700_20161");    weights.push_back(5.84);
-	  //samples.push_back("qcdht1000_20161");    weights.push_back(3.47);
-	  //samples.push_back("qcdht1500_20161");    weights.push_back(0.48);
-	  //samples.push_back("qcdht2000_20161");    weights.push_back(0.19);
-	}
-      }
-
-      if (use_20162) {
-	if (use_signal) {
-	  //samples.push_back("ggHToSSTodddd_tau100mm_M55_2016"); weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau100mm_M55_2016")));
-	  //samples.push_back("ggHToSSTodddd_tau10mm_M55_20162"); weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau10mm_M55_20162")));
-	  //samples.push_back("ggHToSSTodddd_tau1mm_M55_20162"); weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau1mm_M55_20162")));
-
-	  /*samples.push_back("mfv_neu_tau000100um_M0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0200_20162")));
-	  samples.push_back("mfv_neu_tau000100um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0300_20162")));
-	  samples.push_back("mfv_neu_tau000100um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0400_20162")));
-	  samples.push_back("mfv_neu_tau000100um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0600_20162")));
-	  samples.push_back("mfv_neu_tau000100um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0800_20162")));
-	  samples.push_back("mfv_neu_tau000100um_M1200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M1200_20162")));
-	  samples.push_back("mfv_neu_tau000100um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M1600_20162")));
-	  samples.push_back("mfv_neu_tau000100um_M3000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M3000_20162")));
-	  samples.push_back("mfv_neu_tau000300um_M0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0200_20162")));
-	  samples.push_back("mfv_neu_tau000300um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0300_20162")));
-	  samples.push_back("mfv_neu_tau000300um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0400_20162")));
-	  samples.push_back("mfv_neu_tau000300um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0600_20162")));
-	  samples.push_back("mfv_neu_tau000300um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0800_20162")));
-	  samples.push_back("mfv_neu_tau000300um_M1200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M1200_20162")));
-	  samples.push_back("mfv_neu_tau000300um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M1600_20162")));
-	  samples.push_back("mfv_neu_tau000300um_M3000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M3000_20162")));
-	  samples.push_back("mfv_neu_tau001000um_M0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0200_20162")));
-	  samples.push_back("mfv_neu_tau001000um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0300_20162")));
-	  samples.push_back("mfv_neu_tau001000um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0400_20162")));
-	  samples.push_back("mfv_neu_tau001000um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0600_20162")));
-	  samples.push_back("mfv_neu_tau001000um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0800_20162")));
-	  samples.push_back("mfv_neu_tau001000um_M1200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M1200_20162")));
-	  samples.push_back("mfv_neu_tau001000um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M1600_20162")));
-	  samples.push_back("mfv_neu_tau001000um_M3000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M3000_20162")));
-	  samples.push_back("mfv_neu_tau010000um_M0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0200_20162")));
-	  samples.push_back("mfv_neu_tau010000um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0300_20162")));
-	  samples.push_back("mfv_neu_tau010000um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0400_20162")));
-	  samples.push_back("mfv_neu_tau010000um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0600_20162")));
-	  samples.push_back("mfv_neu_tau010000um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0800_20162")));
-	  samples.push_back("mfv_neu_tau010000um_M1200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M1200_20162")));
-	  samples.push_back("mfv_neu_tau010000um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M1600_20162")));
-	  samples.push_back("mfv_neu_tau010000um_M3000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M3000_20162")));
-	  samples.push_back("mfv_neu_tau030000um_M0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0200_20162")));
-	  samples.push_back("mfv_neu_tau030000um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0300_20162")));
-	  samples.push_back("mfv_neu_tau030000um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0400_20162")));
-	  samples.push_back("mfv_neu_tau030000um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0600_20162")));
-	  samples.push_back("mfv_neu_tau030000um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0800_20162")));
-	  samples.push_back("mfv_neu_tau030000um_M1200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M1200_20162")));
-	  samples.push_back("mfv_neu_tau030000um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M1600_20162")));
-	  samples.push_back("mfv_neu_tau030000um_M3000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M3000_20162")));*/
-
-	  /*samples.push_back("mfv_stopbbarbbar_tau000100um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0300_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau000100um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0400_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau000100um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0600_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau000100um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0800_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau000100um_M1200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M1200_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau000100um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M1600_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau000100um_M3000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M3000_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0200_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0300_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0400_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0600_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0800_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M1600_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau000300um_M3000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M3000_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0200_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0300_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0400_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0600_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0800_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M1200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M1200_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M1600_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau001000um_M3000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M3000_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0200_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0300_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0400_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0600_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0800_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M1200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M1200_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M1600_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau010000um_M3000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M3000_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0200_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0300_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0400_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0600_20162")));*/
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0800_20162")));
-	  /*samples.push_back("mfv_stopbbarbbar_tau030000um_M1200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M1200_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M1600_20162")));
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M3000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M3000_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0200_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0300_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0400_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0600_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0800_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M1200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M1200_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M1600_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000100um_M3000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M3000_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0200_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0300_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0400_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0600_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0800_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M1200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M1200_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M1600_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau000300um_M3000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M3000_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0200_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0300_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0400_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0600_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0800_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M1200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M1200_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M1600_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau001000um_M3000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M3000_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0200_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0300_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0400_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0600_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0800_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M1200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M1200_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau010000um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M1600_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0200_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0300_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M0400_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0400_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M0600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0600_20162")));*/
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M0800_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0800_20162")));
-	  /*samples.push_back("mfv_stopdbardbar_tau030000um_M1200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M1200_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M1600_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M1600_20162")));
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M3000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M3000_20162")));*/
-	}
-	else {
-	  samples.push_back("qcdht0100_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht0100_20162")));
-	  samples.push_back("qcdht0200_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht0200_20162")));
-	  samples.push_back("qcdht0300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht0300_20162")));
-	  samples.push_back("qcdht0500_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht0500_20162")));
-	  samples.push_back("qcdht0700_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht0700_20162")));
-	  samples.push_back("qcdht1000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht1000_20162")));
-	  samples.push_back("qcdht1500_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht1500_20162")));
-	  samples.push_back("qcdht2000_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdht2000_20162")));
-	  samples.push_back("ttbar_20162"); weights.push_back(std::stof(callPythonAndGetOutput("ttbar_20162")));
-	  //samples.push_back("ttbar_20162");    weights.push_back(0.31);
-	  //samples.push_back("qcdht0100_20162");    weights.push_back(11914.23);
-	  //samples.push_back("qcdht0200_20162");    weights.push_back(1048.92);
-	  //samples.push_back("qcdht0300_20162");    weights.push_back(246.00);
-	  //samples.push_back("qcdht0500_20162");    weights.push_back(18.50);
-	  //samples.push_back("qcdht0700_20162");    weights.push_back(5.58);
-	  //samples.push_back("qcdht1000_20162");    weights.push_back(2.75);
-	  //samples.push_back("qcdht1500_20162");    weights.push_back(0.37);
-	  //samples.push_back("qcdht2000_20162");    weights.push_back(0.15);
-	}
-      }
-
-      if (use_2017) {
-	if (use_signal) {
-	  //samples.push_back("ggHToSSTodddd_tau1mm_M55_2017");  weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau1mm_M55_2017")));
-	  //samples.push_back("ggHToSSTodddd_tau10mm_M55_2017");  weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau10mm_M55_2017")));
-	  //samples.push_back("ggHToSSTodddd_tau100mm_M55_2017");  weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau100mm_M55_2017")));
-
-	  //samples.push_back("mfv_neu_tau000100um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0200_2017")));
-	  //samples.push_back("mfv_neu_tau000100um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0300_2017")));
-	  //samples.push_back("mfv_neu_tau000100um_M0400_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0400_2017")));
-	  //samples.push_back("mfv_neu_tau000100um_M0600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0600_2017")));
-	  //samples.push_back("mfv_neu_tau000100um_M1200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M1200_2017")));
-	  //samples.push_back("mfv_neu_tau000100um_M1600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M1600_2017")));
-	  //samples.push_back("mfv_neu_tau000100um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M3000_2017")));
-	  //samples.push_back("mfv_neu_tau000300um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0200_2017")));
-	  //samples.push_back("mfv_neu_tau000300um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0300_2017")));
-	  //samples.push_back("mfv_neu_tau000300um_M0600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0600_2017")));
-	  //samples.push_back("mfv_neu_tau000300um_M0800_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0800_2017")));
-	  //samples.push_back("mfv_neu_tau000300um_M1200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M1200_2017")));
-	  //samples.push_back("mfv_neu_tau000300um_M1600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M1600_2017")));
-	  //samples.push_back("mfv_neu_tau000300um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M3000_2017")));
-	  //not done samples.push_back("mfv_neu_tau001000um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0200_2017")));
-	  //samples.push_back("mfv_neu_tau001000um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0300_2017")));
-	  //samples.push_back("mfv_neu_tau001000um_M0400_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0400_2017")));
-	  //samples.push_back("mfv_neu_tau001000um_M0600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0600_2017")));
-	  //samples.push_back("mfv_neu_tau001000um_M0800_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0800_2017")));
-	  //samples.push_back("mfv_neu_tau001000um_M1200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M1200_2017")));
-	  //samples.push_back("mfv_neu_tau001000um_M1600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M1600_2017")));
-	  //samples.push_back("mfv_neu_tau001000um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M3000_2017")));
-	  //samples.push_back("mfv_neu_tau010000um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0200_2017")));
-	  //samples.push_back("mfv_neu_tau010000um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0300_2017")));
-	  //samples.push_back("mfv_neu_tau010000um_M0400_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0400_2017")));
-	  //samples.push_back("mfv_neu_tau010000um_M0600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0600_2017")));
-	  //samples.push_back("mfv_neu_tau010000um_M0800_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0800_2017")));
-	  //samples.push_back("mfv_neu_tau010000um_M1200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M1200_2017")));
-	  //samples.push_back("mfv_neu_tau010000um_M1600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M1600_2017")));
-	  //samples.push_back("mfv_neu_tau010000um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M3000_2017")));
-	  //samples.push_back("mfv_neu_tau030000um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0200_2017")));
-	  //samples.push_back("mfv_neu_tau030000um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0300_2017")));
-	  //samples.push_back("mfv_neu_tau030000um_M0400_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0400_2017")));
-	  //samples.push_back("mfv_neu_tau030000um_M0600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0600_2017")));
-	  //samples.push_back("mfv_neu_tau030000um_M0800_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0800_2017")));
-	  //samples.push_back("mfv_neu_tau030000um_M1600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M1600_2017")));
-	  //samples.push_back("mfv_neu_tau030000um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M3000_2017")));
-
-	  //samples.push_back("mfv_stopbbarbbar_tau000100um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0200_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000100um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0300_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000100um_M0400_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0400_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000100um_M0600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0600_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000100um_M0800_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0800_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000100um_M1200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M1200_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000100um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M3000_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0200_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0300_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M0400_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0400_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M0600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0600_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M0800_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0800_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M1200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M1200_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M1600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M1600_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M3000_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0200_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0300_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M0400_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0400_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M0600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0600_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M0800_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0800_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M1200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M1200_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M1600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M1600_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M3000_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0200_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0300_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M0400_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0400_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M0600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0600_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M0800_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0800_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M1200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M1200_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M1600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M1600_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M3000_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau030000um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0200_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau030000um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0300_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau030000um_M0400_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0400_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau030000um_M0600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0600_2017")));
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M0800_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0800_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau030000um_M1200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M1200_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau030000um_M1600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M1600_2017")));
-	  //samples.push_back("mfv_stopbbarbbar_tau030000um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M3000_2017")));
-	  ///samples.push_back("mfv_stopdbardbar_tau000100um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0200_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0300_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M0400_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0400_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M0600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0600_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M0800_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0800_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M1200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M1200_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M1600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M1600_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M3000_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau000300um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0200_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau000300um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0300_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau000300um_M0400_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0400_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau000300um_M0600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0600_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau000300um_M0800_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0800_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau000300um_M1200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M1200_2017")));
-	  //not done samples.push_back("mfv_stopdbardbar_tau000300um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M3000_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0200_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0300_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M0400_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0400_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M0800_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0800_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M1200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M1200_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M1600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M1600_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M3000_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0200_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0300_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M0400_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0400_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M0600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0600_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M0800_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0800_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M1200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M1200_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M1600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M1600_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M3000_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau030000um_M0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0200_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau030000um_M0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0300_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau030000um_M0400_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0400_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau030000um_M0600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0600_2017")));
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M0800_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0800_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau030000um_M1200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M1200_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau030000um_M1600_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M1600_2017")));
-	  //samples.push_back("mfv_stopdbardbar_tau030000um_M3000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M3000_2017")));
-	}
-	else {  
-	  samples.push_back("ttbar_2017");      weights.push_back(std::stof(callPythonAndGetOutput("ttbar_2017")));
-	  samples.push_back("qcdht0200_2017");  weights.push_back(std::stof(callPythonAndGetOutput("qcdht0200_2017"))); //No difference if removed
-	  samples.push_back("qcdht0300_2017");  weights.push_back(std::stof(callPythonAndGetOutput("qcdht0300_2017"))); //little difference
-	  samples.push_back("qcdht0500_2017");  weights.push_back(std::stof(callPythonAndGetOutput("qcdht0500_2017"))); //major culprit
-	  samples.push_back("qcdht0700_2017");  weights.push_back(std::stof(callPythonAndGetOutput("qcdht0700_2017"))); //the major culprit
-	  samples.push_back("qcdht1000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("qcdht1000_2017")));
-	  samples.push_back("qcdht1500_2017");  weights.push_back(std::stof(callPythonAndGetOutput("qcdht1500_2017")));
-	  samples.push_back("qcdht2000_2017");  weights.push_back(std::stof(callPythonAndGetOutput("qcdht2000_2017")));
-	  //samples.push_back("ttbar_2017"); weights.push_back(0.27);
-	  //samples.push_back("qcdht0200_2017"); weights.push_back(2954.88);
-	  //samples.push_back("qcdht0300_2017"); weights.push_back(601.09);
-	  //samples.push_back("qcdht0500_2017"); weights.push_back(67.95);
-	  //samples.push_back("qcdht0700_2017"); weights.push_back(15.25);
-	  //samples.push_back("qcdht1000_2017"); weights.push_back(8.68);
-	  //samples.push_back("qcdht1500_2017"); weights.push_back(1.04);
-	  //samples.push_back("qcdht2000_2017"); weights.push_back(0.43);
-	}
-      }
-
-      if (use_2018) {
-	if (use_signal) {
-	  //samples.push_back("ggHToSSTodddd_tau1mm_M40_2018");  weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau1mm_M55_2018")));
-          //samples.push_back("ggHToSSTodddd_tau10mm_M40_2018");  weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau10mm_M55_2018")));
-          //samples.push_back("ggHToSSTodddd_tau100mm_M40_2018");  weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau100mm_M55_2018")));
-	  //samples.push_back("ggHToSSTodddd_tau1mm_M55_2018");  weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau1mm_M55_2018")));
-	  //samples.push_back("ggHToSSTodddd_tau10mm_M55_2018");  weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau10mm_M55_2018")));
-	  //samples.push_back("ggHToSSTodddd_tau100mm_M55_2018");  weights.push_back(std::stof(callPythonAndGetOutput("ggHToSSTodddd_tau100mm_M55_2018")));
-
-	  //samples.push_back("mfv_neu_tau000100um_M0200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0200_2018")));
-	  //samples.push_back("mfv_neu_tau000100um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0300_2018")));
-	  //samples.push_back("mfv_neu_tau000100um_M0400_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0400_2018")));
-	  //samples.push_back("mfv_neu_tau000100um_M0600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0600_2018")));
-	  //samples.push_back("mfv_neu_tau000100um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M0800_2018")));
-	  //samples.push_back("mfv_neu_tau000100um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M1200_2018")));
-	  //samples.push_back("mfv_neu_tau000100um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M1600_2018")));
-	  //samples.push_back("mfv_neu_tau000100um_M3000_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000100um_M3000_2018")));
-	  //samples.push_back("mfv_neu_tau000300um_M0200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0200_2018")));
-	  //samples.push_back("mfv_neu_tau000300um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0300_2018")));
-	  //samples.push_back("mfv_neu_tau000300um_M0400_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0400_2018")));
-	  //samples.push_back("mfv_neu_tau000300um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M0800_2018")));
-	  //samples.push_back("mfv_neu_tau000300um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M1200_2018")));
-	  //samples.push_back("mfv_neu_tau000300um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M1600_2018")));
-	  //samples.push_back("mfv_neu_tau000300um_M3000_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau000300um_M3000_2018")));
-	  //samples.push_back("mfv_neu_tau001000um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0300_2018")));
-	  //samples.push_back("mfv_neu_tau001000um_M0400_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0400_2018"))); //tester
-	  //samples.push_back("mfv_neu_tau001000um_M0600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0600_2018")));
-	  //samples.push_back("mfv_neu_tau001000um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M0800_2018"))); //tester
-	  //samples.push_back("mfv_neu_tau001000um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M1200_2018")));
-	  //samples.push_back("mfv_neu_tau001000um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M1600_2018")));
-	  //samples.push_back("mfv_neu_tau001000um_M3000_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau001000um_M3000_2018")));
-	  //samples.push_back("mfv_neu_tau010000um_M0200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0200_2018")));
-	  //samples.push_back("mfv_neu_tau010000um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0300_2018")));
-	  //samples.push_back("mfv_neu_tau010000um_M0400_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0400_2018"))); //tester
-	  //samples.push_back("mfv_neu_tau010000um_M0600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0600_2018")));
-	  //samples.push_back("mfv_neu_tau010000um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M0800_2018"))); //tester
-	  //samples.push_back("mfv_neu_tau010000um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M1200_2018")));
-	  //samples.push_back("mfv_neu_tau010000um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau010000um_M1600_2018")));
-	  //samples.push_back("mfv_neu_tau030000um_M0200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0200_2018")));
-	  //samples.push_back("mfv_neu_tau030000um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0300_2018")));
-	  //samples.push_back("mfv_neu_tau030000um_M0400_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0400_2018")));
-	  //samples.push_back("mfv_neu_tau030000um_M0600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0600_2018")));
-	  //samples.push_back("mfv_neu_tau030000um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M0800_2018")));
-	  //samples.push_back("mfv_neu_tau030000um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M1200_2018")));
-	  //samples.push_back("mfv_neu_tau030000um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M1600_2018")));
-	  //samples.push_back("mfv_neu_tau030000um_M3000_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_neu_tau030000um_M3000_2018")));
-
-	  // samples.push_back("mfv_stopbbarbbar_tau000100um_M0200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0200_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000100um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0300_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000100um_M0400_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0400_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000100um_M0600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0600_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000100um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M0800_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000100um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M1200_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000100um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M1600_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000100um_M3000_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000100um_M3000_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M0200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0200_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0300_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M0400_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0400_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M0600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0600_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M0800_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M1200_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M1600_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau000300um_M3000_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau000300um_M3000_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M0200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0200_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0300_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M0400_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0400_2018"))); //tester
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M0600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0600_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M0800_2018"))); //tester
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M1200_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M1600_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau001000um_M3000_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau001000um_M3000_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M0200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0200_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0300_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M0400_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0400_2018"))); //tester
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M0600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0600_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M0800_2018"))); //tester
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M1200_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M1600_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau010000um_M3000_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau010000um_M3000_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau030000um_M0200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0200_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau030000um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0300_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau030000um_M0400_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0400_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau030000um_M0600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0600_2018")));
-	  samples.push_back("mfv_stopbbarbbar_tau030000um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M0800_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau030000um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M1200_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau030000um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M1600_2018")));
-	  //samples.push_back("mfv_stopbbarbbar_tau030000um_M3000_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopbbarbbar_tau030000um_M3000_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M0200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0200_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0300_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M0400_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0400_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M0600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0600_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M0800_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M1200_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M1600_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000100um_M3000_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000100um_M3000_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000300um_M0200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0200_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000300um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0300_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000300um_M0400_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0400_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000300um_M0600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0600_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000300um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M0800_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000300um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M1200_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000300um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M1600_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau000300um_M3000_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau000300um_M3000_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M0200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0200_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0300_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M0400_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0400_2018"))); //tester
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M0600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0600_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M0800_2018"))); //tester
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M1200_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M1600_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau001000um_M3000_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau001000um_M3000_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M0200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0200_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0300_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M0400_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0400_2018"))); //tester
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M0600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0600_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M0800_2018"))); //tester
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M1200_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M1600_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau010000um_M3000_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau010000um_M3000_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau030000um_M0200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0200_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau030000um_M0300_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0300_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau030000um_M0600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0600_2018")));
-	  samples.push_back("mfv_stopdbardbar_tau030000um_M0800_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M0800_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau030000um_M1200_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M1200_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau030000um_M1600_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M1600_2018")));
-	  //samples.push_back("mfv_stopdbardbar_tau030000um_M3000_2018"); weights.push_back(std::stof(callPythonAndGetOutput("mfv_stopdbardbar_tau030000um_M3000_2018")));
-	}
-	else {
-	  samples.push_back("ttbar_2018");      weights.push_back(std::stof(callPythonAndGetOutput("ttbar_2018"))); //weights.push_back(0.30);
-	  samples.push_back("qcdht0200_2018");  weights.push_back(std::stof(callPythonAndGetOutput("qcdht0200_2018"))); //weights.push_back(3235.19);
-	  samples.push_back("qcdht0300_2018");  weights.push_back(std::stof(callPythonAndGetOutput("qcdht0300_2018"))); //weights.push_back(624.06);
-	  samples.push_back("qcdht0500_2018");  weights.push_back(std::stof(callPythonAndGetOutput("qcdht0500_2018"))); //weights.push_back(73.49);
-	  samples.push_back("qcdht0700_2018");  weights.push_back(std::stof(callPythonAndGetOutput("qcdht0700_2018"))); //weights.push_back(15.73);
-	  samples.push_back("qcdht1000_2018");  weights.push_back(std::stof(callPythonAndGetOutput("qcdht1000_2018"))); //weights.push_back(9.01);
-	  samples.push_back("qcdht1500_2018");  weights.push_back(std::stof(callPythonAndGetOutput("qcdht1500_2018"))); //weights.push_back(1.00);
-	  samples.push_back("qcdht2000_2018");  weights.push_back(std::stof(callPythonAndGetOutput("qcdht2000_2018"))); //weights.push_back(1.00);
-	}
-      }
-    }
-    else { //ADDING 20pc SAMPLES HERE!!!!
-      if (use_20161) {
-	samples.push_back("BTagCSV20161B");                      weights.push_back(1);
-	samples.push_back("BTagCSV20161C");                      weights.push_back(1);
-	samples.push_back("BTagCSV20161D");                      weights.push_back(1);
-	samples.push_back("BTagCSV20161E");                      weights.push_back(1);
-	samples.push_back("BTagCSV20161F");                      weights.push_back(1);
-	samples.push_back("DisplacedJet20161B");                      weights.push_back(1);
-	samples.push_back("DisplacedJet20161C");                      weights.push_back(1);
-	samples.push_back("DisplacedJet20161D");                      weights.push_back(1);
-	samples.push_back("DisplacedJet20161E");                      weights.push_back(1);
-	samples.push_back("DisplacedJet20161F");                      weights.push_back(1);
-      }
-      if (use_20162) {
-	samples.push_back("BTagCSV20162F");                      weights.push_back(1);
-	samples.push_back("BTagCSV20162G");                      weights.push_back(1);
-	samples.push_back("BTagCSV20162H");                      weights.push_back(1);
-	samples.push_back("DisplacedJet20162F");                      weights.push_back(1);
-	samples.push_back("DisplacedJet20162G");                      weights.push_back(1);
-	samples.push_back("DisplacedJet20162H");                      weights.push_back(1);
-      }
-      if (use_2017) {
-	samples.push_back("BTagCSV2017B");                      weights.push_back(1);
-	samples.push_back("BTagCSV2017C");                      weights.push_back(1);
-	samples.push_back("BTagCSV2017D");                      weights.push_back(1);
-	samples.push_back("BTagCSV2017E");                      weights.push_back(1);
-	samples.push_back("BTagCSV2017F");                      weights.push_back(1);
-	//samples.push_back("DisplacedJet2017B");                      weights.push_back(1); //does not exist
-	samples.push_back("DisplacedJet2017C");                      weights.push_back(1);
-	samples.push_back("DisplacedJet2017D");                      weights.push_back(1);
-	samples.push_back("DisplacedJet2017E");                      weights.push_back(1);
-	samples.push_back("DisplacedJet2017F");                      weights.push_back(1);
-      }
-      if (use_2018) {
-	samples.push_back("DisplacedJet2018A");                      weights.push_back(1);
-	samples.push_back("DisplacedJet2018B");                      weights.push_back(1);
-	samples.push_back("DisplacedJet2018C");                      weights.push_back(1);
-	samples.push_back("DisplacedJet2018D");                      weights.push_back(1);
-	samples.push_back("JetHT2018A");                      weights.push_back(1);
-	samples.push_back("JetHT2018B");                      weights.push_back(1);
-	samples.push_back("JetHT2018C");                      weights.push_back(1);
-	samples.push_back("JetHT2018D");                      weights.push_back(1);
-      }
-    }
-
-  }
-  else {
-    if (p.is_mc()) {
-      if (use_20161) {
-	if (use_signal) {
-	  //samples.push_back("WminusHToSSTodddd_tau1mm_M40_20161"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau1mm_M40_20161")));
-	  //samples.push_back("WminusHToSSTodddd_tau10mm_M40_20161"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau10mm_M40_20161")));
-	  //samples.push_back("WplusHToSSTodddd_tau1mm_M40_20161"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau1mm_M40_20161")));
-	  //samples.push_back("WplusHToSSTodddd_tau10mm_M40_20161"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau10mm_M40_20161")));
-	  //samples.push_back("ZHToSSTodddd_tau1mm_M40_20161"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau1mm_M40_20161")));
-	  //samples.push_back("ZHToSSTodddd_tau10mm_M40_20161"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau10mm_M40_20161")));
-	  //samples.push_back("WminusHToSSTodddd_tau1mm_M55_20161"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau1mm_M55_20161")));
-	  samples.push_back("WminusHToSSTodddd_tau10mm_M55_20161"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau10mm_M55_20161")));
-	  //samples.push_back("WplusHToSSTodddd_tau1mm_M55_20161"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau1mm_M55_20161")));
-	  samples.push_back("WplusHToSSTodddd_tau10mm_M55_20161"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau10mm_M55_20161")));
-	  //samples.push_back("ZHToSSTodddd_tau1mm_M55_20161"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau1mm_M55_20161")));
-	  samples.push_back("ZHToSSTodddd_tau10mm_M55_20161"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau10mm_M55_20161")));
-	}
-	else {
-	  samples.push_back("dyjetstollM10_20161"); weights.push_back(std::stof(callPythonAndGetOutput("dyjetstollM10_20161"))); //weights.push_back(18.10);
-	  samples.push_back("dyjetstollM50_20161"); weights.push_back(std::stof(callPythonAndGetOutput("dyjetstollM50_20161"))); //weights.push_back(1.10);
-	  samples.push_back("qcdbctoept020_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept020_20161"))); //weights.push_back(831.25);
-	  samples.push_back("qcdbctoept030_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept030_20161"))); //weights.push_back(906.11);
-	  samples.push_back("qcdbctoept080_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept080_20161"))); //weights.push_back(99.62);
-	  samples.push_back("qcdbctoept170_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept170_20161"))); //weights.push_back(6.15);
-	  samples.push_back("qcdbctoept250_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept250_20161"))); //weights.push_back(1.62);
-	  samples.push_back("qcdempt015_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt015_20161"))); //weights.push_back(6408.17);
-	  samples.push_back("qcdempt020_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt020_20161"))); //weights.push_back(13452.91);
-	  samples.push_back("qcdempt030_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt030_20161"))); //weights.push_back(34786.25);
-	  samples.push_back("qcdempt050_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt050_20161"))); //weights.push_back(650179.33);
-	  samples.push_back("qcdempt080_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt080_20161"))); //weights.push_back(1490.82);
-	  samples.push_back("qcdempt120_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt120_20161"))); //weights.push_back(270.35);
-	  samples.push_back("qcdempt170_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt170_20161"))); //weights.push_back(3411.90);
-	  samples.push_back("qcdempt300_20161"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt300_20161"))); //weights.push_back(19.00);
-	  samples.push_back("qcdmupt15_20161");  weights.push_back(std::stof(callPythonAndGetOutput("qcdmupt15_20161"))); //weights.push_back(541.11);
-	  samples.push_back("ttbar_20161"); weights.push_back(std::stof(callPythonAndGetOutput("ttbar_20161"))); //weights.push_back(0.17);
-	  samples.push_back("wjetstolnu_0j_20161"); weights.push_back(std::stof(callPythonAndGetOutput("wjetstolnu_0j_20161"))); //weights.push_back(6.82);
-	  samples.push_back("wjetstolnu_1j_20161"); weights.push_back(std::stof(callPythonAndGetOutput("wjetstolnu_1j_20161"))); //weights.push_back(1.05);
-	  samples.push_back("wjetstolnu_2j_20161"); weights.push_back(std::stof(callPythonAndGetOutput("wjetstolnu_2j_20161"))); //weights.push_back(0.74);
-	  samples.push_back("ww_20161"); weights.push_back(std::stof(callPythonAndGetOutput("ww_20161"))); //weights.push_back(0.09);
-	  samples.push_back("wz_20161"); weights.push_back(std::stof(callPythonAndGetOutput("wz_20161"))); //weights.push_back(0.07);
-	  samples.push_back("zz_20161"); weights.push_back(std::stof(callPythonAndGetOutput("zz_20161"))); //weights.push_back(0.19);
-	}
-      }
-            
-      if (use_20162) { 
-	if (use_signal) {
-	  //samples.push_back("WminusHToSSTodddd_tau1mm_M40_20162"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau1mm_M40_20162")));
-	  //samples.push_back("WminusHToSSTodddd_tau10mm_M40_20162"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau10mm_M40_20162")));
-	  //samples.push_back("WplusHToSSTodddd_tau1mm_M40_20162"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau1mm_M40_20162")));
-	  //samples.push_back("WplusHToSSTodddd_tau10mm_M40_20162"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau10mm_M40_20162")));
-	  //samples.push_back("ZHToSSTodddd_tau1mm_M40_20162"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau1mm_M40_20162")));
-	  //samples.push_back("ZHToSSTodddd_tau10mm_M40_20162"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau10mm_M40_20162")));
-	  //samples.push_back("WminusHToSSTodddd_tau1mm_M55_20162"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau1mm_M55_20162")));
-	  samples.push_back("WminusHToSSTodddd_tau10mm_M55_20162"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau10mm_M55_20162")));
-	  //samples.push_back("WplusHToSSTodddd_tau1mm_M55_20162"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau1mm_M55_20162")));
-	  samples.push_back("WplusHToSSTodddd_tau10mm_M55_20162"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau10mm_M55_20162")));
-	  //samples.push_back("ZHToSSTodddd_tau1mm_M55_20162"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau1mm_M55_20162")));
-	  samples.push_back("ZHToSSTodddd_tau10mm_M55_20162"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau10mm_M55_20162")));
-	}
-	else {
-	  samples.push_back("dyjetstollM10_20162"); weights.push_back(std::stof(callPythonAndGetOutput("dyjetstollM10_20162"))); //weights.push_back(11.32);
-	  samples.push_back("dyjetstollM50_20162"); weights.push_back(std::stof(callPythonAndGetOutput("dyjetstollM50_20162"))); //weights.push_back(1.10);
-	  samples.push_back("qcdbctoept020_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept020_20162"))); //weights.push_back(705.76);
-	  samples.push_back("qcdbctoept030_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept030_20162"))); //weights.push_back(797.35);
-	  samples.push_back("qcdbctoept080_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept080_20162"))); //weights.push_back(72.58);
-	  samples.push_back("qcdbctoept170_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept170_20162"))); //weights.push_back(4.60);
-	  samples.push_back("qcdbctoept250_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept250_20162"))); //weights.push_back(1.17);
-	  samples.push_back("qcdempt015_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt015_20162"))); //weights.push_back(5582.99);
-	  samples.push_back("qcdempt020_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt020_20162"))); //weights.push_back(11650.56);
-	  samples.push_back("qcdempt030_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt030_20162"))); //weights.push_back(25156.70);
-	  samples.push_back("qcdempt050_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt050_20162"))); //weights.push_back(6199.98);
-	  samples.push_back("qcdempt080_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt080_20162"))); //weights.push_back(1298.58);
-	  samples.push_back("qcdempt120_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt120_20162"))); //weights.push_back(225.78);
-	  samples.push_back("qcdempt170_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt170_20162"))); //weights.push_back(151.61);
-	  samples.push_back("qcdempt300_20162"); weights.push_back(std::stof(callPythonAndGetOutput("qcdempt300_20162"))); //weights.push_back(16.46);
-	  samples.push_back("qcdmupt15_20162");  weights.push_back(std::stof(callPythonAndGetOutput("qcdmupt15_20162"))); //weights.push_back(456.73);
-	  samples.push_back("ttbar_20162"); weights.push_back(std::stof(callPythonAndGetOutput("ttbar_20162"))); //weights.push_back(0.16);
-	  samples.push_back("wjetstolnu_0j_20162"); weights.push_back(std::stof(callPythonAndGetOutput("wjetstolnu_0j_20162"))); //weights.push_back(5.60);
-	  samples.push_back("wjetstolnu_1j_20162"); weights.push_back(std::stof(callPythonAndGetOutput("wjetstolnu_1j_20162"))); //weights.push_back(0.89);
-	  samples.push_back("wjetstolnu_2j_20162"); weights.push_back(std::stof(callPythonAndGetOutput("wjetstolnu_2j_20162"))); //weights.push_back(0.66);
-	  samples.push_back("ww_20162"); weights.push_back(std::stof(callPythonAndGetOutput("ww_20162"))); //weights.push_back(0.08);
-	  samples.push_back("wz_20162"); weights.push_back(std::stof(callPythonAndGetOutput("wz_20162"))); //weights.push_back(0.06);
-	  samples.push_back("zz_20162"); weights.push_back(std::stof(callPythonAndGetOutput("zz_20162"))); //weights.push_back(0.18);
-	}
-      }
-
-      if (use_2017) {
-	if (use_signal) {
-	  //samples.push_back("WminusHToSSTodddd_tau100um_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau100um_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau300um_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau300um_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau1mm_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau1mm_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau3mm_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau3mm_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau10mm_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau10mm_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau30mm_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau30mm_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau100um_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau100um_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau300um_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau300um_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau1mm_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau1mm_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau3mm_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau3mm_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau10mm_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau10mm_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau30mm_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau30mm_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau100um_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau100um_M55_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau300um_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau300um_M55_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau1mm_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau1mm_M55_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau3mm_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau3mm_M55_2017"))); //weights.push_back(1);
-	  samples.push_back("WminusHToSSTodddd_tau10mm_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau10mm_M55_2017"))); //weights.push_back(1);
-	  //samples.push_back("WminusHToSSTodddd_tau30mm_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau30mm_M55_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau100um_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau100um_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau300um_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau300um_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau1mm_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau1mm_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau3mm_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau3mm_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau10mm_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau10mm_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau30mm_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau30mm_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau100um_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau100um_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau300um_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau300um_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau1mm_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau1mm_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau3mm_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau3mm_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau10mm_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau10mm_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau30mm_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau30mm_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau100um_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau100um_M55_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau300um_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau300um_M55_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau1mm_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau1mm_M55_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau3mm_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau3mm_M55_2017"))); //weights.push_back(1);
-	  samples.push_back("WplusHToSSTodddd_tau10mm_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau10mm_M55_2017"))); //weights.push_back(1);
-	  //samples.push_back("WplusHToSSTodddd_tau30mm_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau30mm_M55_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau100um_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau100um_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau300um_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau300um_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau1mm_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau1mm_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau3mm_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau3mm_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau10mm_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau10mm_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau30mm_M15_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau30mm_M15_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau100um_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau100um_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau300um_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau300um_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau1mm_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau1mm_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau3mm_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau3mm_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau10mm_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau10mm_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau30mm_M40_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau30mm_M40_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau100um_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau100um_M55_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau300um_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau300um_M55_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau1mm_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau1mm_M55_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau3mm_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau3mm_M55_2017"))); //weights.push_back(1);
-	  samples.push_back("ZHToSSTodddd_tau10mm_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau10mm_M55_2017"))); //weights.push_back(1);
-	  //samples.push_back("ZHToSSTodddd_tau30mm_M55_2017"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau30mm_M55_2017"))); //weights.push_back(1);
-	}
-	else {
-	  samples.push_back("dyjetstollM10_2017"); weights.push_back(std::stof(callPythonAndGetOutput("dyjetstollM10_2017")));//weights.push_back(15.45);
-          samples.push_back("dyjetstollM50_2017"); weights.push_back(std::stof(callPythonAndGetOutput("dyjetstollM50_2017")));//weights.push_back(2.18);
-	  samples.push_back("qcdbctoept015_2017"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept015_2017")));//weights.push_back(589.79);
-	  samples.push_back("qcdbctoept020_2017"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept020_2017")));//weights.push_back(1142.48);
-	  samples.push_back("qcdbctoept030_2017"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept030_2017")));//weights.push_back(1058.97);
-	  samples.push_back("qcdbctoept080_2017"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept080_2017")));//weights.push_back(101.06);
-	  samples.push_back("qcdbctoept170_2017"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept170_2017")));//weights.push_back(5.57);
-	  samples.push_back("qcdbctoept250_2017"); weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept250_2017")));//weights.push_back(1.47);
-	  samples.push_back("qcdempt020_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdempt020_2017")));//weights.push_back(14035.33);
-	  samples.push_back("qcdempt030_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdempt030_2017")));//weights.push_back(29803.79);
-	  samples.push_back("qcdempt050_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdempt050_2017")));//weights.push_back(7906.91);
-	  samples.push_back("qcdempt080_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdempt080_2017")));//weights.push_back(4664.42);
-	  samples.push_back("qcdempt120_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdempt120_2017")));//weights.push_back(300.25);
-	  samples.push_back("qcdempt170_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdempt170_2017")));//weights.push_back(183.50);
-	  samples.push_back("qcdempt300_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdempt300_2017")));//weights.push_back(20.24);
-	  samples.push_back("qcdpt15mupt5_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdpt15mupt5_2017")));//weights.push_back(18680.12);
-          samples.push_back("qcdpt20mupt5_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdpt20mupt5_2017")));//weights.push_back(1827.01);
-          samples.push_back("qcdpt30mupt5_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdpt30mupt5_2017")));//weights.push_back(1347.09);
-          samples.push_back("qcdpt50mupt5_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdpt50mupt5_2017")));//weights.push_back(412.17);
-          samples.push_back("qcdpt80mupt5_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdpt80mupt5_2017")));//weights.push_back(84.36);
-          samples.push_back("qcdpt120mupt5_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdpt120mupt5_2017")));//weights.push_back(33.29);
-          samples.push_back("qcdpt170mupt5_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdpt170mupt5_2017")));//weights.push_back(6.18);
-          samples.push_back("qcdpt300mupt5_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdpt300mupt5_2017")));//weights.push_back(0.43);
-          samples.push_back("qcdpt470mupt5_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdpt470mupt5_2017")));//weights.push_back(0.06);
-          samples.push_back("qcdpt600mupt5_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdpt600mupt5_2017")));//weights.push_back(0.02);
-          samples.push_back("qcdpt800mupt5_2017");    weights.push_back(std::stof(callPythonAndGetOutput("qcdpt800mupt5_2017")));//weights.push_back(0.00);
-          samples.push_back("qcdpt1000mupt5_2017");   weights.push_back(std::stof(callPythonAndGetOutput("qcdpt1000mupt5_2017")));//weights.push_back(0.00);
-	  samples.push_back("ttbar_2017");         weights.push_back(std::stof(callPythonAndGetOutput("ttbar_2017")));//weights.push_back(0.14);
-	  samples.push_back("wjetstolnu_0j_2017");    weights.push_back(std::stof(callPythonAndGetOutput("wjetstolnu_0j_2017")));//weights.push_back(12.65);
-	  samples.push_back("wjetstolnu_1j_2017");    weights.push_back(std::stof(callPythonAndGetOutput("wjetstolnu_1j_2017")));//weights.push_back(2.00);
-	  samples.push_back("wjetstolnu_2j_2017");    weights.push_back(std::stof(callPythonAndGetOutput("wjetstolnu_2j_2017")));//weights.push_back(1.41);
-	  samples.push_back("ww_2017");    weights.push_back(std::stof(callPythonAndGetOutput("ww_2017")));//weights.push_back(0.21);
-	  samples.push_back("wz_2017");    weights.push_back(std::stof(callPythonAndGetOutput("wz_2017")));//weights.push_back(0.16);
-	  samples.push_back("zz_2017");    weights.push_back(std::stof(callPythonAndGetOutput("zz_2017")));//weights.push_back(0.18);
-	}
-      }
-      if (use_2018) {
-	if (use_signal) {
-	  //samples.push_back("WminusHToSSTodddd_tau1mm_M40_2018"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau1mm_M40_2018")));
-	  //samples.push_back("WminusHToSSTodddd_tau10mm_M40_2018"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau10mm_M40_2018")));
-	  //samples.push_back("WplusHToSSTodddd_tau1mm_M40_2018"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau1mm_M40_2018")));
-	  //samples.push_back("WplusHToSSTodddd_tau10mm_M40_2018"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau10mm_M40_2018")));
-	  //samples.push_back("ZHToSSTodddd_tau1mm_M40_2018"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau1mm_M40_2018")));
-	  //samples.push_back("ZHToSSTodddd_tau10mm_M40_2018"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau10mm_M40_2018")));
-	  //samples.push_back("WminusHToSSTodddd_tau1mm_M55_2018"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau1mm_M55_2018")));
-	  samples.push_back("WminusHToSSTodddd_tau10mm_M55_2018"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau10mm_M55_2018")));
-	  //samples.push_back("WplusHToSSTodddd_tau1mm_M55_2018"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau1mm_M55_2018")));
-	  samples.push_back("WplusHToSSTodddd_tau10mm_M55_2018"); weights.push_back(std::stof(callPythonAndGetOutput("WplusHToSSTodddd_tau10mm_M55_2018")));
-	  //samples.push_back("ZHToSSTodddd_tau1mm_M55_2018"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau1mm_M55_2018")));
-	  samples.push_back("ZHToSSTodddd_tau10mm_M55_2018"); weights.push_back(std::stof(callPythonAndGetOutput("ZHToSSTodddd_tau10mm_M55_2018")));
-	}
-	else {
-	  samples.push_back("dyjetstollM10_2018");   weights.push_back(std::stof(callPythonAndGetOutput("dyjetstollM10_2018"))); //weights.push_back(11.84);
-          samples.push_back("dyjetstollM50_2018");   weights.push_back(std::stof(callPythonAndGetOutput("dyjetstollM50_2018"))); //weights.push_back(3.56);
-	  samples.push_back("qcdbctoept015_2018");   weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept015_2018"))); //weights.push_back(671.48);
-	  samples.push_back("qcdbctoept020_2018");   weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept020_2018"))); //weights.push_back(1709.18);
-	  samples.push_back("qcdbctoept030_2018");   weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept030_2018"))); //weights.push_back(1912.59);
-	  samples.push_back("qcdbctoept080_2018");   weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept080_2018"))); //weights.push_back(141.47);
-	  samples.push_back("qcdbctoept170_2018");   weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept170_2018"))); //weights.push_back(9.93);
-	  samples.push_back("qcdbctoept250_2018");   weights.push_back(std::stof(callPythonAndGetOutput("qcdbctoept250_2018"))); //weights.push_back(7.42);
-	  samples.push_back("qcdempt015_2018");      weights.push_back(std::stof(callPythonAndGetOutput("qcdempt015_2018"))); //weights.push_back(13836.45);
-	  samples.push_back("qcdempt020_2018");      weights.push_back(std::stof(callPythonAndGetOutput("qcdempt020_2018"))); //weights.push_back(20392.99);
-	  samples.push_back("qcdempt030_2018");      weights.push_back(std::stof(callPythonAndGetOutput("qcdempt030_2018"))); //weights.push_back(46444.82);
-	  samples.push_back("qcdempt050_2018");      weights.push_back(std::stof(callPythonAndGetOutput("qcdempt050_2018"))); //weights.push_back(11273.78);
-	  samples.push_back("qcdempt080_2018");      weights.push_back(std::stof(callPythonAndGetOutput("qcdempt080_2018"))); //weights.push_back(2316.50);
-	  samples.push_back("qcdempt120_2018");      weights.push_back(std::stof(callPythonAndGetOutput("qcdempt120_2018"))); //weights.push_back(410.66);
-	  samples.push_back("qcdempt170_2018");      weights.push_back(std::stof(callPythonAndGetOutput("qcdempt170_2018"))); //weights.push_back(267.03);
-	  samples.push_back("qcdempt300_2018");      weights.push_back(std::stof(callPythonAndGetOutput("qcdempt300_2018"))); //weights.push_back(29.73);
-	  samples.push_back("qcdmupt15_2018");   weights.push_back(std::stof(callPythonAndGetOutput("qcdmupt15_2018"))); //weights.push_back(1089.56);
-	  samples.push_back("ttbar_2018");           weights.push_back(std::stof(callPythonAndGetOutput("ttbar_2018"))); //weights.push_back(0.16);
-	  samples.push_back("wjetstolnu_0j_2018");   weights.push_back(std::stof(callPythonAndGetOutput("wjetstolnu_0j_2018"))); //weights.push_back(20.75);
-	  samples.push_back("wjetstolnu_1j_2018");   weights.push_back(std::stof(callPythonAndGetOutput("wjetstolnu_1j_2018"))); //weights.push_back(4.62);
-	  samples.push_back("wjetstolnu_2j_2018");   weights.push_back(std::stof(callPythonAndGetOutput("wjetstolnu_2j_2018"))); //weights.push_back(2.07);
-	  samples.push_back("ww_2018");              weights.push_back(std::stof(callPythonAndGetOutput("ww_2018"))); //weights.push_back(0.54);
-	  samples.push_back("wz_2018");              weights.push_back(std::stof(callPythonAndGetOutput("wz_2018"))); //weights.push_back(1.35);
-	  samples.push_back("zz_2018");              weights.push_back(std::stof(callPythonAndGetOutput("zz_2018"))); //weights.push_back(0.21);
-	}
-      }  
-    }
-    else {
-      if (p.only_20pc()) {
-	if (use_20161) {
-	  //samples.push_back("Lepton_data_20161_20pc");   weights.push_back(1);
-	  samples.push_back("SingleMuon20161B_20pc");    weights.push_back(1);
-	  samples.push_back("SingleMuon20161C_20pc");    weights.push_back(1);
-	  samples.push_back("SingleMuon20161D_20pc");    weights.push_back(1);
-	  samples.push_back("SingleMuon20161E_20pc");    weights.push_back(1);
-	  samples.push_back("SingleMuon20161F_20pc");    weights.push_back(1);
-	  samples.push_back("SingleElectron20161B_20pc");    weights.push_back(1);
-	  samples.push_back("SingleElectron20161C_20pc");    weights.push_back(1);
-	  samples.push_back("SingleElectron20161D_20pc");    weights.push_back(1);
-	  samples.push_back("SingleElectron20161E_20pc");    weights.push_back(1);
-	  samples.push_back("SingleElectron20161F_20pc");    weights.push_back(1);
-	}
-	if (use_20162) {
-	  //samples.push_back("Lepton_data_20162_20pc");   weights.push_back(1);
-	  samples.push_back("SingleMuon20162F_20pc");    weights.push_back(1);
-	  samples.push_back("SingleMuon20162G_20pc");    weights.push_back(1);
-	  samples.push_back("SingleMuon20162H_20pc");    weights.push_back(1);
-	  samples.push_back("SingleElectron20162F_20pc");    weights.push_back(1);
-	  samples.push_back("SingleElectron20162G_20pc");    weights.push_back(1);
-	  samples.push_back("SingleElectron20162H_20pc");    weights.push_back(1);
-	}
-	if (use_2017) {
-	  //samples.push_back("Lepton_data_2017_20pc");    weights.push_back(1);
-	  samples.push_back("SingleElectron2017B_20pc");    weights.push_back(1);
-	  samples.push_back("SingleElectron2017D_20pc");    weights.push_back(1);
-	  samples.push_back("SingleElectron2017F_20pc");    weights.push_back(1);
-	  samples.push_back("SingleMuon2017D_20pc");        weights.push_back(1);
-	  samples.push_back("SingleMuon2017F_20pc");        weights.push_back(1);
-	  samples.push_back("SingleElectron2017C_20pc");    weights.push_back(1);
-	  samples.push_back("SingleElectron2017E_20pc");    weights.push_back(1);
-	  samples.push_back("SingleMuon2017C_20pc");        weights.push_back(1);
-	  samples.push_back("SingleMuon2017E_20pc");        weights.push_back(1);
-	}
-	if (use_2018) {
-	  //samples.push_back("Lepton_data_2018_20pc");    weights.push_back(1);
-	  samples.push_back("SingleMuon2018A_20pc");    weights.push_back(1);
-	  samples.push_back("SingleMuon2018B_20pc");    weights.push_back(1);
-	  samples.push_back("SingleMuon2018C_20pc");    weights.push_back(1);
-	  samples.push_back("SingleMuon2018D_20pc");    weights.push_back(1);
-	  samples.push_back("EGamma2018A_20pc");    weights.push_back(1);
-	  samples.push_back("EGamma2018B_20pc");    weights.push_back(1);
-	  samples.push_back("EGamma2018C_20pc");    weights.push_back(1);
-	  samples.push_back("EGamma2018D_20pc");    weights.push_back(1);
-	}
-      }
-      else {
-	if (use_20161) {
-          //samples.push_back("Lepton_data_20161");   weights.push_back(1);
-          samples.push_back("SingleMuon20161B");    weights.push_back(1);
-          samples.push_back("SingleMuon20161C");    weights.push_back(1);
-          samples.push_back("SingleMuon20161D");    weights.push_back(1);
-          samples.push_back("SingleMuon20161E");    weights.push_back(1);
-          samples.push_back("SingleMuon20161F");    weights.push_back(1);
-          samples.push_back("SingleElectron20161B");    weights.push_back(1);
-          samples.push_back("SingleElectron20161C");    weights.push_back(1);
-          samples.push_back("SingleElectron20161D");    weights.push_back(1);
-          samples.push_back("SingleElectron20161E");    weights.push_back(1);
-          samples.push_back("SingleElectron20161F");    weights.push_back(1);
-        }
-	if (use_20162) {
-          //samples.push_back("Lepton_data_20162");   weights.push_back(1);
-          samples.push_back("SingleMuon20162F");    weights.push_back(1);
-          samples.push_back("SingleMuon20162G");    weights.push_back(1);
-          samples.push_back("SingleMuon20162H");    weights.push_back(1);
-          samples.push_back("SingleElectron20162F");    weights.push_back(1);
-          samples.push_back("SingleElectron20162G");    weights.push_back(1);
-          samples.push_back("SingleElectron20162H");    weights.push_back(1);
-        }
-	if (use_2017) {
-          //samples.push_back("Lepton_data_2017");    weights.push_back(1);
-          samples.push_back("SingleElectron2017B");    weights.push_back(1);
-          samples.push_back("SingleElectron2017D");    weights.push_back(1);
-          samples.push_back("SingleElectron2017F");    weights.push_back(1);
-          samples.push_back("SingleMuon2017D");        weights.push_back(1);
-          samples.push_back("SingleMuon2017F");        weights.push_back(1);
-          samples.push_back("SingleElectron2017C");    weights.push_back(1);
-          samples.push_back("SingleElectron2017E");    weights.push_back(1);
-          samples.push_back("SingleMuon2017C");        weights.push_back(1);
-          samples.push_back("SingleMuon2017E");        weights.push_back(1);
-        }
-	if (use_2018) {
-          //samples.push_back("Lepton_data_2018");    weights.push_back(1);
-          samples.push_back("SingleMuon2018A");    weights.push_back(1);
-          samples.push_back("SingleMuon2018B");    weights.push_back(1);
-          samples.push_back("SingleMuon2018C");    weights.push_back(1);
-          samples.push_back("SingleMuon2018D");    weights.push_back(1);
-          samples.push_back("EGamma2018A");    weights.push_back(1);
-          samples.push_back("EGamma2018B");    weights.push_back(1);
-          samples.push_back("EGamma2018C");    weights.push_back(1);
-          samples.push_back("EGamma2018D");    weights.push_back(1);
-        }
-      }
-    }
-
-  }
-  //end of adding sample weights to samples vector
-
-  //Only uses vertices with the number of tracks defined by ntracks by taking data from the appropriate MiniTree
-  const char* tree_path; int min_ntracks0 = 0; int max_ntracks0 = 1000000; int min_ntracks1 = 0; int max_ntracks1 = 1000000;
-  if (p.ntracks() == 3)      { tree_path = "mfvMiniTreeNtk3/t"; min_ntracks0 = 3; max_ntracks0 = 3; min_ntracks1 = 3; max_ntracks1 = 3; }
-  else if (p.ntracks() == 4) { tree_path = "mfvMiniTreeNtk4/t"; min_ntracks0 = 4; max_ntracks0 = 4; min_ntracks1 = 4; max_ntracks1 = 4; }
-  else if (p.ntracks() == 5) { tree_path = "mfvMiniTree/t"; min_ntracks0 = 5; max_ntracks0 = 5; min_ntracks1 = 5; max_ntracks1 = 5; }
-  else if (p.ntracks() == 7) { tree_path = "mfvMiniTreeNtk3or4/t"; min_ntracks0 = 4; max_ntracks0 = 4; min_ntracks1 = 3; max_ntracks1 = 3; }
-  else if (p.ntracks() == 8) { tree_path = "mfvMiniTreeNtk3or5/t"; min_ntracks0 = 5; max_ntracks0 = 5; min_ntracks1 = 3; max_ntracks1 = 3; }
-  else if (p.ntracks() == 9) { tree_path = "mfvMiniTreeNtk4or5/t"; min_ntracks0 = 5; max_ntracks0 = 5; min_ntracks1 = 4; max_ntracks1 = 4; }
-  else { fprintf(stderr, "bad ntracks"); exit(1); }
-
-  double dphi_pdf_c; double dphi_pdf_e = 2; double dphi_pdf_a; //deltaphi input
-  /*if (p.is_mc()) {
-    if      (p.year() == "20161")        { dphi_pdf_c = 1.22; dphi_pdf_a = 2.63; }
-    else if (p.year() == "20162")        { dphi_pdf_c = 1.22; dphi_pdf_a = 2.54; }
-    else if (p.year() == "20162")         { dphi_pdf_c = 1.22; dphi_pdf_a = 2.73; }
-    else if (p.year() == "2017")         { dphi_pdf_c = 1.24; dphi_pdf_a = 4.86; }
-    else if (p.year() == "2018")         { dphi_pdf_c = 1.38; dphi_pdf_a = 3.77; }
-    else if (p.year() == "2017p8" or p.year() == "run2")  { dphi_pdf_c = 1.23; dphi_pdf_a = 4.18; }
-    else { fprintf(stderr, "bad year"); exit(1); }
-  } else if (p.only_20pc()) {
-    if (p.year() == "2017")         { dphi_pdf_c = 1.34; dphi_pdf_a = 5.44; }
-    else if (p.year() == "2018")    { dphi_pdf_c = 1.25; dphi_pdf_a = 6.21; }
-    else if (p.year() == "2017p8")  { dphi_pdf_c = 1.30; dphi_pdf_a = 5.78; }
-    else if (p.year() == "2017B")   { dphi_pdf_c = 1.29; dphi_pdf_a = 4.84; }
-    else if (p.year() == "2017C")   { dphi_pdf_c = 1.29; dphi_pdf_a = 4.84; }
-    else if (p.year() == "2017D")   { dphi_pdf_c = 1.29; dphi_pdf_a = 4.84; }
-    else if (p.year() == "2017E")   { dphi_pdf_c = 1.29; dphi_pdf_a = 4.84; }
-    else if (p.year() == "2017F")   { dphi_pdf_c = 1.29; dphi_pdf_a = 4.84; }
-    else { fprintf(stderr, "bad year"); exit(1); }
-  } else {
-    if (p.year() == "2017")         { dphi_pdf_c = 1.31; dphi_pdf_a = 5.91; }
-    else if (p.year() == "2018")    { dphi_pdf_c = 1.30; dphi_pdf_a = 6.01; }
-    else if (p.year() == "2017p8")  { dphi_pdf_c = 1.31; dphi_pdf_a = 5.96; }
-    else { fprintf(stderr, "bad year"); exit(1); }
-  }*/
-
-  const char* vpeffs_version; //efficiency input
-  if (p.only_20pc()) {
-    vpeffs_version = "ULV11Bm";
-  } else {
-    vpeffs_version = "ULV11Bm";
-  }
-  //TString eff_file_name_2d = TString::Format("/afs/cern.ch/user/p/pekotamn/crabdirs/vpeffs%s_%s_%s%s.root", p.is_mc() ? "" : "_data", p.year().c_str(), vpeffs_version, p.vary_eff() ? "_ntkseeds" : "");
-  //TString eff_file_name_2d = TString::Format("/uscms/home/alecduqu/mfv_ScaleFactors/src/JMTucker/MFVNeutralino/test/One2Two/vpeffs%s_%s_%s%s.root", p.is_mc() ? "" : "_data", p.year().c_str(), vpeffs_version, p.vary_eff() ? "_ntkseeds" : "");
-  //TString eff_file_name_2d = TString::Format("./vpeffsd2d%s_%s_%s%s.root", p.is_mc() ? "" : "_data", p.year().c_str(), vpeffs_version, p.vary_eff() ? "_ntkseeds" : "");
-  //TString eff_file_name_3d = TString::Format("./vpeffs%s_%s_%s%s.root", p.is_mc() ? "" : "_data", p.year().c_str(), vpeffs_version, p.vary_eff() ? "_ntkseeds" : "");
-  //TString jet_angle_fname = TString::Format("background_lw_2017.root"); //This is not ultimately used anywhere
-
-  const char* eff_hist = "maxtk3";
-  if (p.vary_eff()) {
-    if (p.ntracks() == 3)      { eff_hist = "maxtk3"; }
-    else if (p.ntracks() == 4) { eff_hist = "maxtk4"; }
-    else if (p.ntracks() == 5) { eff_hist = "maxtk5"; }
-    else                       { eff_hist = "maxtk3"; }
-  }
-
-
-  gRandom->SetSeed(12191982);
-
-  //fill only-one-vertex dBV distribution
-  TH1D* h_1v_dbv = new TH1D("h_1v_dbv", "only-one-vertex events;d_{BV} (cm);events", 200, 0, 2.0); //was 1250, 0, 2.5
-  TH1D* h_1v_dbv_npult20 = new TH1D("h_1v_dbv_npult20", "only-one-vertex events;d_{BV} (cm);events", 200, 0, 2.0);
-  TH1D* h_1v_dbv_npugt20lt30 = new TH1D("h_1v_dbv_npugt20lt30", "only-one-vertex events;d_{BV} (cm);events", 200, 0, 2.0);
-  TH1D* h_1v_dbv_npugt30lt40 = new TH1D("h_1v_dbv_npugt30lt40", "only-one-vertex events;d_{BV} (cm);events", 200, 0, 2.0);
-  TH1D* h_1v_dbv_npugt40 = new TH1D("h_1v_dbv_npugt40", "only-one-vertex events;d_{BV} (cm);events", 200, 0, 2.0);
-  TH1D* h_1v_bs2derr = new TH1D("h_1v_bs2derr", "#sigma(dist2d(SV, beamspot)) (cm)", 100, 0, 0.005); //Alec added
-  TH1D* h_1v_rescale_bs2derr = new TH1D("h_1v_rescale_bs2derr", "rescaled #sigma(dist2d(SV, beamspot)) (cm)", 100, 0, 0.005); //Alec added
-  TH1D* h_1v_w = new TH1D("h_1v__w", ";event weight;events", 100, 0, 10); //Alec added
-  TH2D* h_1v_xy  = new TH2D("h_1v_xy", "only-one-vertex events;x0 (cm);y0 (cm)", 250, -1.0, 1.0, 250, -1.0, 1.0);
-  TH1D* h_1v_z = new TH1D("h_1v_z", ";z (cm);events", 250, -1, 1); //Alec added
-  TH1D* h_1v_dz = new TH1D("h_1v_dz", "only-one-vertex events;z distance from pv to sv (cm);events", 1000, -10, 10); //Alec added
-  TH1F* h_1v_dpvsv = new TH1F("h_1v_dpvsv", "only-one-vertex events;3D distance from pv to sv (cm);events", 500, 0, 10); //Alec added 
-  TH1D* h_1v_dbv0 = new TH1D("h_1v_dbv0", "only-one-vertex events;d_{BV}^{0} (cm);events", 1000, 0, 2.0);
-  TH1D* h_1v_dbv1 = new TH1D("h_1v_dbv1", "only-one-vertex events;d_{BV}^{1} (cm);events", 1000, 0, 2.0);
-  TH2D* h_1v_dbv_dz = new TH2D("h_1v_dbv_dz", "only-one-vertex events;d_{BV} (cm); d_{z} (cm)", 1000, 0, 2.0, 1000, 0, 2.0);
-  TH2D* h_1v_dbv_bs2derr = new TH2D("h_1v_dbv_bs2derr", "only-one-vertex events;d_{BV} (cm); #sigma(dist2d(SV, beamspot)) (cm)", 1000, 0, 2.0, 100, 0, 0.005); //Alec added
-  TH1F* h_1v_phiv = new TH1F("h_1v_phiv", "only-one-vertex events;vertex #phi;events", 50, -3.15, 3.15);
-  TH1D* h_1v_npu = new TH1D("h_1v_npu", "only-one-vertex events;# PU interactions;events", 100, 0, 100);
-  TH1D* h_1v_npv = new TH1D("h_1v_npv", "only-one-vertex events;# reconstructed pv;events", 100, 0, 100);
-  TH1F* h_1v_njets = new TH1F("h_1v_njets", "only-one-vertex events;number of jets;events", 20, 0, 20);
-  TH1F* h_1v_ht40 = new TH1F("h_1v_ht40", "only-one-vertex events;H_{T} of jets with p_{T} > 40 GeV;events", 200, 0, 5000);
-  TH1F* h_1v_phij = new TH1F("h_1v_phij", "only-one-vertex events;jets #phi;jets", 50, -3.15, 3.15);
-  TH1F* h_1v_dphijj = new TH1F("h_1v_dphijj", "only-one-vertex events;#Delta#phi_{JJ};jet pairs", 100, -3.1416, 3.1416);
-  TH1F* h_1v_dphijv = new TH1F("h_1v_dphijv", "only-one-vertex events;#Delta#phi_{JV};jet-vertex pairs", 100, -3.1416, 3.1416);
-  TH1F* h_1v_dphijvpt = new TH1F("h_1v_dphijvpt", "only-one-vertex events;p_{T}-weighted #Delta#phi_{JV};jet-vertex pairs", 100, -3.1416, 3.1416);
-  TH1F* h_1v_dphijvmin = new TH1F("h_1v_dphijvmin", "only-one-vertex events;#Delta#phi_{JV}^{min};events", 50, 0, 3.1416);
-  TH1F* h_1v_costh2_onlytks0 = new TH1F("h_1v_costh2_onlytks0", "only-one-vertex events;cos(angle2{flight,momentum}) (only tracks, no jets);events", 302, -1.001, 1.001); //Alec added
-  TH1F* h_1v_costh20 = new TH1F("h_1v_costh20", "only-one-vertex events;cos(angle2{flight,momentum});events", 302, -1.001, 1.001); //Alec added, we don't want bins wider than 0.0075 due to granularity
-  TH1F* h_2v_dbv = new TH1F("h_2v_dbv", "two-vertex events;d_{BV} (cm);vertices", 1250, 0, 2.5);
-  TH2F* h_2v_dbv1_dbv0 = new TH2F("h_2v_dbv1_dbv0", "two-vertex events;d_{BV}^{0} (cm);d_{BV}^{1} (cm)", 1250, 0, 2.5, 1250, 0, 2.5);
-  TH1F* h_2v_dvv = new TH1F("h_2v_dvv", "two-vertex events;d_{VV} (cm);events", dvv_nbins, 0, dvv_nbins * dvv_bin_width);
-  TH1F* h_2v_dvv3D = new TH1F("h_2v_dvv3D", "two-vertex events;3D d_{VV} (cm);events", dvv_nbins, 0, dvv_nbins * dvv_bin_width);
-  TH1F* h_2v_sumdbv = new TH1F("h_2v_sumdbv", "two-vertex events; #Sigma(d_{BV})  (cm);events", 200, 0., 4.0); //was 100, 0, 4.0
-  TH1F* h_2v_dphivv = new TH1F("h_2v_dphivv", "two-vertex events;#Delta#phi_{VV};events", 10, -3.15, 3.15);
-  TH1F* h_2v_absdphivv = new TH1F("h_2v_absdphivv", "two-vertex events;|#Delta#phi_{VV}|;events", 5, 0, 3.15);
-  TH1D* h_2v_npu = new TH1D("h_2v_npu", "two-vertex events;# PU interactions;events", 100, 0, 100);
-  TH1D* h_2v_npv = new TH1D("h_2v_npv", "two-vertex events;# reconstructed pv;events", 100, 0, 100);
-  
-  std::vector<double>  dbv_value_vector; //background template construction npu correction: define vectors for making a list of dbv values and errors
-  std::vector<double> x_value_vector;
-  std::vector<double> y_value_vector;
-  std::vector<double> z_value_vector;
-  //std::vector<double>  dbv_value_vector_npult20;
-  //std::vector<double>  dbv_value_vector_npugt20lt30;
-  //std::vector<double>  dbv_value_vector_npugt30lt40;
-  //std::vector<double>  dbv_value_vector_npugt40;
-  std::vector<double>  dbv_weight_vector;
-  //std::vector<double>  dbv_weight_vector_npult20;
-  //std::vector<double>  dbv_weight_vector_npugt20lt30;
-  //std::vector<double>  dbv_weight_vector_npugt30lt40;
-  //std::vector<double>  dbv_weight_vector_npugt40;
-  std::vector<int>  dbv_npubinid_vector;
-
-  std::vector<double>  dbv_value_vector_btag_npult20;
-  std::vector<double>  dbv_value_vector_btag_npugt20lt30;
-  std::vector<double>  dbv_value_vector_btag_npugt30lt40;
-  std::vector<double>  dbv_value_vector_btag_npugt40;
-  std::vector<double>  dbv_value_vector_nobtag_npult20;
-  std::vector<double>  dbv_value_vector_nobtag_npugt20lt30;
-  std::vector<double>  dbv_value_vector_nobtag_npugt30lt40;
-  std::vector<double>  dbv_value_vector_nobtag_npugt40;
-  std::vector<double>  dbv_value_vector_btag_npult20_5trk;
-  std::vector<double>  dbv_value_vector_btag_npugt20lt30_5trk;
-  std::vector<double>  dbv_value_vector_btag_npugt30lt40_5trk;
-  std::vector<double>  dbv_value_vector_btag_npugt40_5trk;
-  std::vector<double>  dbv_value_vector_nobtag_npult20_5trk;
-  std::vector<double>  dbv_value_vector_nobtag_npugt20lt30_5trk;
-  std::vector<double>  dbv_value_vector_nobtag_npugt30lt40_5trk;
-  std::vector<double>  dbv_value_vector_nobtag_npugt40_5trk;
-
-
-  std::vector<double>  x_value_vector_btag_npult20;
-  std::vector<double>  x_value_vector_btag_npugt20lt30;
-  std::vector<double>  x_value_vector_btag_npugt30lt40;
-  std::vector<double>  x_value_vector_btag_npugt40;
-  std::vector<double>  x_value_vector_nobtag_npult20;
-  std::vector<double>  x_value_vector_nobtag_npugt20lt30;
-  std::vector<double>  x_value_vector_nobtag_npugt30lt40;
-  std::vector<double>  x_value_vector_nobtag_npugt40;
-  std::vector<double>  x_value_vector_btag_npult20_5trk;
-  std::vector<double>  x_value_vector_btag_npugt20lt30_5trk;
-  std::vector<double>  x_value_vector_btag_npugt30lt40_5trk;
-  std::vector<double>  x_value_vector_btag_npugt40_5trk;
-  std::vector<double>  x_value_vector_nobtag_npult20_5trk;
-  std::vector<double>  x_value_vector_nobtag_npugt20lt30_5trk;
-  std::vector<double>  x_value_vector_nobtag_npugt30lt40_5trk;
-  std::vector<double>  x_value_vector_nobtag_npugt40_5trk;
-  
-  std::vector<double>  y_value_vector_btag_npult20;
-  std::vector<double>  y_value_vector_btag_npugt20lt30;
-  std::vector<double>  y_value_vector_btag_npugt30lt40;
-  std::vector<double>  y_value_vector_btag_npugt40;
-  std::vector<double>  y_value_vector_nobtag_npult20;
-  std::vector<double>  y_value_vector_nobtag_npugt20lt30;
-  std::vector<double>  y_value_vector_nobtag_npugt30lt40;
-  std::vector<double>  y_value_vector_nobtag_npugt40;
-  std::vector<double>  y_value_vector_btag_npult20_5trk;
-  std::vector<double>  y_value_vector_btag_npugt20lt30_5trk;
-  std::vector<double>  y_value_vector_btag_npugt30lt40_5trk;
-  std::vector<double>  y_value_vector_btag_npugt40_5trk;
-  std::vector<double>  y_value_vector_nobtag_npult20_5trk;
-  std::vector<double>  y_value_vector_nobtag_npugt20lt30_5trk;
-  std::vector<double>  y_value_vector_nobtag_npugt30lt40_5trk;
-  std::vector<double>  y_value_vector_nobtag_npugt40_5trk;
-  
-  std::vector<double>  z_value_vector_btag_npult20;
-  std::vector<double>  z_value_vector_btag_npugt20lt30;
-  std::vector<double>  z_value_vector_btag_npugt30lt40;
-  std::vector<double>  z_value_vector_btag_npugt40;
-  std::vector<double>  z_value_vector_nobtag_npult20;
-  std::vector<double>  z_value_vector_nobtag_npugt20lt30;
-  std::vector<double>  z_value_vector_nobtag_npugt30lt40;
-  std::vector<double>  z_value_vector_nobtag_npugt40;
-  std::vector<double>  z_value_vector_btag_npult20_5trk;
-  std::vector<double>  z_value_vector_btag_npugt20lt30_5trk;
-  std::vector<double>  z_value_vector_btag_npugt30lt40_5trk;
-  std::vector<double>  z_value_vector_btag_npugt40_5trk;
-  std::vector<double>  z_value_vector_nobtag_npult20_5trk;
-  std::vector<double>  z_value_vector_nobtag_npugt20lt30_5trk;
-  std::vector<double>  z_value_vector_nobtag_npugt30lt40_5trk;
-  std::vector<double>  z_value_vector_nobtag_npugt40_5trk;
-
-  std::vector<double>  dbv_weight_vector_btag_npult20;
-  std::vector<double>  dbv_weight_vector_btag_npugt20lt30;
-  std::vector<double>  dbv_weight_vector_btag_npugt30lt40;
-  std::vector<double>  dbv_weight_vector_btag_npugt40;
-  std::vector<double>  dbv_weight_vector_nobtag_npult20;
-  std::vector<double>  dbv_weight_vector_nobtag_npugt20lt30;
-  std::vector<double>  dbv_weight_vector_nobtag_npugt30lt40;
-  std::vector<double>  dbv_weight_vector_nobtag_npugt40;
-  std::vector<double>  dbv_weight_vector_btag_npult20_5trk;
-  std::vector<double>  dbv_weight_vector_btag_npugt20lt30_5trk;
-  std::vector<double>  dbv_weight_vector_btag_npugt30lt40_5trk;
-  std::vector<double>  dbv_weight_vector_btag_npugt40_5trk;
-  std::vector<double>  dbv_weight_vector_nobtag_npult20_5trk;
-  std::vector<double>  dbv_weight_vector_nobtag_npugt20lt30_5trk;
-  std::vector<double>  dbv_weight_vector_nobtag_npugt30lt40_5trk;
-  std::vector<double>  dbv_weight_vector_nobtag_npugt40_5trk;
-
-  std::vector<double> bsx_vector;
-  std::vector<double> bsx_vector_btag_npult20;
-  std::vector<double> bsx_vector_btag_npugt20lt30;
-  std::vector<double> bsx_vector_btag_npugt30lt40;
-  std::vector<double> bsx_vector_btag_npugt40;
-  std::vector<double> bsx_vector_nobtag_npult20;
-  std::vector<double> bsx_vector_nobtag_npugt20lt30;
-  std::vector<double> bsx_vector_nobtag_npugt30lt40;
-  std::vector<double> bsx_vector_nobtag_npugt40;
-  std::vector<double> bsx_vector_btag_npult20_5trk;
-  std::vector<double> bsx_vector_btag_npugt20lt30_5trk;
-  std::vector<double> bsx_vector_btag_npugt30lt40_5trk;
-  std::vector<double> bsx_vector_btag_npugt40_5trk;
-  std::vector<double> bsx_vector_nobtag_npult20_5trk;
-  std::vector<double> bsx_vector_nobtag_npugt20lt30_5trk;
-  std::vector<double> bsx_vector_nobtag_npugt30lt40_5trk;
-  std::vector<double> bsx_vector_nobtag_npugt40_5trk;
-  
-  std::vector<double> bsy_vector;
-  std::vector<double> bsy_vector_btag_npult20;
-  std::vector<double> bsy_vector_btag_npugt20lt30;
-  std::vector<double> bsy_vector_btag_npugt30lt40;
-  std::vector<double> bsy_vector_btag_npugt40;
-  std::vector<double> bsy_vector_nobtag_npult20;
-  std::vector<double> bsy_vector_nobtag_npugt20lt30;
-  std::vector<double> bsy_vector_nobtag_npugt30lt40;
-  std::vector<double> bsy_vector_nobtag_npugt40;
-  std::vector<double> bsy_vector_btag_npult20_5trk;
-  std::vector<double> bsy_vector_btag_npugt20lt30_5trk;
-  std::vector<double> bsy_vector_btag_npugt30lt40_5trk;
-  std::vector<double> bsy_vector_btag_npugt40_5trk;
-  std::vector<double> bsy_vector_nobtag_npult20_5trk;
-  std::vector<double> bsy_vector_nobtag_npugt20lt30_5trk;
-  std::vector<double> bsy_vector_nobtag_npugt30lt40_5trk;
-  std::vector<double> bsy_vector_nobtag_npugt40_5trk;
-  
-  std::vector<double> bsz_vector;
-  std::vector<double> bsz_vector_btag_npult20;
-  std::vector<double> bsz_vector_btag_npugt20lt30;
-  std::vector<double> bsz_vector_btag_npugt30lt40;
-  std::vector<double> bsz_vector_btag_npugt40;
-  std::vector<double> bsz_vector_nobtag_npult20;
-  std::vector<double> bsz_vector_nobtag_npugt20lt30;
-  std::vector<double> bsz_vector_nobtag_npugt30lt40;
-  std::vector<double> bsz_vector_nobtag_npugt40;
-  std::vector<double> bsz_vector_btag_npult20_5trk;
-  std::vector<double> bsz_vector_btag_npugt20lt30_5trk;
-  std::vector<double> bsz_vector_btag_npugt30lt40_5trk;
-  std::vector<double> bsz_vector_btag_npugt40_5trk;
-  std::vector<double> bsz_vector_nobtag_npult20_5trk;
-  std::vector<double> bsz_vector_nobtag_npugt20lt30_5trk;
-  std::vector<double> bsz_vector_nobtag_npugt30lt40_5trk;
-  std::vector<double> bsz_vector_nobtag_npugt40_5trk;
-
-  std::vector<double> pvx_vector;
-  std::vector<double> pvx_vector_btag_npult20;
-  std::vector<double> pvx_vector_btag_npugt20lt30;
-  std::vector<double> pvx_vector_btag_npugt30lt40;
-  std::vector<double> pvx_vector_btag_npugt40;
-  std::vector<double> pvx_vector_nobtag_npult20;
-  std::vector<double> pvx_vector_nobtag_npugt20lt30;
-  std::vector<double> pvx_vector_nobtag_npugt30lt40;
-  std::vector<double> pvx_vector_nobtag_npugt40;
-  std::vector<double> pvx_vector_btag_npult20_5trk;
-  std::vector<double> pvx_vector_btag_npugt20lt30_5trk;
-  std::vector<double> pvx_vector_btag_npugt30lt40_5trk;
-  std::vector<double> pvx_vector_btag_npugt40_5trk;
-  std::vector<double> pvx_vector_nobtag_npult20_5trk;
-  std::vector<double> pvx_vector_nobtag_npugt20lt30_5trk;
-  std::vector<double> pvx_vector_nobtag_npugt30lt40_5trk;
-  std::vector<double> pvx_vector_nobtag_npugt40_5trk;
-  
-  std::vector<double> pvy_vector;
-  std::vector<double> pvy_vector_btag_npult20;
-  std::vector<double> pvy_vector_btag_npugt20lt30;
-  std::vector<double> pvy_vector_btag_npugt30lt40;
-  std::vector<double> pvy_vector_btag_npugt40;
-  std::vector<double> pvy_vector_nobtag_npult20;
-  std::vector<double> pvy_vector_nobtag_npugt20lt30;
-  std::vector<double> pvy_vector_nobtag_npugt30lt40;
-  std::vector<double> pvy_vector_nobtag_npugt40;
-  std::vector<double> pvy_vector_btag_npult20_5trk;
-  std::vector<double> pvy_vector_btag_npugt20lt30_5trk;
-  std::vector<double> pvy_vector_btag_npugt30lt40_5trk;
-  std::vector<double> pvy_vector_btag_npugt40_5trk;
-  std::vector<double> pvy_vector_nobtag_npult20_5trk;
-  std::vector<double> pvy_vector_nobtag_npugt20lt30_5trk;
-  std::vector<double> pvy_vector_nobtag_npugt30lt40_5trk;
-  std::vector<double> pvy_vector_nobtag_npugt40_5trk;
-
-  std::vector<double> pvz_vector;
-  std::vector<double> pvz_vector_btag_npult20;
-  std::vector<double> pvz_vector_btag_npugt20lt30;
-  std::vector<double> pvz_vector_btag_npugt30lt40;
-  std::vector<double> pvz_vector_btag_npugt40;
-  std::vector<double> pvz_vector_nobtag_npult20;
-  std::vector<double> pvz_vector_nobtag_npugt20lt30;
-  std::vector<double> pvz_vector_nobtag_npugt30lt40;
-  std::vector<double> pvz_vector_nobtag_npugt40;
-  std::vector<double> pvz_vector_btag_npult20_5trk;
-  std::vector<double> pvz_vector_btag_npugt20lt30_5trk;
-  std::vector<double> pvz_vector_btag_npugt30lt40_5trk;
-  std::vector<double> pvz_vector_btag_npugt40_5trk;
-  std::vector<double> pvz_vector_nobtag_npult20_5trk;
-  std::vector<double> pvz_vector_nobtag_npugt20lt30_5trk;
-  std::vector<double> pvz_vector_nobtag_npugt30lt40_5trk;
-  std::vector<double> pvz_vector_nobtag_npugt40_5trk;
-  
-  std::vector<std::vector<reco::TransientTrack>> vertex_tracks_vector;
-  std::vector<std::vector<reco::TransientTrack>> vertex_tracks_vector_btag_npult20;
-  std::vector<std::vector<reco::TransientTrack>> vertex_tracks_vector_btag_npugt20lt30;
-  std::vector<std::vector<reco::TransientTrack>> vertex_tracks_vector_btag_npugt30lt40;
-  std::vector<std::vector<reco::TransientTrack>> vertex_tracks_vector_btag_npugt40;
-  std::vector<std::vector<reco::TransientTrack>> vertex_tracks_vector_nobtag_npult20;
-  std::vector<std::vector<reco::TransientTrack>> vertex_tracks_vector_nobtag_npugt20lt30;
-  std::vector<std::vector<reco::TransientTrack>> vertex_tracks_vector_nobtag_npugt30lt40;
-  std::vector<std::vector<reco::TransientTrack>> vertex_tracks_vector_nobtag_npugt40;
-  
-  std::vector<reco::TrackCollection> vertex_track_collection_vector;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_btag_npult20;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_btag_npugt20lt30;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_btag_npugt30lt40;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_btag_npugt40;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_nobtag_npult20;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_nobtag_npugt20lt30;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_nobtag_npugt30lt40;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_nobtag_npugt40;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_btag_npult20_5trk;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_btag_npugt20lt30_5trk;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_btag_npugt30lt40_5trk;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_btag_npugt40_5trk;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_nobtag_npult20_5trk;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_nobtag_npugt20lt30_5trk;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_nobtag_npugt30lt40_5trk;
-  std::vector<reco::TrackCollection> vertex_track_collection_vector_nobtag_npugt40_5trk;
-
-  //std::vector<double> bsx_vector;
-  //std::vector<double> bsy_vector;
-  //std::vector<double> bsz_vector;
-  //std::vector<std::vector<reco::TransientTrack>> vertex_tracks_vector;
-  //std::vector<reco::TrackCollection> vertex_track_collection_vector;
-
-  std::vector<std::vector<reco::TransientTrack>> reco_vertices;
-  std::vector<int> reco_vertices_ntk;
-  double bssigma_x = 0.00000005; //FIX THESE LATER WHEN THESE VALUES ARE ADDED TO MINITREES
-  double bssigma_y = 0.00000005;
-  double bssigma_z = 0.000005;
-
-  //new implementation signal contamination IN PROGRESS
-  if (signal_contamination) {
-    //TString ntracks_string = std::to_string(p.ntracks());
-    //TString contam_dir = "./ULV30BvetoLHTm_neuM400cT10mm_signonneg_p005bs2derrcut_run2/2v_from_jets_run2_"+ntracks_string+"track_default_ULV30BvetoLHTm.root";
-    std::cout << "SIGNAL CONTAMINATION APPLIED!" << std::endl;
-    //std::string sample_contaminant = "WminusHToSSTodddd_tau10mm_M55_2018";
-    samples.push_back("WminusHToSSTodddd_tau10mm_M55_2018"); weights.push_back(std::stof(callPythonAndGetOutput("WminusHToSSTodddd_tau10mm_M55_2018")));
-    std::cout << "Contaminating this background with signal from: WminusHToSSTodddd_tau10mm_M55_2018" << std::endl;
-
-    //MIGHT HAVE TO FIX THE HOW THE SIGNAL CONTAMINANT IS CALLED FROM A MINITREE DIRECTORY SINCE IT IS MC AND BACKGROUND TEMPLATE IS DATA
-  }
-
-  //loops over each sample defined above 
-  int ns = (int)samples.size();
-  for (int i = 0; i < ns; ++i) {
-    mfv::MiniNtuple nt;
-    TString iteration_sample_name = samples[i];
-    double sig_contam_scale = 1;
-    //setting signal contamination sample and BR
-    if (iteration_sample_name.Contains("tau") and signal_contamination) {
-      sig_contam_scale = 0.01;
-      std::cout << "SIGNAL CONTAMINATION APPLIED!" << std::endl;
-      std::cout << "Contaminating this background with signal from: WminusHToSSTodddd_tau10mm_M55_2018" << std::endl;
-      
-    }
-    TString fn;
-    if (iteration_sample_name.Contains("20161")) {fn = TString::Format("%s/%s.root", file_path_20161, samples[i]);}
-    if (iteration_sample_name.Contains("20162")) {fn = TString::Format("%s/%s.root", file_path_20162, samples[i]);}
-    if (iteration_sample_name.Contains("2017")) {fn = TString::Format("%s/%s.root", file_path_2017, samples[i]);}
-    if (iteration_sample_name.Contains("2018")) {fn = TString::Format("%s/%s.root", file_path_2018, samples[i]);}
-    //TString fn = TString::Format("%s/%s.root", file_path, samples[i]);
-    std::cout << fn.Data() << "\n";
-    TFile* f = TFile::Open(fn);
-    if (!f || !f->IsOpen()) { fprintf(stderr, "bad file"); exit(1); }
-
-    //std::cout << tree_path << std::endl;
-    //TTree* t = (TTree*)f->Get(tree_path);
-    //if (!t) { fprintf(stderr, "bad tree"); exit(1); }
-    TTree* t;
-    if (use_alltrkmultiplicities) {
-      std::cout << std::to_string(p.ntracks()) << std::endl;
-      TChain* chain = new TChain("t");
-      TString t3trk_file_path = fn + "/" + "mfvMiniTreeNtk3/t";
-      TString t4trk_file_path = fn + "/" + "mfvMiniTreeNtk4/t";
-      TString t5trk_file_path = fn + "/" + "mfvMiniTree/t";
-      TString t3or4exacttrk_file_path = fn + "/" + "mfvMiniTreeNtk3or4exact/t";
-      TString t3or5exacttrk_file_path = fn + "/" + "mfvMiniTreeNtk3or5exact/t";
-      TString t4or5exacttrk_file_path = fn + "/" + "mfvMiniTreeNtk4or5exact/t";
-      //fill histograms only if the trk multiplicity category could be misreconstructed in selected category
-      if (p.ntracks() != 5) {chain->Add(t3trk_file_path); std::cout << "mfvMiniTreeNtk3/t" << std::endl;}
-      chain->Add(t4trk_file_path); std::cout << "mfvMiniTreeNtk4/t" << std::endl;
-      chain->Add(t5trk_file_path); std::cout << "mfvMiniTree/t" << std::endl;
-      if (p.ntracks() == 7) {
-	chain->Add(t3or4exacttrk_file_path); std::cout << "mfvMiniTreeNtk3or4exact/t" << std::endl;
-      }
-      if (p.ntracks() == 8) {
-	chain->Add(t3or5exacttrk_file_path); std::cout << "mfvMiniTreeNtk3or5exact/t" << std::endl;
-      }
-      if (p.ntracks() == 9) {
-	chain->Add(t4or5exacttrk_file_path); std::cout << "mfvMiniTreeNtk4or5exact/t" << std::endl;
-      }
-      t = chain;
-      mfv::read_from_tree(t, nt);
-    }
-    else {
-      std::cout << tree_path << std::endl;   
-      t = (TTree*)f->Get(tree_path);
-      if (!t) { fprintf(stderr, "bad tree"); exit(1); }
-      mfv::read_from_tree(t, nt);
-    }
-
-
-    // Tight WP of DeepJet
-    float bdisc_cut_value = 0;
-
-    std::string st_name = samples[i];
-
-    // 20161 must come before 2016 in these conditionals, values from BTagging.cc
-    if (st_name.find("20161") != std::string::npos) {
-      //bdisc_cut_value = 0.0508; //loose
-      //bdisc_cut_value = 0.2598; //medium
-      bdisc_cut_value = 0.6502; //tight, originally used
-    } 
-    else if (st_name.find("20162") != std::string::npos) {
-      //bdisc_cut_value = 0.0480; //loose
-      //bdisc_cut_value = 0.2489;
-      bdisc_cut_value = 0.6377; //tight, originally used
-    } 
-    else if (st_name.find("2017") != std::string::npos) {
-      //bdisc_cut_value = 0.0532; //loose
-      //bdisc_cut_value = 0.3040;
-      bdisc_cut_value = 0.7476; //tight, originally used
-    } 
-    else if (st_name.find("2018") != std::string::npos) {
-      //bdisc_cut_value = 0.0490; //loose
-      //bdisc_cut_value = 0.2783;
-      bdisc_cut_value = 0.7100; //tight, originally used
-    } 
-    //std::cout << "b discrimination value: " << bdisc_cut_value << std::endl;
-    //mfv::read_from_tree(t, nt);
-    for (int j = 0, je = t->GetEntries(); j < je; ++j) {
-      if (t->LoadTree(j) < 0) break;
-      if (t->GetEntry(j) <= 0) continue;
-      //if (nt.rescale_bs2derr0 > 0.0035) continue; //Alec added, bs2derr cut normally .005cm in MFVNeutralino/python/VertexSelector_cfi.py, but we can further constrain here
-      //if (nt.rescale_bs2derr1 > 0.0035) continue; //Alec added
-      if ((p.bquarks() == 0 && nt.gen_flavor_code == 2) || (p.bquarks() == 1 && nt.gen_flavor_code != 2)) continue;
-      //if ((p.btags() == 0 && nt.nbtags(bdisc_cut_value,-1) >= 1) || (p.btags() == 1 && nt.nbtags(bdisc_cut_value,-1) < 1)) continue; //nbtags calls CSV we want DeepJet, see MiniNtuple.h
-      if ((p.btags() == 0 && nt.nbtags_old(bdisc_cut_value,-1) >= 1) || (p.btags() == 1 && nt.nbtags_old(bdisc_cut_value,-1) < 1)) continue; //nbtags_old correctly calls DeepJet, this has been fixed in most recent UL_Lepton!!!!!!!!!!!!!!!!
-      if (nt.npu < p.min_npu() || nt.npu > p.max_npu()) continue;
-      const float w = weights[i] * nt.weight * sig_contam_scale; //THIS IS WHERE THE WEIGHTS ARE APPLIED, sig_contam_scale = 1 unless contam turned on and sample is a MC signal
-
-      double v0_track_sumpt = 0; //start of sumpt & m5 variables for cuts
-      double v1_track_sumpt = 0;
-      //double v0_track_sump = 0;
-      double v0_track_sumpx = 0;
-      double v0_track_sumpy = 0;
-      double v0_track_sumpz = 0;
-      double v0_track_sumE = 0;
-      double v0_track_m5 = 0;
-      //double v1_track_sump = 0;
-      double v1_track_sumpx = 0;
-      double v1_track_sumpy = 0;
-      double v1_track_sumpz = 0;
-      double v1_track_sumE = 0;
-      double v1_track_m5 = 0; //end of sumpt & m5 variable for cuts
-      if (nt.nvtx == 1) {
-	//std::cout << "1-vertex event" << std::endl;
-	//start of sumpt & m5 cut
-
-	//std::cout << "before initializing reco variables" << std::endl;
-	std::vector<reco::TransientTrack> seed_tracks;
-	//std::map<reco::TrackRef, size_t> seed_track_ref_map;
-	std::vector<reco::TrackRef> track_refs;
-	reco::TrackCollection track_collection;
-	reco::Track reco_track;
-	reco::TrackBase::Point referencePoint; //track's closest point of approach to the center of CMS
-	math::XYZVector track_p_vector;
-	GlobalVector constantField(0.0, 0.0, 3.8);
-	UniformMagneticField uniformField(constantField);
-	const MagneticField* B_field = &uniformField;
-	for (int k = 0; k < nt.ntk0; ++k) {
-	  //std::cout << "beginning of loop for sumpt & m5 cut, " << nt.tk0_px[1] << std::endl;
-	  v0_track_sumpt += sqrt(nt.p_tk0_px->at(k)*nt.p_tk0_px->at(k) + nt.p_tk0_py->at(k)*nt.p_tk0_py->at(k));
-	  //std::cout << "added track pt to sumpt" << std::endl;
-	  //v0_track_sump += sqrt(nt.p_tk0_px->at(k)*nt.p_tk0_px->at(k) + nt.p_tk0_py->at(k)*nt.p_tk0_py->at(k) + nt.p_tk0_pz->at(k)*nt.p_tk0_pz->at(k));
-	  v0_track_sumpx += nt.p_tk0_px->at(k);
-	  v0_track_sumpy += nt.p_tk0_py->at(k);
-	  v0_track_sumpz += nt.p_tk0_pz->at(k);
-	  v0_track_sumE += sqrt(nt.p_tk0_px->at(k)*nt.p_tk0_px->at(k) + nt.p_tk0_py->at(k)*nt.p_tk0_py->at(k) + nt.p_tk0_pz->at(k)*nt.p_tk0_pz->at(k) + 0.13957*0.13957); //0.13957 is pi+- mass
-	}
-	v0_track_m5 = sqrt(v0_track_sumE*v0_track_sumE - v0_track_sumpx*v0_track_sumpx - v0_track_sumpy*v0_track_sumpy - v0_track_sumpz*v0_track_sumpz);
-	if (invert_sumpt_m5_cuts) { //invert should keep events where at least one cut failed, orthogonal but still similar to nominal 
-	  if (v0_track_sumpt > 10 and v0_track_m5 > 5.5) continue;
-	}
-	else {
-	  if (v0_track_sumpt < 10) continue;
-	  if (v0_track_m5 < 5.5) continue; //Alec added SUMPT & m5 CUT, this will not be needed once implemented in minitree step
-	}
-	
-	if (c1v_vertexer) {
-	  //std::cout << "beamspot position: (" << nt.bsx << ", " << nt.bsy << ", " << nt.bsz << ")" <<std::endl;
-	  //std::cout << "SV position (relative to beamspot): (" << nt.x0 << ", " << nt.y0 << ", " << nt.z0 << ")" <<std::endl;
-	  //std::cout << "primary vertex position: (" << nt.pvx << ", " << nt.pvy << ", " << nt.pvz << ")" <<std::endl;
-          for (int k = 0; k < nt.ntk0; ++k) {
-	    //FINISH HERE FOR THE VERTEXER ON CONSTRUCTED C1V EVENTS!!!!!!!!!
-            referencePoint = reco::TrackBase::Point(nt.p_tk0_vx->at(k),nt.p_tk0_vy->at(k),nt.p_tk0_vz->at(k));
-	    //std::cout << "track reference point: (" << nt.p_tk0_vx->at(k) << ", " << nt.p_tk0_vy->at(k) << ", " << nt.p_tk0_vz->at(k) << ")" <<std::endl;
-            track_p_vector = math::XYZVector(nt.p_tk0_px->at(k), nt.p_tk0_py->at(k), nt.p_tk0_pz->at(k));
-	    const int track_q = std::signbit(nt.p_tk0_qchi2->at(k)) ? -1 : 1;
-            reco_track = reco::Track(fabs(nt.p_tk0_qchi2->at(k)), nt.p_tk0_ndof->at(k), referencePoint, track_p_vector, track_q, nt.p_tk0_cov->at(k));
-            track_collection.push_back(reco_track);
-          }
-	  for (size_t k = 0; k < track_collection.size(); ++k) {
-	    reco::TrackRef ref(&track_collection, k);
-	    track_refs.push_back(ref);
-	    seed_tracks.push_back(reco::TransientTrack(ref, B_field));
-	  }
-	  //std::cout << "finished looping through tracks" << std::endl;
-	}
-	
-	//std::cout << "finished sumpt and m5 cut" << std::endl;
-        float temp_dbv      = sqrt(nt.x0*nt.x0 + nt.y0*nt.y0);
-        //float temp_dbv      = sqrt((nt.x0-nt.bsx)*(nt.x0-nt.bsx) + (nt.y0-nt.bsy)*(nt.y0-nt.bsy));
-        float temp_dbv_pv   = sqrt((nt.x0-nt.pvx)*(nt.x0-nt.pvx) + (nt.y0-nt.pvy)*(nt.y0-nt.pvy));
-
-	dbv_value_vector.push_back(temp_dbv);
-	x_value_vector.push_back(nt.x0-nt.pvx);
-	y_value_vector.push_back(nt.y0-nt.pvy);
-	z_value_vector.push_back(nt.z0-nt.pvz);
-	dbv_weight_vector.push_back(w);
-	if (c1v_vertexer) {
-	  bsx_vector.push_back(nt.bsx);
-	  bsy_vector.push_back(nt.bsy);
-	  bsz_vector.push_back(nt.bsz);
-	  pvx_vector.push_back(nt.pvx);
-          pvy_vector.push_back(nt.pvy);
-          pvz_vector.push_back(nt.pvz);
-	  vertex_tracks_vector.push_back(seed_tracks);
-	  vertex_track_collection_vector.push_back(track_collection);
-	}
-	/*
-	if (dbv_value_vector.size()==372) {
-	  std::cout<< "SV entry 371 is from " << iteration_sample_name << " with: " << std::endl;
-	  std::cout << "position: (" << nt.x0 << "," << nt.y0 << "," << nt.z0 << "), " << "dbv: " << temp_dbv << ", run: " << nt.run << ", lumi: " << nt.lumi << ", event: " << nt.event << std::endl;
-	}*/
-	//std::cout << "starting npu and btag binning" << std::endl;
-        h_1v_dbv->Fill(temp_dbv, w);
-	//background template construction npu correction: assign dbv values to bins in npu for dbv pairing later
-	/*if (nt.npu <= 20) {
-	  h_1v_dbv_npult20->Fill(temp_dbv, w);
-	  dbv_value_vector_npult20.push_back(temp_dbv);
-	  dbv_weight_vector_npult20.push_back(w);
-	  //dbv_npubinid_vector.push_back(1);
-	}
-	else if (nt.npu > 20 and nt.npu <= 30) {
-	  h_1v_dbv_npugt20lt30->Fill(temp_dbv, w);
-	  dbv_value_vector_npugt20lt30.push_back(temp_dbv);
-          dbv_weight_vector_npugt20lt30.push_back(w);
-	  //dbv_npubinid_vector.push_back(2);
-	}
-	else if (nt.npu > 30 and nt.npu <= 40) {
-          h_1v_dbv_npugt30lt40->Fill(temp_dbv, w);
-	  dbv_value_vector_npugt30lt40.push_back(temp_dbv);
-          dbv_weight_vector_npugt30lt40.push_back(w);
-	  //dbv_npubinid_vector.push_back(3);
-        }
-	else {
-          h_1v_dbv_npugt40->Fill(temp_dbv, w);
-	  dbv_value_vector_npugt40.push_back(temp_dbv);
-          dbv_weight_vector_npugt40.push_back(w);
-	  //dbv_npubinid_vector.push_back(4);
-        }*/
-	//background template construction npu correction: assign dbv values to bins in npu now also for with btagging
-	//if (j<10) {
-	//  std::cout << "npu: " << nt.npu << ", p.btags: " << p.btags() << std::endl;
-	//}
-
-	//this was added: and (p.ntracks() != 5 or (p.ntracks == 5 and nt.ntk0 >= 5))
-	if (nt.npv <= 20 and nt.nbtags_old(bdisc_cut_value,-1) >= 1) { //originally used nt.nbtags but this calls CSV, we want DeepJet which is called by nt.nbtags_old
-          dbv_value_vector_btag_npult20.push_back(temp_dbv);
-	  x_value_vector_btag_npult20.push_back(nt.x0-nt.pvx);
-	  y_value_vector_btag_npult20.push_back(nt.y0-nt.pvy);
-	  z_value_vector_btag_npult20.push_back(nt.z0-nt.pvz);
-          dbv_weight_vector_btag_npult20.push_back(w);
-          dbv_npubinid_vector.push_back(1);
-	  if (c1v_vertexer) {
-	    bsx_vector_btag_npult20.push_back(nt.bsx);
-	    bsy_vector_btag_npult20.push_back(nt.bsy);
-	    bsz_vector_btag_npult20.push_back(nt.bsz);
-	    pvx_vector_btag_npult20.push_back(nt.pvx);
-            pvy_vector_btag_npult20.push_back(nt.pvy);
-            pvz_vector_btag_npult20.push_back(nt.pvz);
-	    vertex_tracks_vector_btag_npult20.push_back(seed_tracks);
-	    vertex_track_collection_vector_btag_npult20.push_back(track_collection);
-	  }
-	  if (p.ntracks() == 5 and use_alltrkmultiplicities and c1v_vertexer and seed_tracks.size() >= 5) {
-	    dbv_value_vector_btag_npult20_5trk.push_back(temp_dbv);
-	    x_value_vector_btag_npult20_5trk.push_back(nt.x0-nt.pvx);
-	    y_value_vector_btag_npult20_5trk.push_back(nt.y0-nt.pvy);
-	    z_value_vector_btag_npult20_5trk.push_back(nt.z0-nt.pvz);
-	    dbv_weight_vector_btag_npult20_5trk.push_back(w);
-	    bsx_vector_btag_npult20_5trk.push_back(nt.bsx);
-            bsy_vector_btag_npult20_5trk.push_back(nt.bsy);
-            bsz_vector_btag_npult20_5trk.push_back(nt.bsz);
-            pvx_vector_btag_npult20_5trk.push_back(nt.pvx);
-            pvy_vector_btag_npult20_5trk.push_back(nt.pvy);
-            pvz_vector_btag_npult20_5trk.push_back(nt.pvz);
-	    vertex_track_collection_vector_btag_npult20_5trk.push_back(track_collection);
-	  }
-        }
-        else if (nt.npv > 20 and nt.npv <= 30 and nt.nbtags_old(bdisc_cut_value,-1) >= 1) {
-          dbv_value_vector_btag_npugt20lt30.push_back(temp_dbv);
-	  x_value_vector_btag_npugt20lt30.push_back(nt.x0-nt.pvx);
-	  y_value_vector_btag_npugt20lt30.push_back(nt.y0-nt.pvy);
-	  z_value_vector_btag_npugt20lt30.push_back(nt.z0-nt.pvz);
-          dbv_weight_vector_btag_npugt20lt30.push_back(w);
-          dbv_npubinid_vector.push_back(2);
-	  if (c1v_vertexer) {
-            bsx_vector_btag_npugt20lt30.push_back(nt.bsx);
-            bsy_vector_btag_npugt20lt30.push_back(nt.bsy);
-            bsz_vector_btag_npugt20lt30.push_back(nt.bsz);
-	    pvx_vector_btag_npugt20lt30.push_back(nt.pvx);
-            pvy_vector_btag_npugt20lt30.push_back(nt.pvy);
-            pvz_vector_btag_npugt20lt30.push_back(nt.pvz);
-            vertex_tracks_vector_btag_npugt20lt30.push_back(seed_tracks);
-            vertex_track_collection_vector_btag_npugt20lt30.push_back(track_collection);
-          }
-	  if (p.ntracks() == 5 and use_alltrkmultiplicities and c1v_vertexer and seed_tracks.size() >= 5) {
-            dbv_value_vector_btag_npugt20lt30_5trk.push_back(temp_dbv);
-            x_value_vector_btag_npugt20lt30_5trk.push_back(nt.x0-nt.pvx);
-            y_value_vector_btag_npugt20lt30_5trk.push_back(nt.y0-nt.pvy);
-            z_value_vector_btag_npugt20lt30_5trk.push_back(nt.z0-nt.pvz);
-            dbv_weight_vector_btag_npugt20lt30_5trk.push_back(w);
-            bsx_vector_btag_npugt20lt30_5trk.push_back(nt.bsx);
-            bsy_vector_btag_npugt20lt30_5trk.push_back(nt.bsy);
-            bsz_vector_btag_npugt20lt30_5trk.push_back(nt.bsz);
-            pvx_vector_btag_npugt20lt30_5trk.push_back(nt.pvx);
-            pvy_vector_btag_npugt20lt30_5trk.push_back(nt.pvy);
-            pvz_vector_btag_npugt20lt30_5trk.push_back(nt.pvz);
-            vertex_track_collection_vector_btag_npugt20lt30_5trk.push_back(track_collection);
-          }
-        }
-        else if (nt.npv > 30 and nt.npv <= 40 and nt.nbtags_old(bdisc_cut_value,-1) >= 1) {
-          dbv_value_vector_btag_npugt30lt40.push_back(temp_dbv);
-	  x_value_vector_btag_npugt30lt40.push_back(nt.x0-nt.pvx);
-	  y_value_vector_btag_npugt30lt40.push_back(nt.y0-nt.pvy);
-	  z_value_vector_btag_npugt30lt40.push_back(nt.z0-nt.pvz);
-          dbv_weight_vector_btag_npugt30lt40.push_back(w);
-          dbv_npubinid_vector.push_back(3);
-	  if (c1v_vertexer) {
-            bsx_vector_btag_npugt30lt40.push_back(nt.bsx);
-            bsy_vector_btag_npugt30lt40.push_back(nt.bsy);
-            bsz_vector_btag_npugt30lt40.push_back(nt.bsz);
-	    pvx_vector_btag_npugt30lt40.push_back(nt.pvx);
-            pvy_vector_btag_npugt30lt40.push_back(nt.pvy);
-            pvz_vector_btag_npugt30lt40.push_back(nt.pvz);
-            vertex_tracks_vector_btag_npugt30lt40.push_back(seed_tracks);
-            vertex_track_collection_vector_btag_npugt30lt40.push_back(track_collection);
-          }
-	  if (p.ntracks() == 5 and use_alltrkmultiplicities and c1v_vertexer and seed_tracks.size() >= 5) {
-            dbv_value_vector_btag_npugt30lt40_5trk.push_back(temp_dbv);
-            x_value_vector_btag_npugt30lt40_5trk.push_back(nt.x0-nt.pvx);
-            y_value_vector_btag_npugt30lt40_5trk.push_back(nt.y0-nt.pvy);
-            z_value_vector_btag_npugt30lt40_5trk.push_back(nt.z0-nt.pvz);
-            dbv_weight_vector_btag_npugt30lt40_5trk.push_back(w);
-            bsx_vector_btag_npugt30lt40_5trk.push_back(nt.bsx);
-            bsy_vector_btag_npugt30lt40_5trk.push_back(nt.bsy);
-            bsz_vector_btag_npugt30lt40_5trk.push_back(nt.bsz);
-            pvx_vector_btag_npugt30lt40_5trk.push_back(nt.pvx);
-            pvy_vector_btag_npugt30lt40_5trk.push_back(nt.pvy);
-            pvz_vector_btag_npugt30lt40_5trk.push_back(nt.pvz);
-            vertex_track_collection_vector_btag_npugt30lt40_5trk.push_back(track_collection);
-          }
-        }
-        else if (nt.npv > 40 and nt.nbtags_old(bdisc_cut_value,-1) >= 1) {
-          dbv_value_vector_btag_npugt40.push_back(temp_dbv);
-	  x_value_vector_btag_npugt40.push_back(nt.x0-nt.pvx);
-	  y_value_vector_btag_npugt40.push_back(nt.y0-nt.pvy);
-	  z_value_vector_btag_npugt40.push_back(nt.z0-nt.pvz);
-          dbv_weight_vector_btag_npugt40.push_back(w);
-          dbv_npubinid_vector.push_back(4);
-	  if (c1v_vertexer) {
-            bsx_vector_btag_npugt40.push_back(nt.bsx);
-            bsy_vector_btag_npugt40.push_back(nt.bsy);
-            bsz_vector_btag_npugt40.push_back(nt.bsz);
-	    pvx_vector_btag_npugt40.push_back(nt.pvx);
-            pvy_vector_btag_npugt40.push_back(nt.pvy);
-            pvz_vector_btag_npugt40.push_back(nt.pvz);
-            vertex_tracks_vector_btag_npugt40.push_back(seed_tracks);
-            vertex_track_collection_vector_btag_npugt40.push_back(track_collection);
-          }
-	  if (p.ntracks() == 5 and use_alltrkmultiplicities and c1v_vertexer and seed_tracks.size() >= 5) {
-            dbv_value_vector_btag_npugt40_5trk.push_back(temp_dbv);
-            x_value_vector_btag_npugt40_5trk.push_back(nt.x0-nt.pvx);
-            y_value_vector_btag_npugt40_5trk.push_back(nt.y0-nt.pvy);
-            z_value_vector_btag_npugt40_5trk.push_back(nt.z0-nt.pvz);
-            dbv_weight_vector_btag_npugt40_5trk.push_back(w);
-            bsx_vector_btag_npugt40_5trk.push_back(nt.bsx);
-            bsy_vector_btag_npugt40_5trk.push_back(nt.bsy);
-            bsz_vector_btag_npugt40_5trk.push_back(nt.bsz);
-            pvx_vector_btag_npugt40_5trk.push_back(nt.pvx);
-            pvy_vector_btag_npugt40_5trk.push_back(nt.pvy);
-            pvz_vector_btag_npugt40_5trk.push_back(nt.pvz);
-            vertex_track_collection_vector_btag_npugt40_5trk.push_back(track_collection);
-          }
-        }
-	else if (nt.npv <= 20 and nt.nbtags_old(bdisc_cut_value,-1) < 1) {
-          dbv_value_vector_nobtag_npult20.push_back(temp_dbv);
-	  x_value_vector_nobtag_npult20.push_back(nt.x0-nt.pvx);
-	  y_value_vector_nobtag_npult20.push_back(nt.y0-nt.pvy);
-	  z_value_vector_nobtag_npult20.push_back(nt.z0-nt.pvz);
-          dbv_weight_vector_nobtag_npult20.push_back(w);
-          dbv_npubinid_vector.push_back(5);
-	  if (c1v_vertexer) {
-            bsx_vector_nobtag_npult20.push_back(nt.bsx);
-            bsy_vector_nobtag_npult20.push_back(nt.bsy);
-            bsz_vector_nobtag_npult20.push_back(nt.bsz);
-	    pvx_vector_nobtag_npult20.push_back(nt.pvx);
-            pvy_vector_nobtag_npult20.push_back(nt.pvy);
-            pvz_vector_nobtag_npult20.push_back(nt.pvz);
-            vertex_tracks_vector_nobtag_npult20.push_back(seed_tracks);
-            vertex_track_collection_vector_nobtag_npult20.push_back(track_collection);
-          }
-	  if (p.ntracks() == 5 and use_alltrkmultiplicities and c1v_vertexer and seed_tracks.size() >= 5) {
-            dbv_value_vector_nobtag_npult20_5trk.push_back(temp_dbv);
-            x_value_vector_nobtag_npult20_5trk.push_back(nt.x0-nt.pvx);
-            y_value_vector_nobtag_npult20_5trk.push_back(nt.y0-nt.pvy);
-            z_value_vector_nobtag_npult20_5trk.push_back(nt.z0-nt.pvz);
-            dbv_weight_vector_nobtag_npult20_5trk.push_back(w);
-            bsx_vector_nobtag_npult20_5trk.push_back(nt.bsx);
-            bsy_vector_nobtag_npult20_5trk.push_back(nt.bsy);
-            bsz_vector_nobtag_npult20_5trk.push_back(nt.bsz);
-            pvx_vector_nobtag_npult20_5trk.push_back(nt.pvx);
-            pvy_vector_nobtag_npult20_5trk.push_back(nt.pvy);
-            pvz_vector_nobtag_npult20_5trk.push_back(nt.pvz);
-            vertex_track_collection_vector_nobtag_npult20_5trk.push_back(track_collection);
-          }
-        }
-        else if (nt.npv > 20 and nt.npv <= 30 and nt.nbtags_old(bdisc_cut_value,-1) < 1) {
-          dbv_value_vector_nobtag_npugt20lt30.push_back(temp_dbv);
-	  x_value_vector_nobtag_npugt20lt30.push_back(nt.x0-nt.pvx);
-	  y_value_vector_nobtag_npugt20lt30.push_back(nt.y0-nt.pvy);
-	  z_value_vector_nobtag_npugt20lt30.push_back(nt.z0-nt.pvz);
-          dbv_weight_vector_nobtag_npugt20lt30.push_back(w);
-          dbv_npubinid_vector.push_back(6);
-	  if (c1v_vertexer) {
-            bsx_vector_nobtag_npugt20lt30.push_back(nt.bsx);
-            bsy_vector_nobtag_npugt20lt30.push_back(nt.bsy);
-            bsz_vector_nobtag_npugt20lt30.push_back(nt.bsz);
-	    pvx_vector_nobtag_npugt20lt30.push_back(nt.pvx);
-            pvy_vector_nobtag_npugt20lt30.push_back(nt.pvy);
-            pvz_vector_nobtag_npugt20lt30.push_back(nt.pvz);
-            vertex_tracks_vector_nobtag_npugt20lt30.push_back(seed_tracks);
-            vertex_track_collection_vector_nobtag_npugt20lt30.push_back(track_collection);
-          }
-	  if (p.ntracks() == 5 and use_alltrkmultiplicities and c1v_vertexer and seed_tracks.size() >= 5) {
-            dbv_value_vector_nobtag_npugt20lt30_5trk.push_back(temp_dbv);
-            x_value_vector_nobtag_npugt20lt30_5trk.push_back(nt.x0-nt.pvx);
-            y_value_vector_nobtag_npugt20lt30_5trk.push_back(nt.y0-nt.pvy);
-            z_value_vector_nobtag_npugt20lt30_5trk.push_back(nt.z0-nt.pvz);
-            dbv_weight_vector_nobtag_npugt20lt30_5trk.push_back(w);
-            bsx_vector_nobtag_npugt20lt30_5trk.push_back(nt.bsx);
-            bsy_vector_nobtag_npugt20lt30_5trk.push_back(nt.bsy);
-            bsz_vector_nobtag_npugt20lt30_5trk.push_back(nt.bsz);
-            pvx_vector_nobtag_npugt20lt30_5trk.push_back(nt.pvx);
-            pvy_vector_nobtag_npugt20lt30_5trk.push_back(nt.pvy);
-            pvz_vector_nobtag_npugt20lt30_5trk.push_back(nt.pvz);
-            vertex_track_collection_vector_nobtag_npugt20lt30_5trk.push_back(track_collection);
-          }
-        }
-        else if (nt.npv > 30 and nt.npv <= 40 and nt.nbtags_old(bdisc_cut_value,-1) < 1) {
-          dbv_value_vector_nobtag_npugt30lt40.push_back(temp_dbv);
-	  x_value_vector_nobtag_npugt30lt40.push_back(nt.x0-nt.pvx);
-	  y_value_vector_nobtag_npugt30lt40.push_back(nt.y0-nt.pvy);
-	  z_value_vector_nobtag_npugt30lt40.push_back(nt.z0-nt.pvz);
-          dbv_weight_vector_nobtag_npugt30lt40.push_back(w);
-          dbv_npubinid_vector.push_back(7);
-	  if (c1v_vertexer) {
-            bsx_vector_nobtag_npugt30lt40.push_back(nt.bsx);
-            bsy_vector_nobtag_npugt30lt40.push_back(nt.bsy);
-            bsz_vector_nobtag_npugt30lt40.push_back(nt.bsz);
-	    pvx_vector_nobtag_npugt30lt40.push_back(nt.pvx);
-            pvy_vector_nobtag_npugt30lt40.push_back(nt.pvy);
-            pvz_vector_nobtag_npugt30lt40.push_back(nt.pvz);
-            vertex_tracks_vector_nobtag_npugt30lt40.push_back(seed_tracks);
-            vertex_track_collection_vector_nobtag_npugt30lt40.push_back(track_collection);
-          }
-	  if (p.ntracks() == 5 and use_alltrkmultiplicities and c1v_vertexer and seed_tracks.size() >= 5) {
-            dbv_value_vector_nobtag_npugt30lt40_5trk.push_back(temp_dbv);
-            x_value_vector_nobtag_npugt30lt40_5trk.push_back(nt.x0-nt.pvx);
-            y_value_vector_nobtag_npugt30lt40_5trk.push_back(nt.y0-nt.pvy);
-            z_value_vector_nobtag_npugt30lt40_5trk.push_back(nt.z0-nt.pvz);
-            dbv_weight_vector_nobtag_npugt30lt40_5trk.push_back(w);
-            bsx_vector_nobtag_npugt30lt40_5trk.push_back(nt.bsx);
-            bsy_vector_nobtag_npugt30lt40_5trk.push_back(nt.bsy);
-            bsz_vector_nobtag_npugt30lt40_5trk.push_back(nt.bsz);
-            pvx_vector_nobtag_npugt30lt40_5trk.push_back(nt.pvx);
-            pvy_vector_nobtag_npugt30lt40_5trk.push_back(nt.pvy);
-            pvz_vector_nobtag_npugt30lt40_5trk.push_back(nt.pvz);
-            vertex_track_collection_vector_nobtag_npugt30lt40_5trk.push_back(track_collection);
-          }
-        }
-        else if (nt.npv > 40 and nt.nbtags_old(bdisc_cut_value,-1) < 1) {
-          dbv_value_vector_nobtag_npugt40.push_back(temp_dbv);
-	  x_value_vector_nobtag_npugt40.push_back(nt.x0-nt.pvx);
-	  y_value_vector_nobtag_npugt40.push_back(nt.y0-nt.pvy);
-	  z_value_vector_nobtag_npugt40.push_back(nt.z0-nt.pvz);
-          dbv_weight_vector_nobtag_npugt40.push_back(w);
-          dbv_npubinid_vector.push_back(8);
-	  if (c1v_vertexer) {
-            bsx_vector_nobtag_npugt40.push_back(nt.bsx);
-            bsy_vector_nobtag_npugt40.push_back(nt.bsy);
-            bsz_vector_nobtag_npugt40.push_back(nt.bsz);
-	    pvx_vector_nobtag_npugt40.push_back(nt.pvx);
-            pvy_vector_nobtag_npugt40.push_back(nt.pvy);
-            pvz_vector_nobtag_npugt40.push_back(nt.pvz);
-            vertex_tracks_vector_nobtag_npugt40.push_back(seed_tracks);
-            vertex_track_collection_vector_nobtag_npugt40.push_back(track_collection);
-          }
-	  if (p.ntracks() == 5 and use_alltrkmultiplicities and c1v_vertexer and seed_tracks.size() >= 5) {
-            dbv_value_vector_nobtag_npugt40_5trk.push_back(temp_dbv);
-            x_value_vector_nobtag_npugt40_5trk.push_back(nt.x0-nt.pvx);
-            y_value_vector_nobtag_npugt40_5trk.push_back(nt.y0-nt.pvy);
-            z_value_vector_nobtag_npugt40_5trk.push_back(nt.z0-nt.pvz);
-            dbv_weight_vector_nobtag_npugt40_5trk.push_back(w);
-            bsx_vector_nobtag_npugt40_5trk.push_back(nt.bsx);
-            bsy_vector_nobtag_npugt40_5trk.push_back(nt.bsy);
-            bsz_vector_nobtag_npugt40_5trk.push_back(nt.bsz);
-            pvx_vector_nobtag_npugt40_5trk.push_back(nt.pvx);
-            pvy_vector_nobtag_npugt40_5trk.push_back(nt.pvy);
-            pvz_vector_nobtag_npugt40_5trk.push_back(nt.pvz);
-            vertex_track_collection_vector_nobtag_npugt40_5trk.push_back(track_collection);
-          }
-        }
-
-	h_1v_bs2derr->Fill(nt.bs2derr0, w);
-	h_1v_rescale_bs2derr->Fill(nt.rescale_bs2derr0, w);
-	h_1v_w->Fill(nt.weight);
-	h_1v_z->Fill(nt.z0, w);
-	h_1v_dz->Fill(nt.z0 - nt.pvz, w);
-	h_1v_dpvsv->Fill(sqrt( (nt.x0-nt.pvx)*(nt.x0-nt.pvx) + (nt.y0-nt.pvy)*(nt.y0-nt.pvy) + (nt.z0-nt.pvz)*(nt.z0-nt.pvz) ), w);
-        h_1v_xy->Fill(nt.x0, nt.y0, w);
-	h_1v_dbv_bs2derr->Fill(temp_dbv, nt.bs2derr0, w);
-
-	//const TVector3 pv = nt.pvs().pos(0);
-	//const TVector3 pos = nt.svs().pos(isv);
-	//const TVector3 flight = pos - pv;
-	//const TVector3 flight2(flight.X(), flight.Y(), 0);
-	//edm::Handle<MFVVertexAuxCollection> vertices; //Alec work in progress
-	//const MFVVertexAux& v0 = vertices->at(0);
-	//const TVector3 flight2(nt.x0, nt.y0, 0);
-	//const TLorentzVector p4 = nt.p4();
-	//const TVector3 pperp(p4.X(), p4.Y(), 0);
-	//const double costh2 = pperp.Unit().Dot(flight2.Unit());
-	//float double costh2 = nt.costhtksjetsntkmombs0.push_back(v0.costhmombs(mfv::PTracksPlusJetsByNtracks));
-	float costh2_onlytks0 = nt.costhtkonlymombs0;
-	float costh20 = nt.costhtksjetsntkmombs0;
-	//std::cout << "cos of the angle between displacement and momentum: " << costh20 << std::endl;
-	h_1v_costh2_onlytks0->Fill(nt.costhtkonlymombs0, w);
-	h_1v_costh20->Fill(nt.costhtksjetsntkmombs0, w);
-        
-	if (nt.ntk0 >= min_ntracks0 && nt.ntk0 <= max_ntracks0) h_1v_dbv0->Fill(temp_dbv_pv, w);
-	if (nt.ntk0 >= min_ntracks1 && nt.ntk0 <= max_ntracks1) h_1v_dbv1->Fill(temp_dbv_pv, w);
-	h_1v_phiv->Fill(atan2(nt.y0,nt.x0), w);
-	h_1v_npu->Fill(nt.npu, w);
-	h_1v_npv->Fill(nt.npv, w);
-	h_1v_njets->Fill(nt.njets, w);
-	h_1v_ht40->Fill(nt.ht(40.), w);
-        double dphijvmin = M_PI;
-        for (int k = 0; k < nt.njets; ++k) {
-          h_1v_phij->Fill(nt.jet_phi[k], w);
-          h_1v_dphijv->Fill(TVector2::Phi_mpi_pi(atan2(nt.y0,nt.x0) - nt.jet_phi[k]), w);
-          h_1v_dphijvpt->Fill(TVector2::Phi_mpi_pi(atan2(nt.y0,nt.x0) - nt.jet_phi[k]), w * (nt.jet_pt[k]/nt.ht(0.)));
-          if (fabs(TVector2::Phi_mpi_pi(atan2(nt.y0,nt.x0) - nt.jet_phi[k])) < dphijvmin) dphijvmin = fabs(TVector2::Phi_mpi_pi(atan2(nt.y0,nt.x0) - nt.jet_phi[k]));
-          for (int l = k+1; l < nt.njets; ++l) {
-            h_1v_dphijj->Fill(TVector2::Phi_mpi_pi(nt.jet_phi[k] - nt.jet_phi[l]), w);
-          }
-        }
-        h_1v_dphijvmin->Fill(dphijvmin, w);
-      }
-
-      if (nt.nvtx >= 2 && nt.ntk0 >= min_ntracks0 && nt.ntk0 <= max_ntracks0 && nt.ntk1 >= min_ntracks1 && nt.ntk1 <= max_ntracks1) {
-	//std::cout << "2-vertex event" << std::endl;
-	//start of sumpt & m5 cut
-	
-        for (int k = 0; k < nt.ntk0; ++k) {
-          v0_track_sumpt += sqrt(nt.p_tk0_px->at(k)*nt.p_tk0_px->at(k) + nt.p_tk0_py->at(k)*nt.p_tk0_py->at(k));
-	  //v0_track_sump += sqrt(nt.p_tk0_px->at(k)*nt.p_tk0_px->at(k) + nt.p_tk0_py->at(k)*nt.p_tk0_py->at(k) + nt.p_tk0_pz->at(k)*nt.p_tk0_pz->at(k));
-	  v0_track_sumpx += nt.p_tk0_px->at(k);
-          v0_track_sumpy += nt.p_tk0_py->at(k);
-          v0_track_sumpz += nt.p_tk0_pz->at(k);
-          v0_track_sumE += sqrt(nt.p_tk0_px->at(k)*nt.p_tk0_px->at(k) + nt.p_tk0_py->at(k)*nt.p_tk0_py->at(k) + nt.p_tk0_pz->at(k)*nt.p_tk0_pz->at(k) + 0.1396*0.1396);
-        }
-	for (int l = 0; l < nt.ntk1; ++l) {
-          v1_track_sumpt += sqrt(nt.p_tk1_px->at(l)*nt.p_tk1_px->at(l) + nt.p_tk1_py->at(l)*nt.p_tk1_py->at(l));
-	  //v1_track_sump += sqrt(nt.p_tk1_px->at(l)*nt.p_tk1_px->at(l) + nt.p_tk1_py->at(l)*nt.p_tk1_py->at(l) + nt.p_tk1_pz->at(l)*nt.p_tk1_pz->at(l));
-	  v1_track_sumpx += nt.p_tk1_px->at(l);
-          v1_track_sumpy += nt.p_tk1_py->at(l);
-          v1_track_sumpz += nt.p_tk1_pz->at(l);
-          v1_track_sumE += sqrt(nt.p_tk1_px->at(l)*nt.p_tk1_px->at(l) + nt.p_tk1_py->at(l)*nt.p_tk1_py->at(l) + nt.p_tk1_pz->at(l)*nt.p_tk1_pz->at(l) + 0.1396*0.1396);
-        }
-	v0_track_m5 = sqrt(v0_track_sumE*v0_track_sumE - v0_track_sumpx*v0_track_sumpx - v0_track_sumpy*v0_track_sumpy - v0_track_sumpz*v0_track_sumpz);
-	v1_track_m5 = sqrt(v1_track_sumE*v1_track_sumE - v1_track_sumpx*v1_track_sumpx - v1_track_sumpy*v1_track_sumpy - v1_track_sumpz*v1_track_sumpz);
-	if (invert_sumpt_m5_cuts) { //invert should keep events where at least one cut failed, orthogonal but still similar to nominal
-	  if (v0_track_sumpt > 10 and v1_track_sumpt > 10 and v0_track_m5 > 5.5 and v1_track_m5 > 5.5) continue;
-	}
-	else {
-	  if (v0_track_sumpt < 10 || v1_track_sumpt < 10) continue;
-	  if (v0_track_m5 < 5.5 || v1_track_m5 < 5.5) continue;  //Alec added SUMPT & m5 CUT, this will not be needed once implemented in minitree step
-	}
-	
-        double dbv0 = sqrt(nt.x0*nt.x0 + nt.y0*nt.y0);
-        double dbv1 = sqrt(nt.x1*nt.x1 + nt.y1*nt.y1);
-        h_2v_dbv->Fill(dbv0, w);
-        h_2v_dbv->Fill(dbv1, w);
-        h_2v_dbv1_dbv0->Fill(dbv0, dbv1, w);
-	double dvv = sqrt((nt.x0-nt.x1)*(nt.x0-nt.x1) + (nt.y0-nt.y1)*(nt.y0-nt.y1));
-	//std::cout << "2v dvv = " << dvv << std::endl;
-        if (dvv > dvv_nbins * dvv_bin_width - 0.5*dvv_bin_width) dvv = dvv_nbins * dvv_bin_width - 0.5*dvv_bin_width;
-        h_2v_dvv->Fill(dvv, w);
-	double dvv3D = sqrt((nt.x0-nt.x1)*(nt.x0-nt.x1) + (nt.y0-nt.y1)*(nt.y0-nt.y1) + (nt.z0-nt.z1)*(nt.z0-nt.z1)); //Alec added
-	if (dvv3D > dvv_nbins * dvv_bin_width - 0.5*dvv_bin_width) dvv3D = dvv_nbins * dvv_bin_width - 0.5*dvv_bin_width; //Alec added
-	h_2v_dvv3D->Fill(dvv3D, w); //Alec added
-	
-        h_2v_sumdbv->Fill(dbv0+dbv1, w);
-        double dphi = TVector2::Phi_mpi_pi(atan2(nt.y0,nt.x0)-atan2(nt.y1,nt.x1));
-        h_2v_dphivv->Fill(dphi, w);
-        h_2v_absdphivv->Fill(fabs(dphi), w);
-        h_2v_npu->Fill(nt.npu, w);
-	h_2v_npv->Fill(nt.npv, w);
-        //printf("ibkg %i %s 2v event j %i weight %f * %f = %f dbv %f %f dvv %f npu %i\n", i, samples[i], j, weights[i], nt.weight, w, dbv0, dbv1, dvv, nt.npu);
-      }
-    }
-    //std::cout << "finished loop over 1 and 2 vertex events" << std::endl;
-    f->Close();
-    delete f;
-  }
-
-  // check for negative bins in dbv histograms that we throw from below--JMTBAD set zero, only wrong ~by a little
-  for (TH1* h : { h_1v_dbv0, h_1v_dbv1})
-    for (int ibin = 0; ibin <= h->GetNbinsX()+1; ++ibin)
-      if (h->GetBinContent(ibin) < 0) {
-        //printf("\e[1;31mdbv histogram %s has negative content %f in bin %i\e[0m\n", h->GetName(), h->GetBinContent(ibin), ibin);
-        h->SetBinContent(ibin, 0);
-      }
-
-  //construct dvvc
-  //TH1F* h_c1v_dbv = new TH1F("h_c1v_dbv", "constructed from only-one-vertex events;d_{BV} (cm);vertices", 200, 0, 2.0); //was 1250, 0, 2.5
-  //TH1F* h_c1v_dvv = new TH1F("h_c1v_dvv", "constructed from only-one-vertex events;d_{VV} (cm);events", 100, 0, M_PI); //was (100, 0, 1.) changed during dphijj fit addition
-  //TH1F* h_c1v_sumdbv = new TH1F("h_c1v_sumdbv", "constructed from only-one-vertex events;#Sigma(d_{BV}) (cm);events", 200, 0, 4.0); //was 100, 0 ,4.0
-  TH1F* h_c1v_dvv3D_w_errorbars = new TH1F("h_c1v_dvv3D_w_errorbars", "constructed from only-one-vertex events;3D d_{VV} (cm);events", 800, 0, 4);
-  TH1F* h_c1v_dvv3D_revertexed_w_errorbars = new TH1F("h_c1v_dvv3D_revertexed_w_errorbars", "constructed from only-one-vertex events;3D d_{VV} (cm);events", 800, 0, 4);
-  TH1F* h_c1v_sumdbv_revertexed_w_errorbars = new TH1F("h_c1v_sumdbv_revertexed_w_errorbars", "constructed from only-one-vertex events;#Sigma(d_{BV}) (cm);events", 200, 0, 4.0);
-  TH1F* h_c1v_sumdbv_w_errorbars = new TH1F("h_c1v_sumdbv_w_errorbars", "constructed from only-one-vertex events;#Sigma(d_{BV}) (cm);events", 200, 0, 4.0);
-  TH1F* h_c1v_absdphivv_revertexed_w_errorbars = new TH1F("h_c1v_absdphivv_revertexed_w_errorbars", "constructed from only-one-vertex events;|#Delta#phi_{VV}|;events", 5, 0, 3.15);
-  //TH1F* h_c1v_absdphivv = new TH1F("h_c1v_absdphivv", "constructed from only-one-vertex events;|#Delta#phi_{VV}|;events", 5, 0, 3.15);
-  //TH1F* h_c1v_dbv0 = new TH1F("h_c1v_dbv0", "constructed from only-one-vertex events;d_{BV}^{0} (cm);events", 1250, 0, 2.5);
-  //TH1F* h_c1v_dbv1 = new TH1F("h_c1v_dbv1", "constructed from only-one-vertex events;d_{BV}^{1} (cm);events", 1250, 0, 2.5);
-  //TH2F* h_c1v_dbv1_dbv0 = new TH2F("h_c1v_dbv1_dbv0", "constructed from only-one-vertex events;d_{BV}^{0} (cm);d_{BV}^{1} (cm)", 1250, 0, 2.5, 1250, 0, 2.5);
-  TH2F* h_c1v_ntrk0_ntrk1 = new TH2F("h_c1v_ntrk0_ntrk1", "constructed from only-one-vertex events;# vtx0 trks;# vtx1 trks", 11, 0 , 11, 11, 0, 11);
-
-  //TF1* f_dphi = new TF1("f_dphi", "(abs(x)-[0])**[1] + [2]", 0, M_PI);
-  //f_dphi->SetParameters(dphi_pdf_c, dphi_pdf_e, dphi_pdf_a);
-  TF1* f_dphi = new TF1("f_dphi", "[1] + [2] + 1.0/[0]", 0, M_PI); //M_PI stands for the physical constant pi
-  dphi_pdf_c = M_PI;
-  f_dphi->SetParameters(dphi_pdf_c, 0.0, 0.0); //background template construction: define function of angular separation between displaced vertices, here it is always 1/pi
-  
-  TF1* i_dphi = 0;
-  TF1* i_dphi2 = 0;
-  TF1* fit_dphijj = 0;
-  TF1* func_dphijj = 0;
-  if (p.vary_dphi()) {
-    //i_dphi = new TF1("i_dphi", "((1/([1]+1))*(x-[0])**([1]+1) + [2]*x - (1/([1]+1))*(-[0])**([1]+1)) / ((1/([1]+1))*(3.14159-[0])**([1]+1) + [2]*3.14159 - (1/([1]+1))*(-[0])**([1]+1))", 0, M_PI);
-    //i_dphi->SetParameters(dphi_pdf_c, dphi_pdf_e, dphi_pdf_a);
-    //i_dphi2 = new TF1("i_dphi2", "x/3.14159", 0, M_PI);
-    //Alec added below
-    fit_dphijj = new TF1("fit_dphijj", "(-3.14159<x && x<-0.6)*([2]*x**2+[1]*x+[0]) + (3.14159>x && x>0.6)*([2]*x**2-[1]*x+[0])", -M_PI, M_PI);
-    fit_dphijj->SetParameters(10,10,5);
-    h_1v_dphijj->Fit(fit_dphijj,"R");
-    //func_dphijj = new TF1("fit_dphijj", "(-3.14159<x && x<0)*([2]*x**2+[1]*x+[0]) + (3.14159>x && x>=0)*([2]*x**2-[1]*x+[0])", -M_PI, M_PI);
-    func_dphijj = new TF1("func_dphijj", "(3.14159>x && x>=0)*([2]*x**2-[1]*x+[0])", 0, M_PI);
-    func_dphijj->SetParameters(fit_dphijj->GetParameter(0), fit_dphijj->GetParameter(1), fit_dphijj->GetParameter(2));
-    //std::cout << fit_dphijj->GetParameter(0) <<  fit_dphijj->GetParameter(1) << fit_dphijj->GetParameter(2) << std::endl;
-  }
-
-  //TFile* jet_angle_file = TFile::Open(jet_angle_fname); //This is not used in this file
-
-  /*TH1F* h_eff_3d = 0; //background template construction: create vertexing efficiency histogram from the vpeffs files based on number max number of tracks
-  if (p.clearing_from_eff()) {
-    TFile* eff_file = TFile::Open(eff_file_name_3d);
-    if (!eff_file || !eff_file->IsOpen()) { fprintf(stderr, "bad file"); exit(1); }
-    h_eff_3d = (TH1F*)eff_file->Get(eff_hist);
-    h_eff_3d->SetBinContent(h_eff_3d->GetNbinsX()+1, h_eff_3d->GetBinContent(h_eff_3d->GetNbinsX()));
-  }
-
-  TH1F* h_eff_2d = 0; //background template construction: create vertexing efficiency histogram from the vpeffs files based on number max number of tracks 
-  if (p.clearing_from_eff()) {
-    TFile* eff_file = TFile::Open(eff_file_name_2d);
-    if (!eff_file || !eff_file->IsOpen()) { fprintf(stderr, "bad file"); exit(1); }
-    h_eff_2d = (TH1F*)eff_file->Get(eff_hist);
-    h_eff_2d->SetBinContent(h_eff_2d->GetNbinsX()+1, h_eff_2d->GetBinContent(h_eff_2d->GetNbinsX()));
-  }*/
-
-  int bin1 = 0;
-  int bin2 = 0;
-  int bin3 = 0;
-  int intobin1 = 0;
-  int intobin2 = 0;
-  int intobin3 = 0;
-  int outofbin1 = 0;
-  int outofbin2 = 0;
-  int outofbin3 = 0;
-
-  //random sampling for sumdbv background template
-  const int nsamples = 1*int(h_1v_dbv->GetEntries());
-  printf("sampling %i times (should be %i if no MC weights)\n", nsamples, 1*int(h_1v_dbv->Integral()));
-  double events_after_eff = 0;
-
-  //systematic sampling of each dbv entry with all others
-  /*const int nsamples = dbv_value_vector.size();
-  printf("sampling %i times\n", nsamples);
-  double events_after_eff = 0;*/
-
-  //signal contamination insertion
-  /*if (p.ntracks() == 3 or p.ntracks() == 4 or p.ntracks() == 5) {
-    TString ntracks_string = std::to_string(p.ntracks());
-    TString contam_dir = "./ULV30BvetoLHTm_neuM400cT10mm_signonneg_p005bs2derrcut_run2/2v_from_jets_run2_"+ntracks_string+"track_default_ULV30BvetoLHTm.root";
-    std::cout << "SIGNAL CONTAMINATION APPLIED!" << std::endl;
-    std::cout << "Contaminating this background with signal from: " << contam_dir << std::endl;
-    TString h_contam_name0 = "h_1v_dbv0";
-    TString h_contam_name1 = "h_1v_dbv1";
-    TFile * fcontam = TFile::Open(contam_dir);
-    TH1D * h_contam0 = (TH1D*)fcontam->Get(h_contam_name0);
-    TH1D * h_contam1 = (TH1D*)fcontam->Get(h_contam_name1);
-    h_contam0->Scale(.01);
-    h_contam1->Scale(.01);
-    h_1v_dbv0->Add(h_contam0);
-    h_1v_dbv1->Add(h_contam1);
-  }*/
-  //start loop with random seed
-  //std::random_device rd;
-  //std::mt19937 gen(rd());
-
-  //always start with the same seed
-  //std::mt19937 gen(42);
-  std::mt19937 gen(73);
-  std::uniform_int_distribution<> dist(0, dbv_value_vector.size() - 1);
-  std::uniform_int_distribution<> dist1(0, dbv_value_vector_btag_npult20.size() - 1);
-  std::uniform_int_distribution<> dist2(0, dbv_value_vector_btag_npugt20lt30.size() - 1);
-  std::uniform_int_distribution<> dist3(0, dbv_value_vector_btag_npugt30lt40.size() - 1);
-  std::uniform_int_distribution<> dist4(0, dbv_value_vector_btag_npugt40.size() - 1);
-  std::uniform_int_distribution<> dist5(0, dbv_value_vector_nobtag_npult20.size() - 1);
-  std::uniform_int_distribution<> dist6(0, dbv_value_vector_nobtag_npugt20lt30.size() - 1);
-  std::uniform_int_distribution<> dist7(0, dbv_value_vector_nobtag_npugt30lt40.size() - 1);
-  std::uniform_int_distribution<> dist8(0, dbv_value_vector_nobtag_npugt40.size() - 1);
-  std::cout << "Start looping through samples" << std::endl;
-  //std::vector<std::string>  dbv_check_vector(h_c1v_sumdbv_w_errorbars->GetNbinsX());
-  std::vector<std::vector<int>> dbv_check_vector(h_c1v_sumdbv_w_errorbars->GetNbinsX());
-  //double sumdbv_test = 0;
-  //double vertexer_passes = 0;
-  //double vertexer_trials = 0;
-  //int paired_with_5_counter = 0;
-  for (int ij = 0; ij < nsamples; ++ij) { //beginning of c1v random pairing loop
-    if (ij == 500000) {std::cout << "made it to 500,000th sample" << std::endl;}
-    if (ij == 1000000) {std::cout << "made it to 1,000,000th sample" << std::endl;}
-    double dbv0 = h_1v_dbv0->GetRandom();  //background template construction: get random entries in dbv histograms
-    double dbv1 = h_1v_dbv1->GetRandom();
-    /*int binx0 = -1;
-    int binx1 = -1;
-    double dbv0_error = 0;
-    double dbv1_error = 0;
-    double sumdbv_error_entry = 0;
-    h_1v_dbv0->GetBinWithContent(dbv0,binx0);
-    h_1v_dbv1->GetBinWithContent(dbv1,binx1);
-    h_1v_dbv0->GetBinError(binx0);
-    h_1v_dbv1->GetBinError(binx1);
-    sumdbv_error_entry = sqrt(dbv0_error*dbv0_error + dbv1_error*dbv1_error);*/
-    //
-    //new for constructing background template
-    //
-
-    //this makes it so loops over pairing every >=5 is paired with entry in all input track multiplicity vector
-    if (p.ntracks() == 5 and vertex_tracks_vector[ij].size() < 5) {continue;}
-
-    int randomIndex0 = dist(gen);
-    double dbv0_entry = dbv_value_vector[ij];
-    double x0_entry = x_value_vector[ij];
-    double y0_entry = y_value_vector[ij];
-    double z0_entry = z_value_vector[ij];
-    double dbv0_weight_entry = dbv_weight_vector[ij];
-
-    double bsx0;
-    double bsy0;
-    double bsz0;
-    double pvx0;
-    double pvy0;
-    double pvz0;
-    //std::vector<reco::TransientTrack> seed_tracks0;
-    reco::TrackCollection track_collection0;
-    double bsx1;
-    double bsy1;
-    double bsz1;
-    double pvx1;
-    double pvy1;
-    double pvz1;
-    //std::vector<reco::TransientTrack> seed_tracks1;
-    reco::TrackCollection track_collection1;
-    reco::TrackCollection track_collection_c1v;
-    std::vector<reco::TransientTrack> seed_tracks_c1v;
-    if (c1v_vertexer) {
-      bsx0 = bsx_vector[ij];
-      bsy0 = bsy_vector[ij];
-      bsz0 = bsz_vector[ij];
-      pvx0 = pvx_vector[ij];
-      pvy0 = pvy_vector[ij];
-      pvz0 = pvz_vector[ij];
-      //seed_tracks_c1v = vertex_tracks_vector[ij];
-      track_collection0 = vertex_track_collection_vector[ij];
-    }
-
-    double dbv1_entry;
-    double x1_entry;
-    double y1_entry;
-    double z1_entry;
-    double dbv1_weight_entry;
-    int randomIndex1;
-    
-    int c1v_pairing_tries = 0;
-    if (dbv_npubinid_vector[ij] == 1) {
-      if (dbv_value_vector_btag_npult20.size() < 2) {
-	randomIndex1 = dist1(gen);
-      }
-      else if (p.ntracks() > 5) {
-	do {randomIndex1 = dist1(gen);} while (dbv0_entry == dbv_value_vector_btag_npult20[randomIndex1] or track_collection0.size() == vertex_track_collection_vector_btag_npult20[randomIndex1].size()); //EITHER ADD THIS TO ALL NPU/BTAG BINS OR GET RID OF IT!!!
-      }
-      else {
-	do {randomIndex1 = dist1(gen);} while (dbv0_entry == dbv_value_vector_btag_npult20[randomIndex1]);
-      }
-      dbv1_entry = dbv_value_vector_btag_npult20[randomIndex1];
-      x1_entry = x_value_vector_btag_npult20[randomIndex1];
-      y1_entry = y_value_vector_btag_npult20[randomIndex1];
-      z1_entry = z_value_vector_btag_npult20[randomIndex1];
-      dbv1_weight_entry = dbv_weight_vector_btag_npult20[randomIndex1];
-      if (c1v_vertexer) {
-	bsx1 = bsx_vector_btag_npult20[randomIndex1];
-	bsy1 = bsy_vector_btag_npult20[randomIndex1];
-	bsz1 = bsz_vector_btag_npult20[randomIndex1];
-	pvx1 = pvx_vector_btag_npult20[randomIndex1];
-        pvy1 = pvy_vector_btag_npult20[randomIndex1];
-        pvz1 = pvz_vector_btag_npult20[randomIndex1];
-	track_collection1 = vertex_track_collection_vector_btag_npult20[randomIndex1];
-      }
-    }
-    else if (dbv_npubinid_vector[ij] == 2) {
-      if (dbv_value_vector_btag_npugt20lt30.size() < 2) {
-        randomIndex1 = dist2(gen);
-      }
-      else {
-        do {randomIndex1 = dist2(gen);} while (dbv0_entry == dbv_value_vector_btag_npugt20lt30[randomIndex1]);
-      }
-      dbv1_entry = dbv_value_vector_btag_npugt20lt30[randomIndex1];
-      x1_entry = x_value_vector_btag_npugt20lt30[randomIndex1];
-      y1_entry = y_value_vector_btag_npugt20lt30[randomIndex1];
-      z1_entry = z_value_vector_btag_npugt20lt30[randomIndex1];
-      dbv1_weight_entry = dbv_weight_vector_btag_npugt20lt30[randomIndex1];
-      if (c1v_vertexer) {
-	bsx1 = bsx_vector_btag_npugt20lt30[randomIndex1];
-        bsy1 = bsy_vector_btag_npugt20lt30[randomIndex1];
-	bsz1 = bsz_vector_btag_npugt20lt30[randomIndex1];
-	pvx1 = pvx_vector_btag_npugt20lt30[randomIndex1];
-        pvy1 = pvy_vector_btag_npugt20lt30[randomIndex1];
-        pvz1 = pvz_vector_btag_npugt20lt30[randomIndex1];
-        track_collection1 = vertex_track_collection_vector_btag_npugt20lt30[randomIndex1];
-      }
-    }
-    else if (dbv_npubinid_vector[ij] == 3) {
-      if (dbv_value_vector_btag_npugt30lt40.size() < 2) {
-        randomIndex1 = dist3(gen);
-      }
-      else {
-        do {randomIndex1 = dist3(gen);} while (dbv0_entry == dbv_value_vector_btag_npugt30lt40[randomIndex1]);
-      }
-      dbv1_entry = dbv_value_vector_btag_npugt30lt40[randomIndex1];
-      x1_entry = x_value_vector_btag_npugt30lt40[randomIndex1];
-      y1_entry = y_value_vector_btag_npugt30lt40[randomIndex1];
-      z1_entry = z_value_vector_btag_npugt30lt40[randomIndex1];
-      dbv1_weight_entry = dbv_weight_vector_btag_npugt30lt40[randomIndex1];
-      if (c1v_vertexer) {
-        bsx1 = bsx_vector_btag_npugt30lt40[randomIndex1];
-        bsy1 = bsy_vector_btag_npugt30lt40[randomIndex1];
-        bsz1 = bsz_vector_btag_npugt30lt40[randomIndex1];
-	pvx1 = pvx_vector_btag_npugt30lt40[randomIndex1];
-        pvy1 = pvy_vector_btag_npugt30lt40[randomIndex1];
-        pvz1 = pvz_vector_btag_npugt30lt40[randomIndex1];
-        track_collection1 = vertex_track_collection_vector_btag_npugt30lt40[randomIndex1];
-      }
-    }
-    else if (dbv_npubinid_vector[ij] == 4) {
-      if (dbv_value_vector_btag_npugt40.size() < 2) {
-        randomIndex1 = dist4(gen);
-      }
-      else {
-        do {randomIndex1 = dist4(gen);} while (dbv0_entry == dbv_value_vector_btag_npugt40[randomIndex1]);
-      }
-      dbv1_entry = dbv_value_vector_btag_npugt40[randomIndex1];
-      x1_entry = x_value_vector_btag_npugt40[randomIndex1];
-      y1_entry = y_value_vector_btag_npugt40[randomIndex1];
-      z1_entry = z_value_vector_btag_npugt40[randomIndex1];
-      dbv1_weight_entry = dbv_weight_vector_btag_npugt40[randomIndex1];
-      if (c1v_vertexer) {
-        bsx1 = bsx_vector_btag_npugt40[randomIndex1];
-        bsy1 = bsy_vector_btag_npugt40[randomIndex1];
-        bsz1 = bsz_vector_btag_npugt40[randomIndex1];
-	pvx1 = pvx_vector_btag_npugt40[randomIndex1];
-        pvy1 = pvy_vector_btag_npugt40[randomIndex1];
-        pvz1 = pvz_vector_btag_npugt40[randomIndex1];
-        track_collection1 = vertex_track_collection_vector_btag_npugt40[randomIndex1];
-      }
-    }
-    else if (dbv_npubinid_vector[ij] == 5) {
-      if (dbv_value_vector_nobtag_npult20.size() < 2) {
-        randomIndex1 = dist5(gen);
-      }
-      else {
-        do {randomIndex1 = dist5(gen);} while (dbv0_entry == dbv_value_vector_nobtag_npult20[randomIndex1]);
-      }
-      dbv1_entry = dbv_value_vector_nobtag_npult20[randomIndex1];
-      x1_entry = x_value_vector_nobtag_npult20[randomIndex1];
-      y1_entry = y_value_vector_nobtag_npult20[randomIndex1];
-      z1_entry = z_value_vector_nobtag_npult20[randomIndex1];
-      dbv1_weight_entry = dbv_weight_vector_nobtag_npult20[randomIndex1];
-      if (c1v_vertexer) {
-        bsx1 = bsx_vector_nobtag_npult20[randomIndex1];
-        bsy1 = bsy_vector_nobtag_npult20[randomIndex1];
-        bsz1 = bsz_vector_nobtag_npult20[randomIndex1];
-	pvx1 = pvx_vector_nobtag_npult20[randomIndex1];
-        pvy1 = pvy_vector_nobtag_npult20[randomIndex1];
-        pvz1 = pvz_vector_nobtag_npult20[randomIndex1];
-        track_collection1 = vertex_track_collection_vector_nobtag_npult20[randomIndex1];
-      }
-    }
-    else if (dbv_npubinid_vector[ij] == 6) {
-      if (dbv_value_vector_nobtag_npugt20lt30.size() < 2) {
-        randomIndex1 = dist6(gen);
-      }
-      else {
-        do {randomIndex1 = dist6(gen);} while (dbv0_entry == dbv_value_vector_nobtag_npugt20lt30[randomIndex1]);
-      }
-      dbv1_entry = dbv_value_vector_nobtag_npugt20lt30[randomIndex1];
-      x1_entry = x_value_vector_nobtag_npugt20lt30[randomIndex1];
-      y1_entry = y_value_vector_nobtag_npugt20lt30[randomIndex1];
-      z1_entry = z_value_vector_nobtag_npugt20lt30[randomIndex1];
-      dbv1_weight_entry = dbv_weight_vector_nobtag_npugt20lt30[randomIndex1];
-      if (c1v_vertexer) {
-        bsx1 = bsx_vector_nobtag_npugt20lt30[randomIndex1];
-        bsy1 = bsy_vector_nobtag_npugt20lt30[randomIndex1];
-        bsz1 = bsz_vector_nobtag_npugt20lt30[randomIndex1];
-	pvx1 = pvx_vector_nobtag_npugt20lt30[randomIndex1];
-        pvy1 = pvy_vector_nobtag_npugt20lt30[randomIndex1];
-        pvz1 = pvz_vector_nobtag_npugt20lt30[randomIndex1];
-        track_collection1 = vertex_track_collection_vector_nobtag_npugt20lt30[randomIndex1];
-      }
-    }
-    else if (dbv_npubinid_vector[ij] == 7) {
-      if (dbv_value_vector_nobtag_npugt30lt40.size() < 2) {
-        randomIndex1 = dist7(gen);
-      }
-      else {
-        do {randomIndex1 = dist7(gen);} while (dbv0_entry == dbv_value_vector_nobtag_npugt30lt40[randomIndex1]);
-      }
-      dbv1_entry = dbv_value_vector_nobtag_npugt30lt40[randomIndex1];
-      x1_entry = x_value_vector_nobtag_npugt30lt40[randomIndex1];
-      y1_entry = y_value_vector_nobtag_npugt30lt40[randomIndex1];
-      z1_entry = z_value_vector_nobtag_npugt30lt40[randomIndex1];
-      dbv1_weight_entry = dbv_weight_vector_nobtag_npugt30lt40[randomIndex1];
-      if (c1v_vertexer) {
-        bsx1 = bsx_vector_nobtag_npugt30lt40[randomIndex1];
-        bsy1 = bsy_vector_nobtag_npugt30lt40[randomIndex1];
-        bsz1 = bsz_vector_nobtag_npugt30lt40[randomIndex1];
-	pvx1 = pvx_vector_nobtag_npugt30lt40[randomIndex1];
-        pvy1 = pvy_vector_nobtag_npugt30lt40[randomIndex1];
-        pvz1 = pvz_vector_nobtag_npugt30lt40[randomIndex1];
-        track_collection1 = vertex_track_collection_vector_nobtag_npugt30lt40[randomIndex1];
-      }
-    }
-    else if (dbv_npubinid_vector[ij] == 8) {
-      if (dbv_value_vector_nobtag_npugt40.size() < 2) {
-        randomIndex1 = dist8(gen);
-      }
-      else {
-        do {randomIndex1 = dist8(gen);} while (dbv0_entry == dbv_value_vector_nobtag_npugt40[randomIndex1]);
-      }
-      dbv1_entry = dbv_value_vector_nobtag_npugt40[randomIndex1];
-      x1_entry = x_value_vector_nobtag_npugt40[randomIndex1];
-      y1_entry = y_value_vector_nobtag_npugt40[randomIndex1];
-      z1_entry = z_value_vector_nobtag_npugt40[randomIndex1];
-      dbv1_weight_entry = dbv_weight_vector_nobtag_npugt40[randomIndex1];
-      if (c1v_vertexer) {
-        bsx1 = bsx_vector_nobtag_npugt40[randomIndex1];
-        bsy1 = bsy_vector_nobtag_npugt40[randomIndex1];
-        bsz1 = bsz_vector_nobtag_npugt40[randomIndex1];
-	pvx1 = pvx_vector_nobtag_npugt40[randomIndex1];
-        pvy1 = pvy_vector_nobtag_npugt40[randomIndex1];
-        pvz1 = pvz_vector_nobtag_npugt40[randomIndex1];
-        track_collection1 = vertex_track_collection_vector_nobtag_npugt40[randomIndex1];
-      }
-    }
-    else {
-      std::cout << "Error: Improper btagging/pileup binning id, recieved binning id: " << dbv_npubinid_vector[ij] << std::endl;
-    }
-    //if (track_collection1.size() > 4) {paired_with_5_counter += 1;}
-    
-    std::vector<reco::TrackRef> track_refs_c1v;
-    GlobalVector constantField(0.0, 0.0, 3.8);
-    UniformMagneticField uniformField(constantField);
-    const MagneticField* B_field = &uniformField;
-    produce_vertices produce_output;
-    if (c1v_vertexer) {
-      std::vector<double> bs_position_c1v = {bsx0,bsy0,bsz0};
-      std::vector<double> pv_position_c1v = {pvx0,pvy0,pvz0}; //with respect to the beamspot!!!!
-      //std::cout << "beamspot position: (" << bsx0 << ", " << bsy0 << ", " << bsz0 << ")" <<std::endl;
-      for (int k = 0; k < track_collection0.size(); ++k) {
-	track_collection_c1v.push_back(track_collection0[k]);
-      }
-      for (int k = 0; k < track_collection1.size(); ++k) {
-	reco::TrackBase::Point referencePoint1_zshifted = reco::TrackBase::Point(track_collection1[k].vx() - (pvx1+bsx1) + (pvx0+bsx0),
-										 track_collection1[k].vy() - (pvy1+bsy1) + (pvy0+bsy0),
-										 track_collection1[k].vz() - (pvz1+bsz1) + (pvz0+bsz0));
-	if (verbose and ij < 10) std::cout << "track reference point for track in v0: (" << track_collection0[k].vx() << ", " << track_collection0[k].vy() << ", " << track_collection0[k].vz() << "), for track preshifted pv v1: (" << track_collection1[k].vx() << ", " << track_collection1[k].vy() << ", " << track_collection1[k].vz() << "), for track in shifted pv v1: (" << track_collection1[k].vx() - (pvx1+bsx1) + (pvx0+bsx0) << ", " << track_collection1[k].vy() - (pvy1+bsy1) + (pvy0+bsy0) << ", " << track_collection1[k].vz() - (pvz1+bsz1) + (pvz0+bsz0) << ")" << std::endl;
-	reco::Track reco_track1_zshifted = reco::Track(track_collection1[k].chi2(), track_collection1[k].ndof(), referencePoint1_zshifted, track_collection1[k].momentum(), track_collection1[k].charge(), track_collection1[k].covariance());
-	track_collection_c1v.push_back(reco_track1_zshifted);
-      }
-      for (size_t k = 0; k < track_collection_c1v.size(); ++k) {
-	reco::TrackRef ref_c1v(&track_collection_c1v, k);
-	track_refs_c1v.push_back(ref_c1v);
-	seed_tracks_c1v.push_back(reco::TransientTrack(ref_c1v, B_field));
-      }
-      //seed_tracks_c1v.insert(seed_tracks_c1v.end(), seed_tracks1.begin(), seed_tracks1.end());  //ADD THESE BACK TO MERGE TRACKS FROM BOTH VERTICES!!!!!!
-      //track_collection_c1v.insert(track_collection_c1v.end(), track_collection1.begin(), track_collection1.end());
-      //produce_vertices output = {number_of_vertices,numbers_of_vertex_tracks,positions};
-      if (verbose) std::cout << "START OF NEW C1V VERTEX PAIR REVERTEXING!!!" << std::endl;
-      if (verbose) std::cout << "# of tracks in seed_tracks vector: " <<  seed_tracks_c1v.size() << ", # of tracks in track_collection: " << track_collection_c1v.size() << std::endl;
-      for (int t = 0; t < seed_tracks_c1v.size(); ++t) {
-	if (verbose) std::cout << "before input to produce(), track pt: " << seed_tracks_c1v[t].track().pt() << std::endl;
-	//std::cout << "reco::Track parameters input to produce():: chi^2: " << seed_tracks_c1v[t].track().chi2() << ", ndf: " << seed_tracks_c1v[t].track().ndof() << ", reference point: " << seed_tracks_c1v[t].track().vertex() << ", p: (" << seed_tracks_c1v[t].track().px() << "," << seed_tracks_c1v[t].track().py() << "," << seed_tracks_c1v[t].track().pz() << ", charge: " << seed_tracks_c1v[t].track().charge() << ", cov matrix:" << std::endl << seed_tracks_c1v[t].track().covariance() << std::endl; 
-      }
-      produce_output = produce(bs_position_c1v, bssigma_x, bssigma_y, bssigma_z, seed_tracks_c1v, track_collection_c1v); //use beamspot value for event0 rather than event1
-      if (p.ntracks() == 5 && verbose && (produce_output.numbers_of_vertex_tracks.size() != 2 or produce_output.numbers_of_vertex_tracks[0] < p.ntracks() or produce_output.numbers_of_vertex_tracks[1] < p.ntracks())) std::cout << "BAD REVERTEXING SINCE VERTICES NOW BELOW 5 TRACKS OUTPUT AT EVENT " << ij << " or " << randomIndex1 << "!!!" << std::endl;
-      else if (verbose && (produce_output.numbers_of_vertex_tracks.size() != 2 or produce_output.numbers_of_vertex_tracks[0] != p.ntracks() or produce_output.numbers_of_vertex_tracks[1] != p.ntracks())) std::cout << "BAD REVERTEXING OUTPUT AT EVENT " << ij << " or " << randomIndex1 << "!!!  Input 3D dvv: " << sqrt((x0_entry - x1_entry)*(x0_entry - x1_entry) + (y0_entry - y1_entry)*(y0_entry - y1_entry) + (z0_entry - z1_entry)*(z0_entry - z1_entry)) << std::endl;
-      if (verbose and produce_output.numbers_of_vertex_tracks.size() == 0) std::cout << "NO VERTICES AT ALL RECONSTRUCTED!!!" << std::endl;
-    }
-
-    double sumdbv_entry = dbv0_entry + dbv1_entry;
-    double sumdbv_bin = h_c1v_sumdbv_w_errorbars->FindBin(sumdbv_entry);
-    //double sumdbv_w_entry = sqrt(dbv0_weight_entry*dbv0_weight_entry + dbv1_weight_entry*dbv1_weight_entry); //we think this was wrong
-    double sumdbv_w_entry = dbv0_weight_entry*dbv1_weight_entry;
-
-    //std::cout << ", dbv1_entry: " << dbv1_entry << ", dbv1_weight_entry: " << dbv1_weight_entry << std::endl;
-
-    //double dphi = TVector2::Phi_mpi_pi(atan2(nt.y0,nt.x0)-atan2(nt.y1,nt.x1)); //definition used in the 2v case
-    double dphi   = f_dphi->GetRandom(); //background template construction: get random angle (dphi) between the random dbv pair, always 1/pi (set above)
-    double phi0 = std::atan2(y0_entry,x0_entry);
-    double phi1 = std::atan2(y1_entry,x1_entry);
-    double absdphi_revertexed;
-    if (M_PI < phi1-phi0) {
-      absdphi_revertexed = 2*M_PI - (phi1-phi0);
-    }
-    else if(-M_PI > phi1-phi0) {
-      absdphi_revertexed = 2*M_PI + (phi1-phi0);
-    }
-    else {
-      absdphi_revertexed = fabs(phi1-phi0);
-    }
-    //if (ij < 20) {
-    //  std::cout << "vertex 0: (" << x0_entry << "," << y0_entry << "), phi0: " << phi0 << ", vertex 1: (" << x1_entry << "," << y1_entry << "), phi1: " << phi1 << ", |dphi_revertexed|: " << absdphi_revertexed << ", dphi using 2v definition: " << TVector2::Phi_mpi_pi(atan2(y0_entry,x0_entry)-atan2(y1_entry,x1_entry)) << std::endl;
-    //}
-    
-    double dvv_entry = sqrt(dbv0_entry*dbv0_entry + dbv1_entry*dbv1_entry - 2*dbv0_entry*dbv1_entry*cos(dphi));
-    double dvv3D_entry = sqrt(dbv0_entry*dbv0_entry + dbv1_entry*dbv1_entry - 2*dbv0_entry*dbv1_entry*cos(dphi) + (z0_entry - z1_entry)*(z0_entry - z1_entry));
-    double dvv3D_entry_exact = sqrt((x0_entry - x1_entry)*(x0_entry - x1_entry) + (y0_entry - y1_entry)*(y0_entry - y1_entry) + (z0_entry - z1_entry)*(z0_entry - z1_entry));
-    double dvvc   = sqrt(dbv0*dbv0 + dbv1*dbv1 - 2*dbv0*dbv1*cos(dphi)); //background template construction: compute 2D distance between 2 random dbv pair vertices with dphi angular separation (1/pi)
-    double sumdbv = dbv0 + dbv1; //background template construction: sum random dbv pair to find sumdbv
-
-    if (p.vary_dphi()) {
-      //double dphi2 = i_dphi2->GetX(i_dphi->Eval(dphi), 0, M_PI);//Alec commented
-      double dphi2 = func_dphijj->GetRandom(); //Alec added
-      double dvvc2 = sqrt(dbv0_entry*dbv0_entry + dbv1_entry*dbv1_entry - 2*dbv0_entry*dbv1_entry*cos(dphi2));
-      if (dvvc < 0.04) ++bin1;
-      if (dvvc >= 0.04 && dvvc < 0.07) ++bin2;
-      if (dvvc >= 0.07) ++bin3;
-      if (!(dvvc < 0.04) && (dvvc2 < 0.04)) ++intobin1;
-      if (!(dvvc >= 0.04 && dvvc < 0.07) && (dvvc2 >= 0.04 && dvvc2 < 0.07)) ++intobin2;
-      if (!(dvvc >= 0.07) && (dvvc2 >= 0.07)) ++intobin3;
-      if ((dvvc < 0.04) && !(dvvc2 < 0.04)) ++outofbin1;
-      if ((dvvc >= 0.04 && dvvc < 0.07) && !(dvvc2 >= 0.04 && dvvc2 < 0.07)) ++outofbin2;
-      if ((dvvc >= 0.07) && !(dvvc2 >= 0.07)) ++outofbin3;
-      dphi = dphi2;
-      dvvc = dvvc2;
-      dvv_entry = dvvc2;
-    }
-
-    /*double prob  = 1; //background template construction: 
-    if (p.clearing_from_eff()) {
-      prob = h_eff_2d->GetBinContent(h_eff_2d->FindBin(dvvc));
-      prob *= p.extra_eff_2d(dvvc);
-    }
-    double prob_w_errorbars  = 1; //background template construction:
-    if (p.clearing_from_eff() and use_dvv3D) {
-      prob_w_errorbars = h_eff_3d->GetBinContent(h_eff_3d->FindBin(dvv3D_entry_exact));
-      //prob_sumdbv_w_errorbars *= p.extra_eff_2d(dvv_entry);
-    }
-    else if (p.clearing_from_eff()) {
-      prob_w_errorbars = h_eff_2d->GetBinContent(h_eff_2d->FindBin(dvv_entry));
-      //prob_sumdbv_w_errorbars *= p.extra_eff_2d(dvv_entry);
-    }*/
-
-    double btag_weight = 1; //REMEMBER TO FINISH/ADJUST THIS!!!!!!!!!
-    if (dbv_npubinid_vector[ij] < 5) {
-      btag_weight = 99/80;
-    }
-    else {
-      btag_weight = 1/20;
-    }
-
-    if (dvvc > dvv_nbins * dvv_bin_width - 0.5*dvv_bin_width) dvvc = dvv_nbins * dvv_bin_width - 0.5*dvv_bin_width;
-    //h_c1v_dvv->Fill(dvv_entry, prob);  //errors not propagated properly just for dvv here
-    //h_c1v_sumdbv->Fill(sumdbv_entry, prob); //background template construction: fill histogram with constructed value and weight
-    //h_c1v_sumdbv_w_errorbars->Fill(sumdbv_entry, sqrt(prob_sumdbv_w_errorbars*prob_sumdbv_w_errorbars + sumdbv_w_entry*sumdbv_w_entry));
-    //h_c1v_dvv3D_w_errorbars->Fill(dvv3D_entry, btag_weight*sumdbv_w_entry); //sumdbv_w_entry is the event and sample weight here and is correct, not just for dbv
-    //h_c1v_sumdbv_w_errorbars->Fill(sumdbv_entry, btag_weight*sumdbv_w_entry);
-    if (c1v_vertexer) { //compare z0_entry < 1 and z1_entry < 1 to without it
-      //now we perform a coordinate transformation for our vertex points to be with respect to the beamspot for xy and pv for z rather than (0,0,0)
-      double ntx0_revertexed = produce_output.positions[0].x() - bsx0 - pvx0;
-      double nty0_revertexed = produce_output.positions[0].y() - bsy0 - pvy0;
-      double ntz0_revertexed = produce_output.positions[0].z() - bsz0 - pvz0;
-      double ntx1_revertexed = produce_output.positions[1].x() - bsx0 - pvx0;
-      double nty1_revertexed = produce_output.positions[1].y() - bsy0 - pvy0;
-      double ntz1_revertexed = produce_output.positions[1].z() - bsz0 - pvz0;
-      double dvv3D_revertexed = sqrt( (produce_output.positions[0].x()-produce_output.positions[1].x())*(produce_output.positions[0].x()-produce_output.positions[1].x())
-      			      + (produce_output.positions[0].y()-produce_output.positions[1].y())*(produce_output.positions[0].y()-produce_output.positions[1].y())
-      			      + (produce_output.positions[0].z()-produce_output.positions[1].z())*(produce_output.positions[0].z()-produce_output.positions[1].z()) );
-      if (produce_output.numbers_of_vertex_tracks.size() < 2) {dvv3D_revertexed = 0;}
-      //double dvv3D_revertexed = sqrt((ntx0_revertexed-ntx1_revertexed)*(ntx0_revertexed-ntx1_revertexed) + (nty0_revertexed-nty1_revertexed)*(nty0_revertexed-nty1_revertexed) + (ntz0_revertexed-ntz1_revertexed)*(ntz0_revertexed-ntz1_revertexed));
-      
-      if (verbose and ij < 10 and produce_output.numbers_of_vertex_tracks.size() == 2 and produce_output.numbers_of_vertex_tracks[0] == p.ntracks() and produce_output.numbers_of_vertex_tracks[1] == p.ntracks()) {
-	double dbv0_revertexed = sqrt(ntx0_revertexed*ntx0_revertexed + nty0_revertexed*nty0_revertexed);
-	double dbv1_revertexed = sqrt(ntx1_revertexed*ntx1_revertexed + nty1_revertexed*nty1_revertexed);
-	std::cout << "dvv3D: " << dvv3D_entry_exact << ", attempted recreation of dvv3D with dbv0/1 revertexed and phi: " << sqrt(dbv0_revertexed*dbv0_revertexed + dbv1_revertexed*dbv1_revertexed - 2*dbv0_revertexed*dbv1_revertexed*cos(dphi) + (ntz0_revertexed - ntz1_revertexed)*(ntz0_revertexed - ntz1_revertexed)) << ", dvv3D revertexed: " << dvv3D_revertexed << std::endl;
-	std::cout << "dbv0: " << dbv0_entry << ", dbv0 revertexed: " << sqrt(ntx0_revertexed*ntx0_revertexed + nty0_revertexed*nty0_revertexed) << std::endl;
-	std::cout << "z0: " << z0_entry << ", produce output z0: " << produce_output.positions[0].z() << ", z0 revertexed: " << ntz0_revertexed << std::endl;
-	std::cout << "z1: " << z1_entry << ", produce output z1: " << produce_output.positions[1].z() << ", z1 revertexed: " << ntz1_revertexed << std::endl;
-	std::cout << "attempted recreation of nt.z1 using produce outputs: " << z1_entry + pvz1  << std::endl;
-	std::cout << "bsx0: " << bsx0 << ", bsx1: " << bsx1 << std::endl;
-	std::cout << "bsy0: " << bsy0 << ", bsy1: " << bsy1 << std::endl;
-	std::cout << "bsz0: " << bsz0 << ", bsz1: " << bsz1 << std::endl;
-	std::cout << "pvx0: " << pvx0 << ", pvx1: " << pvx1 << std::endl;
-	std::cout << "pvy0: " << pvy0 << ", pvy1: " << pvy1 << std::endl;
-	std::cout << "pvz0: " << pvz0 << ", pvz1: " << pvz1 << std::endl;
-	std::cout << std::endl;
-      }
-     
-      int ntrk0 = 0;
-      int ntrk1 = 0;
-      int vtx0_index = 0;
-      int vtx1_index = 0;
-      if (produce_output.numbers_of_vertex_tracks.size() > 2) {  //NOT HAVING THIS IS PROBABLY THE REASON WHY WE SEE SO MANY NO VERTICES RECONSTRUCTED!!!!
-	for (int v = 0; v < produce_output.numbers_of_vertex_tracks.size(); ++v) {
-	  if (produce_output.numbers_of_vertex_tracks[v] > ntrk0) {
-	    ntrk1 = ntrk0;
-	    ntrk0 = produce_output.numbers_of_vertex_tracks[v];
-	    vtx0_index = v;
-	  }
-	  else if (produce_output.numbers_of_vertex_tracks[v] > ntrk1) {
-	    ntrk1 = produce_output.numbers_of_vertex_tracks[v];
-	    vtx1_index = v;
-	  }
-	}
-	dvv3D_revertexed = sqrt( (produce_output.positions[vtx0_index].x()-produce_output.positions[vtx1_index].x())*(produce_output.positions[vtx0_index].x()-produce_output.positions[vtx1_index].x())
-				 + (produce_output.positions[vtx0_index].y()-produce_output.positions[vtx1_index].y())*(produce_output.positions[vtx0_index].y()-produce_output.positions[vtx1_index].y())
-				 + (produce_output.positions[vtx0_index].z()-produce_output.positions[vtx1_index].z())*(produce_output.positions[vtx0_index].z()-produce_output.positions[vtx1_index].z()) );
-      }
-      if (produce_output.numbers_of_vertex_tracks.size() == 2) {ntrk0 = produce_output.numbers_of_vertex_tracks[0]; ntrk1 = produce_output.numbers_of_vertex_tracks[1];}
-      if (produce_output.numbers_of_vertex_tracks.size() == 1) {ntrk0 = produce_output.numbers_of_vertex_tracks[0];}
-      
-      if (verbose and produce_output.numbers_of_vertex_tracks.size() > 2) {
-	std::cout << "MORE THAN 2 VERTICES!!!" << std::endl;
-	int ntrk0_many_vertices = 0;
-	int ntrk1_many_vertices = 0;
-	for (int v = 0; v < produce_output.numbers_of_vertex_tracks.size(); ++v) {
-	  if (produce_output.numbers_of_vertex_tracks[v] > ntrk0_many_vertices) {
-	    ntrk1_many_vertices = ntrk0_many_vertices;
-            ntrk0_many_vertices = produce_output.numbers_of_vertex_tracks[v];
-	  }
-	  else if (produce_output.numbers_of_vertex_tracks[v] > ntrk1_many_vertices) {
-	    ntrk1_many_vertices = produce_output.numbers_of_vertex_tracks[v];
-	  }
-	}
-	if (ntrk0_many_vertices >= p.ntracks() and ntrk1_many_vertices >= p.ntracks()) std::cout << "EVENT PASSES REGARDLESS!!!!!" << std::endl; 
-      }
-      
-      //if (produce_output.numbers_of_vertex_tracks.size() == 1) {std::cout << "constructed as 1-vertex event, 3D dvv: " << dvv3D_revertexed << ", vtx0 z: " << produce_output.positions[0].z() << "vtx1 z: " << produce_output.positions[1].z() << ", # of tracks in vtx1: " << produce_output.numbers_of_vertex_tracks[1] <<std::endl;}
-      //if (dvv3D_revertexed < 0.1) {h_c1v_ntrk0_ntrk1->Fill(ntrk0, ntrk1, btag_weight*sumdbv_w_entry);}
-      h_c1v_ntrk0_ntrk1->Fill(ntrk0, ntrk1, btag_weight*sumdbv_w_entry);
-
-      h_c1v_dvv3D_w_errorbars->Fill(dvv3D_entry_exact, btag_weight*sumdbv_w_entry);
-      h_c1v_sumdbv_w_errorbars->Fill(sumdbv_entry, btag_weight*sumdbv_w_entry);
-      if (p.ntracks() == 5 and produce_output.numbers_of_vertex_tracks.size() == 2 and produce_output.numbers_of_vertex_tracks[0] >= p.ntracks() and produce_output.numbers_of_vertex_tracks[1] >= p.ntracks()) {
-	h_c1v_dvv3D_revertexed_w_errorbars->Fill(dvv3D_revertexed, btag_weight*sumdbv_w_entry);
-	h_c1v_sumdbv_revertexed_w_errorbars->Fill(sumdbv_entry, btag_weight*sumdbv_w_entry);
-	h_c1v_absdphivv_revertexed_w_errorbars->Fill(absdphi_revertexed, btag_weight*sumdbv_w_entry);
-      }
-      else if (p.ntracks() == 9 and produce_output.numbers_of_vertex_tracks.size() == 2 and (produce_output.numbers_of_vertex_tracks[0] == 4 or produce_output.numbers_of_vertex_tracks[1] == 4) and (produce_output.numbers_of_vertex_tracks[0] >= 5 or produce_output.numbers_of_vertex_tracks[1] >= 5)) {
-	h_c1v_dvv3D_revertexed_w_errorbars->Fill(dvv3D_revertexed, btag_weight*sumdbv_w_entry);
-        h_c1v_sumdbv_revertexed_w_errorbars->Fill(sumdbv_entry, btag_weight*sumdbv_w_entry);
-        h_c1v_absdphivv_revertexed_w_errorbars->Fill(absdphi_revertexed, btag_weight*sumdbv_w_entry);
-      }
-      else if (p.ntracks() == 8 and produce_output.numbers_of_vertex_tracks.size() == 2 and (produce_output.numbers_of_vertex_tracks[0] == 3 or produce_output.numbers_of_vertex_tracks[1] == 3) and (produce_output.numbers_of_vertex_tracks[0] >= 5 or produce_output.numbers_of_vertex_tracks[1] >= 5)) {
-	h_c1v_dvv3D_revertexed_w_errorbars->Fill(dvv3D_revertexed, btag_weight*sumdbv_w_entry);
-        h_c1v_sumdbv_revertexed_w_errorbars->Fill(sumdbv_entry, btag_weight*sumdbv_w_entry);
-        h_c1v_absdphivv_revertexed_w_errorbars->Fill(absdphi_revertexed, btag_weight*sumdbv_w_entry);
-      }
-      else if (p.ntracks() == 7 and produce_output.numbers_of_vertex_tracks.size() == 2 and p.ntracks() == (produce_output.numbers_of_vertex_tracks[0]+produce_output.numbers_of_vertex_tracks[1]) and produce_output.numbers_of_vertex_tracks[0] != produce_output.numbers_of_vertex_tracks[1] and produce_output.numbers_of_vertex_tracks[0] > 2 and produce_output.numbers_of_vertex_tracks[1] > 2) {
-	h_c1v_dvv3D_revertexed_w_errorbars->Fill(dvv3D_revertexed, btag_weight*sumdbv_w_entry);
-        h_c1v_sumdbv_revertexed_w_errorbars->Fill(sumdbv_entry, btag_weight*sumdbv_w_entry);
-	h_c1v_absdphivv_revertexed_w_errorbars->Fill(absdphi_revertexed, btag_weight*sumdbv_w_entry);
-      }
-      else if (produce_output.numbers_of_vertex_tracks.size() == 2 and produce_output.numbers_of_vertex_tracks[0] == p.ntracks() and produce_output.numbers_of_vertex_tracks[1] == p.ntracks()) {
-        h_c1v_dvv3D_revertexed_w_errorbars->Fill(dvv3D_revertexed, btag_weight*sumdbv_w_entry);
-        h_c1v_sumdbv_revertexed_w_errorbars->Fill(sumdbv_entry, btag_weight*sumdbv_w_entry);
-	h_c1v_absdphivv_revertexed_w_errorbars->Fill(absdphi_revertexed, btag_weight*sumdbv_w_entry);
-      }
-    }
-    else if (!c1v_vertexer) {
-      h_c1v_dvv3D_w_errorbars->Fill(dvv3D_entry_exact, btag_weight*sumdbv_w_entry); //sumdbv_w_entry is the event and sample weight here and is correct, not just for dbv
-      h_c1v_sumdbv_w_errorbars->Fill(sumdbv_entry, btag_weight*sumdbv_w_entry);
-    }
-    //vertexer_trials += 1;
-    //if (produce_output.numbers_of_vertex_tracks.size() == 1 and produce_output.numbers_of_vertex_tracks[0] == p.ntracks()) {
-    //  vertexer_passes += 1;
-    //}
-
-    //random sampling for sumdbv background template
-    /*if (std::find(dbv_check_vector[sumdbv_bin].begin(), dbv_check_vector[sumdbv_bin].end(), randomIndex0) != dbv_check_vector[sumdbv_bin].end()) {
-      h_c1v_sumdbv_w_errorbars->Fill(sumdbv_entry, prob_sumdbv_w_errorbars*pow(2*h_c1v_sumdbv_w_errorbars->GetBinError(sumdbv_bin)*sumdbv_w_entry+pow(sumdbv_w_entry,2),0.5));
-    }
-    else if (std::find(dbv_check_vector[sumdbv_bin].begin(), dbv_check_vector[sumdbv_bin].end(), randomIndex1) != dbv_check_vector[sumdbv_bin].end()) {
-      h_c1v_sumdbv_w_errorbars->Fill(sumdbv_entry, prob_sumdbv_w_errorbars*pow(2*h_c1v_sumdbv_w_errorbars->GetBinError(sumdbv_bin)*sumdbv_w_entry+pow(sumdbv_w_entry,2),0.5));
-    }
-    else {
-      h_c1v_sumdbv_w_errorbars->Fill(sumdbv_entry, prob_sumdbv_w_errorbars*sumdbv_w_entry);
-    }
-    dbv_check_vector[sumdbv_bin].push_back(randomIndex0);
-    dbv_check_vector[sumdbv_bin].push_back(randomIndex1);*/
-    
-  }  //END OF c1v RANDOM PAIRING LOOP, unless running track cross contam with 5-track target
-  //std::cout << paired_with_5_counter << std::endl;
-
-  //when running >= 5 track with all track multiplicities, this loops over pairing every >=5 with another >=5
-  if (p.ntracks() == 5 and c1v_vertexer and use_alltrkmultiplicities) {
-    std::mt19937 gen(86); //defines seed for rng usage so we will get the same plots every run, easier to debug
-    //std::uniform_int_distribution<> dist_5trk(0, dbv_value_vector_5trk.size() - 1);
-    std::uniform_int_distribution<> dist1_5trk(0, dbv_value_vector_btag_npult20_5trk.size() - 1);
-    std::uniform_int_distribution<> dist2_5trk(0, dbv_value_vector_btag_npugt20lt30_5trk.size() - 1);
-    std::uniform_int_distribution<> dist3_5trk(0, dbv_value_vector_btag_npugt30lt40_5trk.size() - 1);
-    std::uniform_int_distribution<> dist4_5trk(0, dbv_value_vector_btag_npugt40_5trk.size() - 1);
-    std::uniform_int_distribution<> dist5_5trk(0, dbv_value_vector_nobtag_npult20_5trk.size() - 1);
-    std::uniform_int_distribution<> dist6_5trk(0, dbv_value_vector_nobtag_npugt20lt30_5trk.size() - 1);
-    std::uniform_int_distribution<> dist7_5trk(0, dbv_value_vector_nobtag_npugt30lt40_5trk.size() - 1);
-    std::uniform_int_distribution<> dist8_5trk(0, dbv_value_vector_nobtag_npugt40_5trk.size() - 1);
-    for (int ij = 0; ij < nsamples; ++ij) {
-      if (p.ntracks() == 5 and vertex_tracks_vector[ij].size() < 5) {continue;}
-      double dbv0_entry = dbv_value_vector[ij];
-      double x0_entry = x_value_vector[ij];
-      double y0_entry = y_value_vector[ij];
-      double z0_entry = z_value_vector[ij];
-      double dbv0_weight_entry = dbv_weight_vector[ij];
-
-      double bsx0;
-      double bsy0;
-      double bsz0;
-      double pvx0;
-      double pvy0;
-      double pvz0;
-      reco::TrackCollection track_collection0;
-      double bsx1;
-      double bsy1;
-      double bsz1;
-      double pvx1;
-      double pvy1;
-      double pvz1;
-      reco::TrackCollection track_collection1;
-      reco::TrackCollection track_collection_c1v;
-      std::vector<reco::TransientTrack> seed_tracks_c1v;
-      if (c1v_vertexer) {
-	bsx0 = bsx_vector[ij];
-	bsy0 = bsy_vector[ij];
-	bsz0 = bsz_vector[ij];
-	pvx0 = pvx_vector[ij];
-	pvy0 = pvy_vector[ij];
-	pvz0 = pvz_vector[ij];
-	track_collection0 = vertex_track_collection_vector[ij];
-      }
-
-      double dbv1_entry;
-      double x1_entry;
-      double y1_entry;
-      double z1_entry;
-      double dbv1_weight_entry;
-      int randomIndex1;
-
-      if (dbv_npubinid_vector[ij] == 1) {
-	if (dbv_value_vector_btag_npult20.size() < 2) {
-	  randomIndex1 = dist1_5trk(gen);
-	}
-	//else if (p.ntracks() > 5) {
-	//  do {randomIndex1 = dist1(gen);} while (dbv0_entry == dbv_value_vector_btag_npult20[randomIndex1] or track_collection0.size() == vertex_track_collection_vector_btag_npult20[randomIndex1].size()); //EITHER ADD THIS TO ALL NPU/BTAG BINS OR GET RID OF IT!!!
-	//}
-	else {
-	  do {randomIndex1 = dist1_5trk(gen);} while (dbv0_entry == dbv_value_vector_btag_npult20_5trk[randomIndex1]);
-	}
-	dbv1_entry = dbv_value_vector_btag_npult20_5trk[randomIndex1];
-	x1_entry = x_value_vector_btag_npult20_5trk[randomIndex1];
-	y1_entry = y_value_vector_btag_npult20_5trk[randomIndex1];
-	z1_entry = z_value_vector_btag_npult20_5trk[randomIndex1];
-	dbv1_weight_entry = dbv_weight_vector_btag_npult20_5trk[randomIndex1];
-	bsx1 = bsx_vector_btag_npult20_5trk[randomIndex1];
-	bsy1 = bsy_vector_btag_npult20_5trk[randomIndex1];
-	bsz1 = bsz_vector_btag_npult20_5trk[randomIndex1];
-	pvx1 = pvx_vector_btag_npult20_5trk[randomIndex1];
-	pvy1 = pvy_vector_btag_npult20_5trk[randomIndex1];
-	pvz1 = pvz_vector_btag_npult20_5trk[randomIndex1];
-	track_collection1 = vertex_track_collection_vector_btag_npult20_5trk[randomIndex1];
-      }
-      else if (dbv_npubinid_vector[ij] == 2) {
-	if (dbv_value_vector_btag_npugt20lt30_5trk.size() < 2) {
-	  randomIndex1 = dist2_5trk(gen);
-	}
-	else {
-	  do {randomIndex1 = dist2_5trk(gen);} while (dbv0_entry == dbv_value_vector_btag_npugt20lt30_5trk[randomIndex1]);
-	}
-	dbv1_entry = dbv_value_vector_btag_npugt20lt30_5trk[randomIndex1];
-	x1_entry = x_value_vector_btag_npugt20lt30_5trk[randomIndex1];
-	y1_entry = y_value_vector_btag_npugt20lt30_5trk[randomIndex1];
-	z1_entry = z_value_vector_btag_npugt20lt30_5trk[randomIndex1];
-	dbv1_weight_entry = dbv_weight_vector_btag_npugt20lt30_5trk[randomIndex1];
-	bsx1 = bsx_vector_btag_npugt20lt30_5trk[randomIndex1];
-	bsy1 = bsy_vector_btag_npugt20lt30_5trk[randomIndex1];
-	bsz1 = bsz_vector_btag_npugt20lt30_5trk[randomIndex1];
-	pvx1 = pvx_vector_btag_npugt20lt30_5trk[randomIndex1];
-	pvy1 = pvy_vector_btag_npugt20lt30_5trk[randomIndex1];
-	pvz1 = pvz_vector_btag_npugt20lt30_5trk[randomIndex1];
-	track_collection1 = vertex_track_collection_vector_btag_npugt20lt30_5trk[randomIndex1];
-      }
-      else if (dbv_npubinid_vector[ij] == 3) {
-	if (dbv_value_vector_btag_npugt30lt40_5trk.size() < 2) {
-	  randomIndex1 = dist3_5trk(gen);
-	}
-	else {
-	  do {randomIndex1 = dist3_5trk(gen);} while (dbv0_entry == dbv_value_vector_btag_npugt30lt40_5trk[randomIndex1]);
-	}
-	dbv1_entry = dbv_value_vector_btag_npugt30lt40_5trk[randomIndex1];
-	x1_entry = x_value_vector_btag_npugt30lt40_5trk[randomIndex1];
-	y1_entry = y_value_vector_btag_npugt30lt40_5trk[randomIndex1];
-	z1_entry = z_value_vector_btag_npugt30lt40_5trk[randomIndex1];
-	dbv1_weight_entry = dbv_weight_vector_btag_npugt30lt40_5trk[randomIndex1];
-	bsx1 = bsx_vector_btag_npugt30lt40_5trk[randomIndex1];
-	bsy1 = bsy_vector_btag_npugt30lt40_5trk[randomIndex1];
-	bsz1 = bsz_vector_btag_npugt30lt40_5trk[randomIndex1];
-	pvx1 = pvx_vector_btag_npugt30lt40_5trk[randomIndex1];
-	pvy1 = pvy_vector_btag_npugt30lt40_5trk[randomIndex1];
-	pvz1 = pvz_vector_btag_npugt30lt40_5trk[randomIndex1];
-	track_collection1 = vertex_track_collection_vector_btag_npugt30lt40_5trk[randomIndex1];
-      }
-      else if (dbv_npubinid_vector[ij] == 4) {
-	if (dbv_value_vector_btag_npugt40_5trk.size() < 2) {
-	  randomIndex1 = dist4_5trk(gen);
-	}
-	else {
-	  do {randomIndex1 = dist4_5trk(gen);} while (dbv0_entry == dbv_value_vector_btag_npugt40_5trk[randomIndex1]);
-	}
-	dbv1_entry = dbv_value_vector_btag_npugt40_5trk[randomIndex1];
-	x1_entry = x_value_vector_btag_npugt40_5trk[randomIndex1];
-	y1_entry = y_value_vector_btag_npugt40_5trk[randomIndex1];
-	z1_entry = z_value_vector_btag_npugt40_5trk[randomIndex1];
-	dbv1_weight_entry = dbv_weight_vector_btag_npugt40_5trk[randomIndex1];
-	bsx1 = bsx_vector_btag_npugt40_5trk[randomIndex1];
-	bsy1 = bsy_vector_btag_npugt40_5trk[randomIndex1];
-	bsz1 = bsz_vector_btag_npugt40_5trk[randomIndex1];
-	pvx1 = pvx_vector_btag_npugt40_5trk[randomIndex1];
-	pvy1 = pvy_vector_btag_npugt40_5trk[randomIndex1];
-	pvz1 = pvz_vector_btag_npugt40_5trk[randomIndex1];
-	track_collection1 = vertex_track_collection_vector_btag_npugt40_5trk[randomIndex1];
-      }
-      else if (dbv_npubinid_vector[ij] == 5) {
-	if (dbv_value_vector_nobtag_npult20_5trk.size() < 2) {
-	  randomIndex1 = dist5_5trk(gen);
-	}
-	else {
-	  do {randomIndex1 = dist5_5trk(gen);} while (dbv0_entry == dbv_value_vector_nobtag_npult20_5trk[randomIndex1]);
-	}
-	dbv1_entry = dbv_value_vector_nobtag_npult20_5trk[randomIndex1];
-	x1_entry = x_value_vector_nobtag_npult20_5trk[randomIndex1];
-	y1_entry = y_value_vector_nobtag_npult20_5trk[randomIndex1];
-	z1_entry = z_value_vector_nobtag_npult20_5trk[randomIndex1];
-	dbv1_weight_entry = dbv_weight_vector_nobtag_npult20_5trk[randomIndex1];
-	bsx1 = bsx_vector_nobtag_npult20_5trk[randomIndex1];
-	bsy1 = bsy_vector_nobtag_npult20_5trk[randomIndex1];
-	bsz1 = bsz_vector_nobtag_npult20_5trk[randomIndex1];
-	pvx1 = pvx_vector_nobtag_npult20_5trk[randomIndex1];
-	pvy1 = pvy_vector_nobtag_npult20_5trk[randomIndex1];
-	pvz1 = pvz_vector_nobtag_npult20_5trk[randomIndex1];
-	track_collection1 = vertex_track_collection_vector_nobtag_npult20_5trk[randomIndex1];
-      }
-      else if (dbv_npubinid_vector[ij] == 6) {
-	if (dbv_value_vector_nobtag_npugt20lt30_5trk.size() < 2) {
-	  randomIndex1 = dist6_5trk(gen);
-	}
-	else {
-	  do {randomIndex1 = dist6_5trk(gen);} while (dbv0_entry == dbv_value_vector_nobtag_npugt20lt30_5trk[randomIndex1]);
-	}
-	dbv1_entry = dbv_value_vector_nobtag_npugt20lt30_5trk[randomIndex1];
-	x1_entry = x_value_vector_nobtag_npugt20lt30_5trk[randomIndex1];
-	y1_entry = y_value_vector_nobtag_npugt20lt30_5trk[randomIndex1];
-	z1_entry = z_value_vector_nobtag_npugt20lt30_5trk[randomIndex1];
-	dbv1_weight_entry = dbv_weight_vector_nobtag_npugt20lt30_5trk[randomIndex1];
-	bsx1 = bsx_vector_nobtag_npugt20lt30_5trk[randomIndex1];
-	bsy1 = bsy_vector_nobtag_npugt20lt30_5trk[randomIndex1];
-	bsz1 = bsz_vector_nobtag_npugt20lt30_5trk[randomIndex1];
-	pvx1 = pvx_vector_nobtag_npugt20lt30_5trk[randomIndex1];
-	pvy1 = pvy_vector_nobtag_npugt20lt30_5trk[randomIndex1];
-	pvz1 = pvz_vector_nobtag_npugt20lt30_5trk[randomIndex1];
-	track_collection1 = vertex_track_collection_vector_nobtag_npugt20lt30_5trk[randomIndex1];
-      }
-      else if (dbv_npubinid_vector[ij] == 7) {
-	if (dbv_value_vector_nobtag_npugt30lt40_5trk.size() < 2) {
-	  randomIndex1 = dist7_5trk(gen);
-	}
-	else {
-	  do {randomIndex1 = dist7_5trk(gen);} while (dbv0_entry == dbv_value_vector_nobtag_npugt30lt40_5trk[randomIndex1]);
-	}
-	dbv1_entry = dbv_value_vector_nobtag_npugt30lt40_5trk[randomIndex1];
-	x1_entry = x_value_vector_nobtag_npugt30lt40_5trk[randomIndex1];
-	y1_entry = y_value_vector_nobtag_npugt30lt40_5trk[randomIndex1];
-	z1_entry = z_value_vector_nobtag_npugt30lt40_5trk[randomIndex1];
-	dbv1_weight_entry = dbv_weight_vector_nobtag_npugt30lt40_5trk[randomIndex1];
-	bsx1 = bsx_vector_nobtag_npugt30lt40_5trk[randomIndex1];
-	bsy1 = bsy_vector_nobtag_npugt30lt40_5trk[randomIndex1];
-	bsz1 = bsz_vector_nobtag_npugt30lt40_5trk[randomIndex1];
-	pvx1 = pvx_vector_nobtag_npugt30lt40_5trk[randomIndex1];
-	pvy1 = pvy_vector_nobtag_npugt30lt40_5trk[randomIndex1];
-	pvz1 = pvz_vector_nobtag_npugt30lt40_5trk[randomIndex1];
-	track_collection1 = vertex_track_collection_vector_nobtag_npugt30lt40_5trk[randomIndex1];
-      }
-      else if (dbv_npubinid_vector[ij] == 8) {
-	if (dbv_value_vector_nobtag_npugt40_5trk.size() < 2) {
-	  randomIndex1 = dist8_5trk(gen);
-	}
-	else {
-	  do {randomIndex1 = dist8_5trk(gen);} while (dbv0_entry == dbv_value_vector_nobtag_npugt40_5trk[randomIndex1]);
-	}
-	dbv1_entry = dbv_value_vector_nobtag_npugt40_5trk[randomIndex1];
-	x1_entry = x_value_vector_nobtag_npugt40_5trk[randomIndex1];
-	y1_entry = y_value_vector_nobtag_npugt40_5trk[randomIndex1];
-	z1_entry = z_value_vector_nobtag_npugt40_5trk[randomIndex1];
-	dbv1_weight_entry = dbv_weight_vector_nobtag_npugt40_5trk[randomIndex1];
-	bsx1 = bsx_vector_nobtag_npugt40_5trk[randomIndex1];
-	bsy1 = bsy_vector_nobtag_npugt40_5trk[randomIndex1];
-	bsz1 = bsz_vector_nobtag_npugt40_5trk[randomIndex1];
-	pvx1 = pvx_vector_nobtag_npugt40_5trk[randomIndex1];
-	pvy1 = pvy_vector_nobtag_npugt40_5trk[randomIndex1];
-	pvz1 = pvz_vector_nobtag_npugt40_5trk[randomIndex1];
-	track_collection1 = vertex_track_collection_vector_nobtag_npugt40_5trk[randomIndex1];
-      }
-      else {
-	std::cout << "Error: Improper btagging/pileup binning id, recieved binning id: " << dbv_npubinid_vector[ij] << std::endl;
-      }
-
-      std::vector<reco::TrackRef> track_refs_c1v;
-      GlobalVector constantField(0.0, 0.0, 3.8);
-      UniformMagneticField uniformField(constantField);
-      const MagneticField* B_field = &uniformField;
-      produce_vertices produce_output;
-      std::vector<double> bs_position_c1v = {bsx0,bsy0,bsz0};
-      std::vector<double> pv_position_c1v = {pvx0,pvy0,pvz0};
-      for (int k = 0; k < track_collection0.size(); ++k) {
-	track_collection_c1v.push_back(track_collection0[k]);
-      }
-      for (int k = 0; k < track_collection1.size(); ++k) {
-	reco::TrackBase::Point referencePoint1_zshifted = reco::TrackBase::Point(track_collection1[k].vx() - (pvx1+bsx1) + (pvx0+bsx0),
-                                                                                 track_collection1[k].vy() - (pvy1+bsy1) + (pvy0+bsy0),
-                                                                                 track_collection1[k].vz() - (pvz1+bsz1) + (pvz0+bsz0));
-	reco::Track reco_track1_zshifted = reco::Track(track_collection1[k].chi2(), track_collection1[k].ndof(), referencePoint1_zshifted, track_collection1[k].momentum(), track_collection1[k].charge(), track_collection1[k].covariance());
-	track_collection_c1v.push_back(reco_track1_zshifted);
-      }
-      for (size_t k = 0; k < track_collection_c1v.size(); ++k) {
-	reco::TrackRef ref_c1v(&track_collection_c1v, k);
-	track_refs_c1v.push_back(ref_c1v);
-	seed_tracks_c1v.push_back(reco::TransientTrack(ref_c1v, B_field));
-      }
-      produce_output = produce(bs_position_c1v, bssigma_x, bssigma_y, bssigma_z, seed_tracks_c1v, track_collection_c1v); //use beamspot value for event0 rather than event1
-
-      double sumdbv_entry = dbv0_entry + dbv1_entry;
-      double sumdbv_bin = h_c1v_sumdbv_w_errorbars->FindBin(sumdbv_entry);
-      double sumdbv_w_entry = dbv0_weight_entry*dbv1_weight_entry;
-      double dphi   = f_dphi->GetRandom(); //background template construction: get random angle (dphi) between the random dbv pair, always 1/pi (set above)
-      double phi0 = std::atan2(y0_entry,x0_entry);
-      double phi1 = std::atan2(y1_entry,x1_entry);
-      double absdphi_revertexed;
-      if (M_PI < phi1-phi0) {
-	absdphi_revertexed = 2*M_PI - (phi1-phi0);
-      }
-      else if(-M_PI > phi1-phi0) {
-	absdphi_revertexed = 2*M_PI + (phi1-phi0);
-      }
-      else {
-	absdphi_revertexed = fabs(phi1-phi0);
-      }
-
-      double dvv_entry = sqrt(dbv0_entry*dbv0_entry + dbv1_entry*dbv1_entry - 2*dbv0_entry*dbv1_entry*cos(dphi));
-      double dvv3D_entry = sqrt(dbv0_entry*dbv0_entry + dbv1_entry*dbv1_entry - 2*dbv0_entry*dbv1_entry*cos(dphi) + (z0_entry - z1_entry)*(z0_entry - z1_entry));
-      double dvv3D_entry_exact = sqrt((x0_entry - x1_entry)*(x0_entry - x1_entry) + (y0_entry - y1_entry)*(y0_entry - y1_entry) + (z0_entry - z1_entry)*(z0_entry - z1_entry));
-
-      double btag_weight = 1; //REMEMBER TO FINISH/ADJUST THIS!!!!!!!!!
-      if (dbv_npubinid_vector[ij] < 5) {
-	btag_weight = 99/80;
-      }
-      else {
-	btag_weight = 1/20;
-      }
-
-      double ntx0_revertexed = produce_output.positions[0].x() - bsx0 - pvx0;
-      double nty0_revertexed = produce_output.positions[0].y() - bsy0 - pvy0;
-      double ntz0_revertexed = produce_output.positions[0].z() - bsz0 - pvz0;
-      double ntx1_revertexed = produce_output.positions[1].x() - bsx0 - pvx0;
-      double nty1_revertexed = produce_output.positions[1].y() - bsy0 - pvy0;
-      double ntz1_revertexed = produce_output.positions[1].z() - bsz0 - pvz0;
-      double dvv3D_revertexed = sqrt( (produce_output.positions[0].x()-produce_output.positions[1].x())*(produce_output.positions[0].x()-produce_output.positions[1].x())
-				      + (produce_output.positions[0].y()-produce_output.positions[1].y())*(produce_output.positions[0].y()-produce_output.positions[1].y())
-				      + (produce_output.positions[0].z()-produce_output.positions[1].z())*(produce_output.positions[0].z()-produce_output.positions[1].z()) );
-      if (produce_output.numbers_of_vertex_tracks.size() < 2) {dvv3D_revertexed = 0;}
-
-      int ntrk0 = 0;
-      int ntrk1 = 0;
-      int vtx0_index = 0;
-      int vtx1_index = 0;
-      if (produce_output.numbers_of_vertex_tracks.size() > 2) {
-        for (int v = 0; v < produce_output.numbers_of_vertex_tracks.size(); ++v) {
-          if (produce_output.numbers_of_vertex_tracks[v] > ntrk0) {
-            ntrk1 = ntrk0;
-            ntrk0 = produce_output.numbers_of_vertex_tracks[v];
-            vtx0_index = v;
-          }
-          else if (produce_output.numbers_of_vertex_tracks[v] > ntrk1) {
-            ntrk1 = produce_output.numbers_of_vertex_tracks[v];
-            vtx1_index = v;
-          }
-        }
-        dvv3D_revertexed = sqrt( (produce_output.positions[vtx0_index].x()-produce_output.positions[vtx1_index].x())*(produce_output.positions[vtx0_index].x()-produce_output.positions[vtx1_index].x())
-                                 + (produce_output.positions[vtx0_index].y()-produce_output.positions[vtx1_index].y())*(produce_output.positions[vtx0_index].y()-produce_output.positions[vtx1_index].y())
-                                 + (produce_output.positions[vtx0_index].z()-produce_output.positions[vtx1_index].z())*(produce_output.positions[vtx0_index].z()-produce_output.positions[vtx1_index].z()) );
-      }
-      if (produce_output.numbers_of_vertex_tracks.size() == 2) {ntrk0 = produce_output.numbers_of_vertex_tracks[0]; ntrk1 = produce_output.numbers_of_vertex_tracks[1];}
-      if (produce_output.numbers_of_vertex_tracks.size() == 1) {ntrk0 = produce_output.numbers_of_vertex_tracks[0];}
-
-      h_c1v_ntrk0_ntrk1->Fill(ntrk0, ntrk1, btag_weight*sumdbv_w_entry);
-
-      h_c1v_dvv3D_w_errorbars->Fill(dvv3D_entry_exact, btag_weight*sumdbv_w_entry);
-      h_c1v_sumdbv_w_errorbars->Fill(sumdbv_entry, btag_weight*sumdbv_w_entry);
-      if (p.ntracks() == 5 and produce_output.numbers_of_vertex_tracks.size() == 2 and produce_output.numbers_of_vertex_tracks[0] >= p.ntracks() and produce_output.numbers_of_vertex_tracks[1] >= p.ntracks()) {
-        h_c1v_dvv3D_revertexed_w_errorbars->Fill(dvv3D_revertexed, btag_weight*sumdbv_w_entry);
-        h_c1v_sumdbv_revertexed_w_errorbars->Fill(sumdbv_entry, btag_weight*sumdbv_w_entry);
-        h_c1v_absdphivv_revertexed_w_errorbars->Fill(absdphi_revertexed, btag_weight*sumdbv_w_entry);
-      }
-      else if (p.ntracks() == 9 and produce_output.numbers_of_vertex_tracks.size() == 2 and (produce_output.numbers_of_vertex_tracks[0] == 4 or produce_output.numbers_of_vertex_tracks[1] == 4) and (produce_output.numbers_of_vertex_tracks[0] >= 5 or produce_output.numbers_of_vertex_tracks[1] >= 5)) {
-        h_c1v_dvv3D_revertexed_w_errorbars->Fill(dvv3D_revertexed, btag_weight*sumdbv_w_entry);
-        h_c1v_sumdbv_revertexed_w_errorbars->Fill(sumdbv_entry, btag_weight*sumdbv_w_entry);
-        h_c1v_absdphivv_revertexed_w_errorbars->Fill(absdphi_revertexed, btag_weight*sumdbv_w_entry);
-      }
-      else if (p.ntracks() == 8 and produce_output.numbers_of_vertex_tracks.size() == 2 and (produce_output.numbers_of_vertex_tracks[0] == 3 or produce_output.numbers_of_vertex_tracks[1] == 3) and (produce_output.numbers_of_vertex_tracks[0] >= 5 or produce_output.numbers_of_vertex_tracks[1] >= 5)) {
-        h_c1v_dvv3D_revertexed_w_errorbars->Fill(dvv3D_revertexed, btag_weight*sumdbv_w_entry);
-        h_c1v_sumdbv_revertexed_w_errorbars->Fill(sumdbv_entry, btag_weight*sumdbv_w_entry);
-        h_c1v_absdphivv_revertexed_w_errorbars->Fill(absdphi_revertexed, btag_weight*sumdbv_w_entry);
-      }
-      else if (p.ntracks() == 7 and produce_output.numbers_of_vertex_tracks.size() == 2 and p.ntracks() == (produce_output.numbers_of_vertex_tracks[0]+produce_output.numbers_of_vertex_tracks[1]) and produce_output.numbers_of_vertex_tracks[0] != produce_output.numbers_of_vertex_tracks[1] and produce_output.numbers_of_vertex_tracks[0] > 2 and produce_output.numbers_of_vertex_tracks[1] > 2) {
-        h_c1v_dvv3D_revertexed_w_errorbars->Fill(dvv3D_revertexed, btag_weight*sumdbv_w_entry);
-        h_c1v_sumdbv_revertexed_w_errorbars->Fill(sumdbv_entry, btag_weight*sumdbv_w_entry);
-        h_c1v_absdphivv_revertexed_w_errorbars->Fill(absdphi_revertexed, btag_weight*sumdbv_w_entry);
-      }
-      else if (produce_output.numbers_of_vertex_tracks.size() == 2 and produce_output.numbers_of_vertex_tracks[0] == p.ntracks() and produce_output.numbers_of_vertex_tracks[1] == p.ntracks()) {
-        h_c1v_dvv3D_revertexed_w_errorbars->Fill(dvv3D_revertexed, btag_weight*sumdbv_w_entry);
-        h_c1v_sumdbv_revertexed_w_errorbars->Fill(sumdbv_entry, btag_weight*sumdbv_w_entry);
-        h_c1v_absdphivv_revertexed_w_errorbars->Fill(absdphi_revertexed, btag_weight*sumdbv_w_entry);
-      }
-    }
-  } //end of extra vertex pairing loop in which we pair all >=5 track events after pairing >=5 track events with any track multiplicity
-
-  if (verbose) std::cout << "End looping through samples" << std::endl;
-  //std::cout << "Percentage of single vertex inputs passing the vertexer: " << 100*vertexer_passes/vertexer_trials << "%" << std::endl;
-
-
-  printf("events before efficiency correction = %d, events after efficiency correction = %f, integrated efficiency correction = %f\n", nsamples, events_after_eff, events_after_eff/nsamples);
-
-  TString cb_cbbar = TString::Format("%s, %f", out_fn, events_after_eff/nsamples);
-  cb_cbbar_vector.push_back(cb_cbbar);
-
-  if (p.vary_dphi()) {
-    printf("bin1 = %d, bin2 = %d, bin3 = %d, intobin1 = %d, intobin2 = %d, intobin3 = %d, outofbin1 = %d, outofbin2 = %d, outofbin3 = %d\n", bin1, bin2, bin3, intobin1, intobin2, intobin3, outofbin1, outofbin2, outofbin3);
-    printf("uncorrelated variation / default (bin 1): %f +/- %f\n", 1 + (intobin1 - outofbin1) / (1.*bin1), sqrt(bin1 + bin1 + intobin1 - outofbin1) / bin1);
-    printf("  correlated variation / default (bin 1): %f +/- %f\n", 1 + (intobin1 - outofbin1) / (1.*bin1), sqrt(intobin1 + outofbin1) / bin1);
-    printf("uncertainty correlated / uncorrelated (bin 1): %f\n", sqrt(intobin1 + outofbin1) / sqrt(bin1 + bin1 + intobin1 - outofbin1));
-    printf("uncorrelated variation / default (bin 2): %f +/- %f\n", 1 + (intobin2 - outofbin2) / (1.*bin2), sqrt(bin2 + bin2 + intobin2 - outofbin2) / bin2);
-    printf("  correlated variation / default (bin 2): %f +/- %f\n", 1 + (intobin2 - outofbin2) / (1.*bin2), sqrt(intobin2 + outofbin2) / bin2);
-    printf("uncertainty correlated / uncorrelated (bin 2): %f\n", sqrt(intobin2 + outofbin2) / sqrt(bin2 + bin2 + intobin2 - outofbin2));
-    printf("uncorrelated variation / default (bin 3): %f +/- %f\n", 1 + (intobin3 - outofbin3) / (1.*bin3), sqrt(bin3 + bin3 + intobin3 - outofbin3) / bin3);
-    printf("  correlated variation / default (bin 3): %f +/- %f\n", 1 + (intobin3 - outofbin3) / (1.*bin3), sqrt(intobin3 + outofbin3) / bin3);
-    printf("uncertainty correlated / uncorrelated (bin 3): %f\n", sqrt(intobin3 + outofbin3) / sqrt(bin3 + bin3 + intobin3 - outofbin3));
-  }
-
-  TFile* fh = TFile::Open(out_fn, "recreate");
-
-  h_1v_dbv->Write();
-  h_1v_dbv_npult20->Write();
-  h_1v_dbv_npugt20lt30->Write();
-  h_1v_dbv_npugt30lt40->Write();
-  h_1v_dbv_npugt40->Write();
-  h_1v_costh2_onlytks0->Write(); //Alec added
-  h_1v_costh20->Write(); //Alec added
-  h_1v_bs2derr->Write(); //Alec added
-  h_1v_rescale_bs2derr->Write(); //Alec added
-  h_1v_w->Write(); //Alec added
-  h_1v_z->Write();
-  h_1v_dz->Write();
-  h_1v_dpvsv->Write();
-  h_1v_xy->Write();
-  h_1v_dbv0->Write();
-  h_1v_dbv1->Write();
-  h_1v_dbv_dz->Write();
-  h_1v_dbv_bs2derr->Write(); //Alec added
-  h_1v_phiv->Write();
-  h_1v_npu->Write();
-  h_1v_npv->Write();
-  h_1v_njets->Write();
-  h_1v_ht40->Write();
-  h_1v_phij->Write();
-  h_1v_dphijj->Write();
-  h_1v_dphijv->Write();
-  h_1v_dphijvpt->Write();
-  h_1v_dphijvmin->Write();
-  h_2v_dbv->Write();
-  h_2v_dbv1_dbv0->Write();
-  h_2v_dvv->Write();
-  h_2v_dvv3D->Write(); //Alec added
-  h_2v_sumdbv->Write();
-  h_2v_dphivv->Write();
-  h_2v_absdphivv->Write();
-  h_2v_npu->Write();
-  h_2v_npv->Write();
-
-  //h_c1v_dbv->Write();
-  //h_c1v_dvv->Scale(1./h_c1v_dvv->Integral());
-  //h_c1v_dvv->Write();
-  //h_c1v_sumdbv->Scale(1./h_c1v_sumdbv->Integral());
-  //h_c1v_sumdbv->Write();
-  h_c1v_dvv3D_w_errorbars->Write();
-  h_c1v_dvv3D_revertexed_w_errorbars->Write();
-  h_c1v_sumdbv_revertexed_w_errorbars->Write();
-  h_c1v_absdphivv_revertexed_w_errorbars->Write();
-  h_c1v_sumdbv_w_errorbars->Write();
-  h_c1v_absdphivv_revertexed_w_errorbars->Write();
-  h_c1v_ntrk0_ntrk1->Write();
-  //h_c1v_absdphivv->Write();
-  //h_c1v_dbv0->Write();
-  //h_c1v_dbv1->Write();
-  //h_c1v_dbv1_dbv0->Write();
-
-  /*TCanvas* c_dvv = new TCanvas("c_dvv", "c_dvv", 700, 700);
-  TLegend* l_dvv = new TLegend(0.35,0.75,0.85,0.85);
-  h_2v_dvv->SetTitle(";d_{VV} (cm);events");
-  h_2v_dvv->SetLineColor(kBlue);
-  h_2v_dvv->SetLineWidth(3);
-  h_2v_dvv->Scale(1./h_2v_dvv->Integral());
-  h_2v_dvv->SetStats(0);
-  h_2v_dvv->Draw();
-  l_dvv->AddEntry(h_2v_dvv, "two-vertex events");
-  h_c1v_dvv->SetLineColor(kRed);
-  h_c1v_dvv->SetLineWidth(3);
-  h_c1v_dvv->Scale(1./h_c1v_dvv->Integral());
-  h_c1v_dvv->SetStats(0);
-  h_c1v_dvv->Draw("sames");
-  l_dvv->AddEntry(h_c1v_dvv, "constructed from only-one-vertex events");
-  l_dvv->SetFillColor(0);
-  l_dvv->Draw();
-  c_dvv->SetTickx();
-  c_dvv->SetTicky();
-  c_dvv->Write();
-
-  TCanvas* c_sumdbv = new TCanvas("c_sumdbv", "c_sumdbv", 700, 700);
-  TLegend* l_sumdbv = new TLegend(0.35,0.75,0.85,0.85);
-  h_2v_sumdbv->SetTitle(";#Sigmad_{BV} (cm);events");
-  h_2v_sumdbv->SetLineColor(kBlue);
-  h_2v_sumdbv->SetLineWidth(3);
-  h_2v_sumdbv->Scale(1./h_2v_sumdbv->Integral());
-  h_2v_sumdbv->SetStats(0);
-  h_2v_sumdbv->Draw();
-  l_sumdbv->AddEntry(h_2v_sumdbv, "two-vertex events");
-  h_c1v_sumdbv->SetLineColor(kRed);
-  h_c1v_sumdbv->SetLineWidth(3);
-  h_c1v_sumdbv->Scale(1./h_c1v_sumdbv->Integral());
-  h_c1v_sumdbv->SetStats(0);
-  h_c1v_sumdbv->Draw("sames");
-  l_sumdbv->AddEntry(h_c1v_sumdbv, "constructed from only-one-vertex events");
-  l_sumdbv->SetFillColor(0);
-  l_sumdbv->Draw();
-  c_sumdbv->SetTickx();
-  c_sumdbv->SetTicky();
-  c_sumdbv->Write();*/
-
-  TCanvas* c_sumdbv_w_errorbars = new TCanvas("c_sumdbv_w_errorbars", "c_sumdbv_w_errorbars", 700, 700);
-  TLegend* l_sumdbv_w_errorbars = new TLegend(0.35,0.75,0.85,0.85);
-  h_2v_sumdbv->SetTitle(";#Sigmad_{BV} (cm);events");
-  h_2v_sumdbv->SetLineColor(kBlue);
-  h_2v_sumdbv->SetLineWidth(3);
-  h_2v_sumdbv->Scale(1./h_2v_sumdbv->Integral());
-  h_2v_sumdbv->SetStats(0);
-  h_2v_sumdbv->Draw();
-  l_sumdbv_w_errorbars->AddEntry(h_2v_sumdbv, "two-vertex events");
-  h_c1v_sumdbv_w_errorbars->SetLineColor(kRed);
-  h_c1v_sumdbv_w_errorbars->SetLineWidth(3);
-  h_c1v_sumdbv_w_errorbars->Scale(1./h_c1v_sumdbv_w_errorbars->Integral());
-  h_c1v_sumdbv_w_errorbars->SetStats(0);
-  h_c1v_sumdbv_w_errorbars->Draw("sames");
-  l_sumdbv_w_errorbars->AddEntry(h_c1v_sumdbv_w_errorbars, "constructed from only-one-vertex events");
-  l_sumdbv_w_errorbars->SetFillColor(0);
-  l_sumdbv_w_errorbars->Draw();
-  c_sumdbv_w_errorbars->SetTickx();
-  c_sumdbv_w_errorbars->SetTicky();
-  c_sumdbv_w_errorbars->Write();
-
-  /*TCanvas* c_absdphivv = new TCanvas("c_absdphivv", "c_absdphivv", 700, 700);
-  TLegend* l_absdphivv = new TLegend(0.25,0.75,0.75,0.85);
-  h_2v_absdphivv->SetTitle(";|#Delta#phi_{VV}|;events");
-  h_2v_absdphivv->SetLineColor(kBlue);
-  h_2v_absdphivv->SetLineWidth(3);
-  h_2v_absdphivv->Scale(1./h_2v_absdphivv->Integral());
-  h_2v_absdphivv->SetStats(0);
-  h_2v_absdphivv->Draw();
-  l_absdphivv->AddEntry(h_2v_absdphivv, "two-vertex events");
-  h_c1v_absdphivv->SetLineColor(kRed);
-  h_c1v_absdphivv->SetLineWidth(3);
-  h_c1v_absdphivv->Scale(1./h_c1v_absdphivv->Integral());
-  h_c1v_absdphivv->SetStats(0);
-  h_c1v_absdphivv->Draw("sames");
-  l_absdphivv->AddEntry(h_c1v_absdphivv, "constructed from only-one-vertex events");
-  l_absdphivv->SetFillColor(0);
-  l_absdphivv->Draw();
-  c_absdphivv->SetTickx();
-  c_absdphivv->SetTicky();
-  c_absdphivv->Write();*/
-
-  f_dphi->Write();
-  //if (p.clearing_from_eff()) {
-  //  h_eff_2d->SetName("h_eff_2d");
-  //  h_eff_2d->Write();
-  //}
-  if (p.vary_dphi()) {
-    //i_dphi->Write();
-    //i_dphi2->Write();
-    fit_dphijj->Write();
-    func_dphijj->Write();
-  }
-
-  fh->Close();
-
-  delete h_1v_dbv;
-  delete h_1v_dbv_npult20;
-  delete h_1v_dbv_npugt20lt30;
-  delete h_1v_dbv_npugt30lt40;
-  delete h_1v_dbv_npugt40;
-  delete h_1v_costh2_onlytks0; //Alec added
-  delete h_1v_costh20; //Alec added
-  delete h_1v_bs2derr; //Alec added
-  delete h_1v_rescale_bs2derr; //Alec added
-  delete h_1v_w; //Alec added
-  delete h_1v_z;
-  delete h_1v_dz;
-  delete h_1v_dpvsv;
-  delete h_1v_xy;
-  delete h_1v_dbv0;
-  delete h_1v_dbv1;
-  delete h_1v_dbv_dz;
-  delete h_1v_dbv_bs2derr; //Alec added
-  delete h_1v_phiv;
-  delete h_1v_npu;
-  delete h_1v_npv;
-  delete h_1v_njets;
-  delete h_1v_ht40;
-  delete h_1v_phij;
-  delete h_1v_dphijj;
-  delete h_1v_dphijv;
-  delete h_1v_dphijvpt;
-  delete h_1v_dphijvmin;
-  delete h_2v_dbv;
-  delete h_2v_dbv1_dbv0;
-  delete h_2v_dvv;
-  delete h_2v_dvv3D; //Alec added
-  delete h_2v_sumdbv;
-  delete h_2v_dphivv;
-  delete h_2v_absdphivv;
-  delete h_2v_npu;
-  delete h_2v_npv;
-  //delete c_dvv;
-  //delete c_sumdbv;
-  delete c_sumdbv_w_errorbars;
-  //delete c_absdphivv;
-  //delete h_c1v_dbv;
-  //delete h_c1v_dvv;
-  //delete h_c1v_sumdbv;
-  delete h_c1v_dvv3D_w_errorbars;
-  delete h_c1v_dvv3D_revertexed_w_errorbars;
-  delete h_c1v_sumdbv_revertexed_w_errorbars;
-  delete h_c1v_absdphivv_revertexed_w_errorbars;
-  delete h_c1v_sumdbv_w_errorbars;
-  delete h_c1v_ntrk0_ntrk1;
-  //delete h_c1v_absdphivv;
-  //delete h_c1v_dbv0;
-  //delete h_c1v_dbv1;
-  //delete h_c1v_dbv1_dbv0;
 }
 
-int main(int argc, const char* argv[]) {
-  TH1::SetDefaultSumw2();
+// What came back from revertexing one constructed event
+struct RevertexedPair {
+  std::vector<int> ntracks;
+  std::vector<reco::Vertex::Point> positions;
+};
+
+// Builds the constructed event and revertexes it. The partner's tracks move rigidly so that its PV lands on the anchor's PV; momenta and covariances are unchanged.
+RevertexedPair revertexPair(const VertexRecord& v0, const VertexRecord& v1) {
+  static const UniformMagneticField field(magneticField);
+  reco::TrackCollection tracks = v0.tracks;
+  for (const reco::Track& t : v1.tracks) {
+    // Written term by term as in the original: computing the shift once changes the last bits of the positions
+    const reco::TrackBase::Point shifted(t.vx() - (v1.pv[0] + v1.bs[0]) + (v0.pv[0] + v0.bs[0]), t.vy() - (v1.pv[1] + v1.bs[1]) + (v0.pv[1] + v0.bs[1]), t.vz() - (v1.pv[2] + v1.bs[2]) + (v0.pv[2] + v0.bs[2]));
+    tracks.push_back(reco::Track(t.chi2(), t.ndof(), shifted, t.momentum(), t.charge(), t.covariance()));
+  }
+  std::vector<reco::TransientTrack> seedTracks;
+  for (size_t k = 0; k < tracks.size(); ++k)
+    seedTracks.push_back(reco::TransientTrack(reco::TrackRef(&tracks, k), &field));
+
+  // The anchor's beamspot stands in for the constructed event's. Only distances from it are used, so it carries no uncertainty.
+  const reco::Vertex beamspot(reco::Vertex::Point(v0.bs[0], v0.bs[1], v0.bs[2]), reco::Vertex::Error());
+
+  reco::VertexCollection vertices = seedVertices(seedTracks);
+  resolveSharedTracks(vertices, seedTracks);
+  // Kept for the bit-identical check: Bugs/backgroundTemplate/templateZRefitSkipped.md (zRefit and its chi2/dof cleanup are skipped) and Bugs/backgroundTemplate/templateSharedJetsSkipped.md
+  mergeNearby(vertices, seedTracks, beamspot);
+
+  RevertexedPair out;
+  for (const reco::Vertex& v : vertices) {
+    out.ntracks.push_back(v.tracksSize());
+    out.positions.push_back(v.position());
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- Pairing and filling
+
+// The two pairing passes: the partner is any DV of the anchor's category, or one with >= 5 tracks (5x5 only)
+enum class Partners { any, fivePlus };
+
+// Whether a revertexed pair enters the template of a mode
+bool passesTemplate(int code, const std::vector<int>& n) {
+  // Kept for the bit-identical check: Bugs/backgroundTemplate/templateAcceptanceNoTightCuts.md (exactly two output DVs, no tight DV cuts)
+  if (n.size() != 2) return false;
+  if (code == 5) return n[0] >= 5 && n[1] >= 5;
+  // Kept for the bit-identical check: Bugs/backgroundTemplate/templateSidebandAcceptance.md (3x5 and 4x5 accept >= 6-track DVs, and through the last line 3x4, 3x5 and 4x5 accept 7x7, 8x8 and 9x9)
+  if (code == 9 && (n[0] == 4 || n[1] == 4) && (n[0] >= 5 || n[1] >= 5)) return true;
+  if (code == 8 && (n[0] == 3 || n[1] == 3) && (n[0] >= 5 || n[1] >= 5)) return true;
+  if (code == 7 && n[0] + n[1] == 7 && n[0] != n[1] && n[0] > 2 && n[1] > 2) return true;
+  return n[0] == code && n[1] == code;
+}
+
+// |dPhi| of the two input DVs, with azimuths measured from each event's PV
+// Kept for the bit-identical check (the observed h_2v_absdphivv measures them from the beamspot)
+double absDeltaPhi(const VertexRecord& v0, const VertexRecord& v1) {
+  const double phi0 = std::atan2(v0.y, v0.x), phi1 = std::atan2(v1.y, v1.x);
+  if (M_PI < phi1 - phi0) return 2 * M_PI - (phi1 - phi0);
+  if (-M_PI > phi1 - phi0) return 2 * M_PI + (phi1 - phi0);
+  return fabs(phi1 - phi0);
+}
+
+void fillPair(const VertexRecord& v0, const VertexRecord& v1, const RevertexedPair& out, int code, Histos& h) {
+  // b-composition weight: f2/f1 for b-tagged anchors and (1 - f2)/(1 - f1) for untagged ones, with the placeholders f2 = 0.99 and f1 = 0.80
+  // Kept for the bit-identical check: Bugs/backgroundTemplate/templateBtagWeightIntegerDivision.md (integer division gives 1 and 0)
+  const double btagWeight = v0.category < nNpvBins ? 99 / 80 : 1 / 20;
+  // Kept for the bit-identical check (in MC, uniform partner draws times this product weight each category by its mean event weight)
+  const double w = btagWeight * (v0.weight * v1.weight);
+  const double sumDbv = v0.dbv + v1.dbv;
+  const double dvv3D = sqrt((v0.x - v1.x) * (v0.x - v1.x) + (v0.y - v1.y) * (v0.y - v1.y) + (v0.z - v1.z) * (v0.z - v1.z));
+
+  // Track counts of the output DVs as returned when there are two, otherwise the two largest (0 when missing)
+  std::vector<int> n = out.ntracks;
+  if (n.size() != 2) std::sort(n.begin(), n.end(), std::greater<int>());
+  const int ntrk0 = n.size() > 0 ? n[0] : 0, ntrk1 = n.size() > 1 ? n[1] : 0;
+
+  // Every trial fills these, passing or not
+  h.twoD("h_c1v_ntrk0_ntrk1")->Fill(ntrk0, ntrk1, w);
+  h["h_c1v_dvv3D_w_errorbars"]->Fill(dvv3D, w);
+  h["h_c1v_sumdbv_w_errorbars"]->Fill(sumDbv, w);
+  if (!passesTemplate(code, out.ntracks)) return;
+  const reco::Vertex::Point &p0 = out.positions[0], &p1 = out.positions[1];
+  h["h_c1v_dvv3D_revertexed_w_errorbars"]->Fill(sqrt((p0.x() - p1.x()) * (p0.x() - p1.x()) + (p0.y() - p1.y()) * (p0.y() - p1.y()) + (p0.z() - p1.z()) * (p0.z() - p1.z())), w);
+  h["h_c1v_sumdbv_revertexed_w_errorbars"]->Fill(sumDbv, w);
+  h["h_c1v_absdphivv_revertexed_w_errorbars"]->Fill(absDeltaPhi(v0, v1), w);
+}
+
+// Draws the partner of anchor i from its category. Partners with the anchor's exact dBV are redrawn, which excludes the anchor itself.
+int drawPartner(std::mt19937& gen, const VertexPool& pool, size_t i, Partners partners, const NtracksMode& mode) {
+  const VertexRecord& v0 = pool.records[i];
+  const std::vector<int>& candidates = partners == Partners::any ? pool.all[v0.category] : pool.fivePlus[v0.category];
+  // Kept for the bit-identical check (for the b-tagged, npv <= 20 category the >= 5-track pass checks the size of the list of all DVs)
+  const size_t guardSize = partners == Partners::fivePlus && v0.category == 0 ? pool.all[0].size() : candidates.size();
+  // Kept for the bit-identical check: Bugs/backgroundTemplate/templateSameNtracksVetoOneCategory.md (in 3x4, 3x5 and 4x5 only the b-tagged, npv <= 20 category rejects partners with the anchor's track count)
+  const bool vetoSameNtracks = partners == Partners::any && v0.category == 0 && mode.ntk0 != mode.ntk1;
+  const auto acceptable = [&](int c) {
+    const VertexRecord& p = pool.records[c];
+    return v0.dbv != p.dbv && !(vetoSameNtracks && v0.tracks.size() == p.tracks.size());
+  };
+  std::uniform_int_distribution<> dist(0, candidates.size() - 1);
+  // Kept for the bit-identical check (with fewer than two candidates the anchor can become its own partner)
+  if (guardSize < 2) return candidates[dist(gen)];
+  // Where no candidate is acceptable the original redraws forever, so stop with an error. These checks draw no random numbers.
+  if (candidates.size() == 1 && !acceptable(candidates[0])) fail("The only >= 5-track DV of the b-tagged, npv <= 20 category has no partner, and the original would redraw forever. Use a larger sample.");
+  if (vetoSameNtracks && pool.ntracksCount[v0.category].at(v0.tracks.size()) == candidates.size()) fail("Every DV of the b-tagged, npv <= 20 category has " + std::to_string(v0.tracks.size()) + " tracks, and the original would redraw forever (Bugs/backgroundTemplate/templateSameNtracksVetoOneCategory.md). Use a larger sample.");
+  int k;
+  do
+    k = dist(gen);
+  while (!acceptable(candidates[k]));
+  return candidates[k];
+}
+
+// One pass over the pool: every anchor gets one partner, and the constructed event is revertexed and filled
+void pairingLoop(Partners partners, const VertexPool& pool, const NtracksMode& mode, Histos& h) {
+  std::mt19937 gen(partners == Partners::any ? anyPartnerSeed : fivePlusPartnerSeed);
+  for (size_t i = 0; i < pool.records.size(); ++i) {
+    const VertexRecord& v0 = pool.records[i];
+    if (mode.code == 5 && v0.tracks.size() < 5) continue;
+    // Unused draw, kept because it advances gen
+    if (partners == Partners::any) std::uniform_int_distribution<>(0, pool.records.size() - 1)(gen);
+    const VertexRecord& v1 = pool.records[drawPartner(gen, pool, i, partners, mode)];
+    fillPair(v0, v1, revertexPair(v0, v1), mode.code, h);
+  }
+}
+
+// ---------------------------------------------------------------- Output
+
+// Overlays the observed 2V sumdBV and the constructed one, each scaled to unit area. Draw keeps pointers, and the scaling runs after the histograms are written, so only the copies stored in the canvas come out normalized.
+// Kept for the bit-identical check (the constructed curve holds every trial, before the template test)
+TCanvas* sumDbvCanvas(const Histos& h) {
+  TCanvas* canvas = new TCanvas("c_sumdbv_w_errorbars", "c_sumdbv_w_errorbars", 700, 700);
+  TLegend* legend = new TLegend(0.35, 0.75, 0.85, 0.85);
+  h["h_2v_sumdbv"]->SetTitle(";#Sigmad_{BV} (cm);events");
+  struct Curve {
+    const char* name;
+    Color_t color;
+    const char* drawOption;
+    const char* label;
+  };
+  for (const Curve& curve : {Curve{"h_2v_sumdbv", kBlue, "", "two-vertex events"}, Curve{"h_c1v_sumdbv_w_errorbars", kRed, "sames", "constructed from only-one-vertex events"}}) {
+    TH1* hist = h[curve.name];
+    hist->SetLineColor(curve.color);
+    hist->SetLineWidth(3);
+    hist->Scale(1. / hist->Integral());
+    hist->SetStats(0);
+    hist->Draw(curve.drawOption);
+    legend->AddEntry(hist, curve.label);
+  }
+  legend->SetFillColor(0);
+  legend->Draw();
+  canvas->SetTickx();
+  canvas->SetTicky();
+  return canvas;
+}
+
+void writeOutputs(const std::string& path, Histos& h) {
+  TFile* out = TFile::Open(path.c_str(), "recreate");
+  if (!out || !out->IsOpen()) fail("Cannot write " + path);
+  for (TH1* hist : h.writeOrder)
+    hist->Write();
+  TCanvas* canvas = sumDbvCanvas(h);
+  canvas->Write();
+  // Kept for the bit-identical check: a flat dPhi function that nothing here or downstream uses. It is made with new, as in the original, because ROOT writes into the file whether an object was made with new.
+  TF1* flatDphi = new TF1("f_dphi", "[1] + [2] + 1.0/[0]", 0, M_PI);
+  flatDphi->SetParameters(M_PI, 0.0, 0.0);
+  flatDphi->Write();
+  out->Close();
+  delete out;
+  delete flatDphi;
+  delete canvas;
+}
+
+// cb_vals.csv feeds bquark_fraction.py, with one row per b-tagged or untagged run. Each value is a pair-efficiency sum divided by the number of pooled DVs, and the sum stays 0 since revertexing replaced the efficiencies, so every row reads 0 (NaN for an empty pool).
+// Kept for the bit-identical check: Bugs/backgroundTemplate/templateBQuarkFractionUnmeasured.md
+void writeCbValues(const std::string& cbDir, const std::string& label, const std::vector<std::pair<std::string, int>>& runs) {
+  std::ofstream csv(cbDir + "/cb_vals.csv");
+  csv << "variant,cb_val" << std::endl;
+  for (const auto& run : runs) {
+    TString row = TString::Format("%s, %f", run.first.c_str(), 0.0 / run.second);
+    if (!row.Contains("_btags_") && !row.Contains("_nobtags_")) continue;
+    row.ReplaceAll("2v_from_jets_", "");
+    row.ReplaceAll("_" + TString(label) + ".root", "");
+    row.ReplaceAll("_btags", "_cb");
+    row.ReplaceAll("_nobtags", "_cbbar");
+    row.ReplaceAll("track", "trk");
+    row.ReplaceAll(" ", "");
+    csv << row << std::endl;
+  }
+}
+
+// Reads the inputs, pairs and revertexes, and writes one output file. Returns the number of pooled 1V DVs.
+int runConfiguration(const Config& cfg, const std::string& fileName) {
+  std::cout << "Running " << fileName << std::endl;
+  gROOT->cd();
+  Histos h = bookHistograms();
+  const VertexPool pool = readInputs(cfg, h);
+  std::cout << "Pairing " << pool.records.size() << " 1V DVs" << std::endl;
+  // Kept for the bit-identical check: Bugs/backgroundTemplate/templateLoopsFixTrialMix.md (the two passes fix the mix of 4x>=5 and >=5x>=5 trials) and Bugs/backgroundTemplate/templateErrorsIgnorePairing.md (one partner per anchor, plain Sumw2 errors)
+  pairingLoop(Partners::any, pool, *cfg.mode, h);
+  if (cfg.mode->code == 5) pairingLoop(Partners::fivePlus, pool, *cfg.mode, h);
+  writeOutputs(cfg.outDir + "/" + fileName, h);
+  for (auto& entry : h.byName)
+    delete entry.second;
+  return pool.records.size();
+}
+
+// ---------------------------------------------------------------- Command line
+
+const char* usage = R"(Usage: 2v_from_jets.exe --channel lepton|displacement --outDir DIR [options]
+
+Builds the 2V background template from 1V events. With only --channel and --outDir it runs the production set of the channel: run2, 5x5, and the b-tag selections all, 1 and 0, each into its own file.
+
+For one configuration, for example the lepton 3x3 template over all events:
+  2v_from_jets.exe --channel lepton --outDir lepton3x3 --ntracks 3x3 --btags all
+
+Required:
+  --channel lepton|displacement  Trigger channel: lepton reads the ULV30Lepm MiniTrees, displacement the ULV30BvetoLHTm ones.
+  --outDir DIR                   Folder for the ROOT files and cb_vals/cb_vals.csv, created if missing. File names do not say whether a run read data, 20% data or MC, so give each its own folder.
+
+Options. A comma list runs every value, and the lists run in every combination:
+  --year LIST        run2, 20161 (2016 preVFP), 20162 (2016 postVFP), 2017, 2018, or 2017p8 for 2017 and 2018 together. Default run2.
+  --ntracks LIST     Track counts of the 2V region the template stands for: 3x3, 4x4, 5x5, 3x4, 3x5 or 4x5, or their file-name codes below. Default 5x5.
+  --btags LIST       Events by tight DeepJet b tags: all, 1 for at least one b-tagged jet, 0 for none. Default all,1,0. With 0 the template is empty, since untagged pairs get weight 0 (Kamui Bugs/backgroundTemplate/templateBtagWeightIntegerDivision.md).
+  --mc               Read the background MC, weighted by 2v_from_jets_new.py next to the executable. Default data.
+  --bquarks all|1|0  With --mc: every event, only those with a generated b hadron (1), or only those without (0). Default all.
+  --minNpu N         With --mc: keep events with at least N pileup interactions.
+  --maxNpu N         With --mc: keep events with at most N pileup interactions.
+  --only20pc         Data only: read the 20% data MiniTrees. The displacement channel has none, so, as in the original, it reads the per-era data files of MiniTree_tag004BvetoLHTm.
+  --help             Print this text.
+Options also work as --option=value.
+
+Each run writes 2v_from_jets_<year>_<code>track_<selection>_<label>.root, where
+  <code>       is 3, 4 or 5 for 3x3, 4x4 or 5x5, and 7, 8 or 9 for 3x4, 3x5 or 4x5
+  <selection>  is default when nothing is selected, otherwise btags or nobtags, bquarks or nobquarks, and npu<min>to<max>, joined by underscores
+  <label>      is ULV30Lepm or ULV30BvetoLHTm
+Every invocation rewrites cb_vals/cb_vals.csv. In data, events with two >= 5-track DVs are skipped (blinding), so the 5x5 h_2v_* histograms are empty.
+)";
+
+// The command line: the settings every run shares, and the lists whose every combination runs
+struct Options {
+  Config base;
+  std::vector<std::string> years{"run2"};
+  std::vector<const NtracksMode*> modes;  // Default 5x5
+  std::vector<int> btags{-1, 1, 0};       // The production set
+};
+
+const Channel* findChannel(const std::string& name) {
+  std::string known;
+  for (const Channel& ch : channels) {
+    if (ch.name == name) return &ch;
+    known += " " + ch.name;
+  }
+  usageError("Unknown --channel value " + name + ", known:" + known);
+}
+
+const NtracksMode* findMode(const std::string& name) {
+  std::string known;
+  for (const NtracksMode& mode : ntracksModes) {
+    if (mode.name == name || std::to_string(mode.code) == name) return &mode;
+    known += " " + mode.name;
+  }
+  usageError("Unknown --ntracks value " + name + ", known:" + known);
+}
+
+// A comma list of distinct values
+std::vector<std::string> parseList(const std::string& value, const std::string& option) {
+  const std::vector<std::string> parts = split(value, ',');
+  std::set<std::string> seen;
+  for (const std::string& part : parts)
+    if (part.empty() || !seen.insert(part).second) usageError(option + " needs distinct values separated by commas, got " + value);
+  if (parts.empty() || value.back() == ',') usageError(option + " needs distinct values separated by commas, got " + value);
+  return parts;
+}
+
+int parseSelection(const std::string& value, const std::string& option) {
+  if (value == "all") return -1;
+  if (value != "1" && value != "0") usageError(option + " takes all, 1 or 0, got " + value);
+  return value == "1";
+}
+
+// A pileup count, stored in one byte
+int parseNpu(const std::string& value, const std::string& option) {
+  char* end = nullptr;
+  const long n = strtol(value.c_str(), &end, 10);
+  if (value.empty() || *end != '\0' || n < defaultMinNpu || n > defaultMaxNpu) usageError(option + " needs a whole number from " + std::to_string(defaultMinNpu) + " to " + std::to_string(defaultMaxNpu) + ", got " + value);
+  return n;
+}
+
+Options parseArguments(int argc, char** argv) {
+  if (argc == 1) {
+    std::cout << usage;
+    exit(0);
+  }
+  Options opt;
+  opt.modes = {findMode("5x5")};
+  const std::string exe = argv[0];
+  const size_t slash = exe.rfind('/');
+  opt.base.weightHelper = (slash == std::string::npos ? std::string(".") : exe.substr(0, slash)) + "/2v_from_jets_new.py";
+  const std::set<std::string> takesValue{"--channel", "--year", "--ntracks", "--btags", "--bquarks", "--minNpu", "--maxNpu", "--outDir"};
+  bool npuGiven = false;
+  for (int i = 1; i < argc; ++i) {
+    std::string arg = argv[i], value;
+    const size_t equals = arg.find('=');
+    const bool inlineValue = arg.rfind("--", 0) == 0 && equals != std::string::npos;
+    if (inlineValue) {
+      value = arg.substr(equals + 1);
+      arg = arg.substr(0, equals);
+    }
+    if (arg == "--help" || arg == "-h") {
+      std::cout << usage;
+      exit(0);
+    }
+    if (arg == "--mc" || arg == "--only20pc") {
+      if (inlineValue) usageError(arg + " takes no value");
+      if (arg == "--mc") opt.base.mc = true;
+      if (arg == "--only20pc") opt.base.only20pc = true;
+      continue;
+    }
+    if (!takesValue.count(arg)) usageError("Unknown argument " + arg);
+    if (!inlineValue) {
+      if (i + 1 >= argc || std::string(argv[i + 1]).rfind("--", 0) == 0) usageError(arg + " needs a value");
+      value = argv[++i];
+    }
+    if (arg == "--channel") opt.base.channel = findChannel(value);
+    if (arg == "--year") {
+      opt.years = parseList(value, arg);
+      for (const std::string& year : opt.years)
+        if (!yearParts.count(year)) {
+          std::string known;
+          for (const auto& entry : yearParts)
+            known += " " + entry.first;
+          usageError("Unknown --year value " + year + ", known:" + known);
+        }
+    }
+    if (arg == "--ntracks") {
+      opt.modes.clear();
+      for (const std::string& name : parseList(value, arg))
+        opt.modes.push_back(findMode(name));
+    }
+    if (arg == "--btags") {
+      opt.btags.clear();
+      for (const std::string& selection : parseList(value, arg))
+        opt.btags.push_back(parseSelection(selection, arg));
+    }
+    if (arg == "--bquarks") opt.base.bquarks = parseSelection(value, arg);
+    if (arg == "--minNpu") opt.base.minNpu = parseNpu(value, arg);
+    if (arg == "--maxNpu") opt.base.maxNpu = parseNpu(value, arg);
+    if (arg == "--minNpu" || arg == "--maxNpu") npuGiven = true;
+    if (arg == "--outDir") opt.base.outDir = value;
+  }
+
+  if (!opt.base.channel) usageError("--channel is required");
+  if (opt.base.outDir.empty()) usageError("--outDir is required");
+  if (opt.base.bquarks >= 0 && !opt.base.mc) usageError("--bquarks needs --mc, since data has no generated b hadrons");
+  if (npuGiven && !opt.base.mc) usageError("--minNpu and --maxNpu need --mc, since data MiniTrees store npu as 0");
+  if (opt.base.minNpu > opt.base.maxNpu) usageError("--minNpu is above --maxNpu");
+  if (opt.base.only20pc && opt.base.mc) usageError("--only20pc applies to data only");
+  if (opt.base.mc && gSystem->AccessPathName(opt.base.weightHelper.c_str())) fail("--mc needs the weight helper " + opt.base.weightHelper);
+  return opt;
+}
+
+int main(int argc, char** argv) {
+  const Options opt = parseArguments(argc, argv);
+  const std::string cbDir = opt.base.outDir + "/" + cbValuesDir;
+  gSystem->mkdir(cbDir.c_str(), true);
+  if (gSystem->AccessPathName(cbDir.c_str())) fail("Cannot create " + cbDir);
   gStyle->SetPadTickX(1);
   gStyle->SetPadTickY(1);
 
-  const bool only_default = argc >= 2 && strcmp(argv[1], "only_default") == 0;
-  ConstructDvvcParameters pars;
-  if (only_default) {
-    const char* outfn  = "2v_from_jets.root";
-    const char* drawfn = "2v_from_jets.png";
-    const int ntracks  = argc >= 3 ? atoi(argv[2]) : 3;
-    const char* year  = argc >= 4 ? argv[3] : "run2"; //change depending on year run
-    const int ibkg  = argc >= 5 ? atoi(argv[4]) : -999;
-
-    ConstructDvvcParameters pars2 = pars.year(year).ntracks(ntracks);
-    if (ibkg != -999) pars2 = pars2.ibkg_begin(ibkg).ibkg_end(ibkg);
-    construct_dvvc(pars2, outfn);
-    TCanvas c("c","",700,900);
-    TFile* f = TFile::Open(outfn);
-    TH1* h_2v_dvv  = (TH1*)f->Get("h_2v_dvv");
-    TH1* h_c1v_dvv = (TH1*)f->Get("h_c1v_dvv");
-    h_c1v_dvv->Scale(h_2v_dvv->Integral()/h_c1v_dvv->Integral());
-    h_c1v_dvv->SetLineColor(kRed);
-    h_2v_dvv->SetLineColor(kBlue);
-    for (auto h : {h_c1v_dvv, h_2v_dvv}) {
-      h->SetTitle(TString::Format("%i-track, 2-vertex events (%s);d_{VV} (cm);events", ntracks, year));
-      h->SetLineWidth(2);
-      h->SetStats(0);
-    }
-    TRatioPlot rat(h_2v_dvv, h_c1v_dvv);
-    rat.SetH1DrawOpt("e");
-    rat.SetH2DrawOpt("hist");
-    rat.Draw();
-    c.Update();
-    rat.GetLowerPad()->SetLogy();
-    double minr = 1e99, maxr = 0;
-    for (int ibin = 1; ibin <= std::min(10,h_2v_dvv->GetNbinsX()); ++ibin) {
-      const double r = h_2v_dvv->GetBinContent(ibin) / h_c1v_dvv->GetBinContent(ibin);
-      minr = std::min(minr, r);
-      maxr = std::max(maxr, r);
-    }
-    rat.GetLowerRefYaxis()->SetRangeUser(minr*0.5,maxr*2);
-    rat.GetCalculationOutputGraph()->SetLineWidth(2);
-    rat.GetCalculationOutputGraph()->SetLineColor(kBlue);
-    rat.SetGridlines(std::vector<double>({1.}));
-
-    c.SaveAs(drawfn);
-    return 0;
-  }
-
-  // production version 
-  char* version;
-  if (ulversion == "ULV30BvetoLHTm") {
-      version = "ULV30BvetoLHTm";
-  }
-  else{  
-      version = "ULV30Lepm";
-  }  
- 
-  // This for loop runs over simulated background
-  
-  for (const char* year : { "run2",}) { //{"20161", "20162", "2017", "2018", "2017p8", "run2"}) { //change depending on year run
-    for (int ntracks : { 5}) { // use 3 for 3x3, 4 for 4x4, 5 for 5x5, 7 for 3x4, 8 for 3x5, and 9 for 4x5; multiple can be run at a time with e.g. 3,4,5,7,8,9
-      ConstructDvvcParameters pars2 = pars.year(year).ntracks(ntracks);
-
-      construct_dvvc(pars2,                                     TString::Format("2v_from_jets_%s_%dtrack_default_%s.root", year, ntracks, version));
-      construct_dvvc(pars2.btags(1),     TString::Format("2v_from_jets_%s_%dtrack_btags_%s.root", year, ntracks, version));
-      construct_dvvc(pars2.btags(0),     TString::Format("2v_from_jets_%s_%dtrack_nobtags_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.vary_dphi(true),          TString::Format("2v_from_jets_%s_%dtrack_vary_dphi_default_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.btags(1).vary_dphi(true), TString::Format("2v_from_jets_%s_%dtrack_vary_dphi_btags_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.btags(0).vary_dphi(true), TString::Format("2v_from_jets_%s_%dtrack_vary_dphi_nobtags_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.btags(1).vary_eff(true), TString::Format("2v_from_jets_%s_%dtrack_vary_eff_btags_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.btags(0).vary_eff(true), TString::Format("2v_from_jets_%s_%dtrack_vary_eff_nobtags_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.              TString::Format("2v_from_jets_%s_%dtrack_bquark_uncorrected_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.bquarks(1),   TString::Format("2v_from_jets_%s_%dtrack_bquarks_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.bquarks(0),   TString::Format("2v_from_jets_%s_%dtrack_nobquarks_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.btags(1).inject_signal(true),     TString::Format("2v_from_jets_%s_%dtrack_btags_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.btags(0).inject_signal(true),     TString::Format("2v_from_jets_%s_%dtrack_nobtags_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.clearing_from_eff(false),            TString::Format("2v_from_jets_%s_%dtrack_noclearing_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.min_npu(0).max_npu(27),              TString::Format("2v_from_jets_%s_%dtrack_npu0to27_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.min_npu(28).max_npu(36),             TString::Format("2v_from_jets_%s_%dtrack_npu28to36_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.min_npu(37).max_npu(255),            TString::Format("2v_from_jets_%s_%dtrack_npu37to255_%s.root", year, ntracks, version));
-    }
-  }
-    
-  // This for loop runs over real data
-  /*
-  for (const char* year : {"2017",}){ // "2018", "2017p8"}) {
-    for (int ntracks : {3, 4, 5, 7,}){ // 8, 9}) {
-      ConstructDvvcParameters pars2 = pars.year(year).ntracks(ntracks).is_mc(false);
-      construct_dvvc(pars2,                             TString::Format("2v_from_jets_data_%s_%dtrack_default_%s.root", year, ntracks, version));
-      construct_dvvc(pars2.btags(1),                    TString::Format("2v_from_jets_data_%s_%dtrack_btags_%s.root", year, ntracks, version));
-      construct_dvvc(pars2.btags(0),                    TString::Format("2v_from_jets_data_%s_%dtrack_nobtags_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.btags(1).vary_dphi(true),    TString::Format("2v_from_jets_data_%s_%dtrack_vary_dphi_btags_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.btags(0).vary_dphi(true),    TString::Format("2v_from_jets_data_%s_%dtrack_vary_dphi_nobtags_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.btags(1).vary_eff(true),     TString::Format("2v_from_jets_data_%s_%dtrack_vary_eff_btags_%s.root", year, ntracks, version));
-//      construct_dvvc(pars2.btags(0).vary_eff(true),     TString::Format("2v_from_jets_data_%s_%dtrack_vary_eff_nobtags_%s.root", year, ntracks, version));
-    }
-  }
-  */
-  // For use in bquark_fraction.py
-  std::ofstream outfile;
-  outfile.open("cb_vals/cb_vals.csv");
-  outfile << "variant,cb_val" << std::endl;;
-
-  for(TString cb_cbbar : cb_cbbar_vector){
-    if(cb_cbbar.Contains("_btags_") || cb_cbbar.Contains("_nobtags_")){
-
-      // format for our csv file
-      cb_cbbar.ReplaceAll("2v_from_jets_","");
-      cb_cbbar.ReplaceAll("_"+(TString)version+".root","");
-
-      cb_cbbar.ReplaceAll("_btags","_cb");
-      cb_cbbar.ReplaceAll("_nobtags","_cbbar");
-      cb_cbbar.ReplaceAll("track","trk");
-      cb_cbbar.ReplaceAll(" ","");
-      outfile << cb_cbbar << std::endl;
-    }
-  }
-  outfile.close();
+  std::vector<std::pair<std::string, int>> runs;
+  for (const std::string& year : opt.years)
+    for (const NtracksMode* mode : opt.modes)
+      for (int btags : opt.btags) {
+        Config cfg = opt.base;
+        cfg.year = year;
+        cfg.mode = mode;
+        cfg.btags = btags;
+        const std::string fileName = outputName(cfg);
+        runs.push_back({fileName, runConfiguration(cfg, fileName)});
+      }
+  writeCbValues(cbDir, opt.base.channel->label, runs);
+  return 0;
 }

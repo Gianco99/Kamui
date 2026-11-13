@@ -24,3 +24,8 @@ typescript
 *.swp
 .DS_Store
 config/normalizations/generatorSums.json.lock
+
+# Background template build products and run outputs. Logs and ROOT files are covered above.
+backgroundTemplate/2v_from_jets.exe
+backgroundTemplate/MiniNtuple.o
+backgroundTemplate/outputs/
