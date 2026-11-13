@@ -2,7 +2,7 @@
 
 Kamui is the framework for our Run 3 CMS DV analysis. A DV is a vertex fit from displaced tracks, the tracks that pass far from the beamspot. Kamui reads MiniAOD datasets, writes ntuples that keep only the objects and variables we choose, and applies event selections to those ntuples. An ntuple here is a ROOT file holding an `Events` tree with one entry per event.
 
-The physics lives in easy-to-edit, human-readable configuration files under `config/`, one folder per topic, and the `./kamui` CLI runs each step. Each relevant subdirectory has a README.md that records its important design choices and ends with a Caveats section, so you and an AI helper can both follow the code.
+The physics lives in easy-to-edit, human-readable configuration files under `config/`, one folder per topic, and the `./kamui` CLI runs each step. Each relevant subdirectory has a README.md that covers its design choices and the caveats that matter, so you and an AI helper can both follow the code.
 
 **Important Note:** AI helps develop this framework, but every commit and piece of written code MUST BE HUMAN-REVIEWED before it is merged!
 

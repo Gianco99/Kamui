@@ -147,7 +147,7 @@ def nanoSibling(dataset, instance="prod/global", refresh=False):
     matches = [d for d in found if d.strip("/").split("/")[1].startswith(campaign) and (not conditions or conditions in d.strip("/").split("/")[1])]
     if not matches:
         return None
-    ## Several NanoAOD versions of one campaign can match, and plain string order picks the last (see the grid README, Caveats).
+    ## Several NanoAOD versions of one campaign can match, and plain string order picks the last.
     return sorted(matches)[-1]
 
 

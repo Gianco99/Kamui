@@ -65,9 +65,5 @@ Kamui reproduces the bugs found in JMTucker's vertexing that change its output, 
 
 ## Caveats
 
-- The MC track drop draws from an engine seeded by each event's run, lumi and event number, so an event always drops the same tracks, whatever the job configuration.
-  - Because every event has its own seed, the drops in different jobs are independent.
-  - JMTucker seeds its engine once per job and keeps drawing from it event after event, so an event's drops depend on the job's seed and on every event the job read before it.
-- Seed tracks keep their `packedPFCandidates` order, and every fit takes its tracks in that order too, because `plugins/DVProducer.cc` gathers them in a `std::set<reco::TrackRef>`, which sorts them by seed-track index. Be careful with that order: the Kalman fit is order sensitive, so a different order can give different vertices.
-- Two odd `DV_dBVErr` values copy JMTucker, and each has its file in `Bugs/jmtucker/adapted/`. It is 0 when the refit fails, which passes any upper cut. It is NaN when JMTucker's selector would get a NaN uncertainty from the DV's own covariance and drop it, and NaN fails any cut on `DV_dBVErr`.
-- A plugin name must be unique across all of CMSSW, the release included. Before you name a new one, grep `$CMSSW_RELEASE_BASE/lib/$SCRAM_ARCH/.edmplugincache` for it.
+- `DV_dBVErr` copies two odd values from JMTucker, each with its file in `Bugs/jmtucker/adapted/`. It is 0 when the refit fails, which passes any upper cut, and NaN when JMTucker would drop the DV for a NaN uncertainty, which fails any cut on it.
+- The Kalman fit is order sensitive. Every fit takes its tracks in seed-track order, so changing that order changes the vertices.

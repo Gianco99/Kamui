@@ -4,7 +4,6 @@ A definition is a named list of cuts that you write once and reuse by name. For 
 
 - Each file here holds one definition, named after the file. Its `requirements` is a list of cuts in the same syntax as a selection's object cut, or an object keyed by era when the cuts differ by era.
 - You can name a definition inside any requirement list: in a selection's object cut or count, in another definition, or in the `VertexJet` collection.
-- Kamui replaces each name with its cuts when it reads the configs, so jobs never read this folder.
 - Definitions sit in two folders, `run2/` and `run3/`, since IDs and working points differ between runs. A config reads the definition of that name from its era's run folder, so a Run 3 config can only name a definition in `run3/`.
 
 The shape of a definition file, and a selection cut that uses one:
@@ -28,4 +27,4 @@ See `config/selections/README.md` for the full cut syntax.
 
 ## Caveats
 
-- `tightLepVeto` uses `above` and `below`, the exclusive bounds. Its `chHEF` cut has to reject jets with no charged energy at all, and those jets sit exactly on its threshold, so an inclusive `min` would keep them.
+- Jets with no charged energy sit exactly on the `chHEF` threshold of `tightLepVeto`, so that cut must use the exclusive `above` to reject them.

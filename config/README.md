@@ -36,12 +36,6 @@ For datasets already cached at FNAL, `root://cmsxrootd.fnal.gov/` is a faster `s
 
 ## Caveats
 
-- `_doc` is the only comment key. Write at most one per object: one plain sentence on what that object is for. Kamui removes it when it reads the file, at any depth.
-- `doc`, without the underscore, is text Kamui writes into its outputs, such as an ntuple branch description or a cutflow row.
+- `_doc` is the only comment key: at most one per object, one sentence on what that object is for. `doc`, without the underscore, is text Kamui writes into its outputs, such as an ntuple branch description or a cutflow row.
 - Keep the layout compact: short objects and lists sit on one line, and long lists put one item per line. `normalizations/generatorSums.json` keeps its own layout, since `./kamui norm --write` rewrites it.
-- `include` is a list of config names to pull in. Each included config loads its own includes first, and nested blocks merge key by key. An include loop is an error.
-- Only JSON objects merge. A list or single value replaces the included one, so a config that names a list throws away the included list entirely.
-- To find a config named `<name>`, Kamui looks for `<name>.json` in the run folder of the era being run, and in each subfolder one level below it. A name found in two of those folders is an error unless you write it with its subfolder, such as `presets/<name>`.
-- Only code in `configReaders/` may open these files.
-  - `select/normalization.py` is an exception.
-- CRAB refuses to write under another user's `/store/user` area, so it can't use the shared `lpcdisplacedvertices` directory and gets its own `crabStageoutBase`. Condor copies its outputs with `xrdcp` and has no such restriction, so it writes to the shared group area.
+- `include` lists the configs to build on, and a config's own keys override what it includes. Objects merge key by key, and a list or single value replaces the included one outright, so a config that names a list throws away the included list.

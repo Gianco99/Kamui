@@ -48,9 +48,7 @@ Binaries, logs and ROOT outputs stay out of the repo. Everything the validation 
 
 ## Caveats
 
-- Fixing a kept bug changes the template, so treat it as a physics change: rerun the production set and compare the bins before and after.
-- In data, the code skips every event with two DVs of 5 or more tracks before filling anything, which keeps the signal region blind. Still never open `h_2v_*` or `c_sumdbv*` in a data output. The comparison scripts skip them for that reason.
+- In data, the code skips every event with two DVs of 5 or more tracks before filling anything, which keeps the signal region blind. Still, never open `h_2v_*` or `c_sumdbv*` in a data output.
 - Displacement-channel runs need a lot of memory. Run at most two at a time, as `runAll.sh` does.
-- `build.sh`, `run.sh` and `cliChecks.sh` use Gianfranco's CMSSW_10_6_48 area unless `CMSSW_SRC` points at another one.
+- `build.sh`, `run.sh` and `cliChecks.sh` use Gianfranco's CMSSW_10_6_48 area unless `CMSSW_SRC` points at another one, which needs JMTucker's code built in it.
 - The input MiniTrees are Joey's, read in place from `/uscms_data/d3/joeyr/crabdirs/`. Never write there.
-- `validateAll.sh`, `runExtra.sh` and `makeExtraReferences.py` find the references by absolute path. If `BackgroundTemplateRebuild` moves, update the paths at the top of each.

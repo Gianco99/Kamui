@@ -4,7 +4,7 @@ This folder holds the numbers that turn a count of selected events into an expec
 
 ## The Normalization Formula
 
-Post-processing applies these numbers when you report or analyze yields, with this formula. Inside Kamui, only `check` reads `lumi.json` and the cross section files.
+You apply these numbers yourself in post-processing, when you report or analyze yields, with this formula:
 
 ```
 N_expected = lumi[pb^-1] * xsec[pb] * filterEff * sum(per-event weights of passing events) / sumGenWeight
@@ -16,9 +16,7 @@ N_expected = lumi[pb^-1] * xsec[pb] * filterEff * sum(per-event weights of passi
 
 ## Cross Section Files
 
-Each physics model has one file, holding the cross sections its samples are normalized by. Its top level holds one block per run, `run2` or `run3`. Normalize a sample with the block of its era's run, so a Run 2 cross section never normalizes a Run 3 sample. Every JSON here other than `lumi.json` and `generatorSums.json` is read as a cross section file.
-
-`exoticHiggs.json` holds only a `run2` block, at 13 TeV. Run 3 samples need a `run3` block, at 13.6 TeV, before they can be normalized.
+Each physics model has one file, holding the cross sections its samples are normalized by. Its top level holds one block per run, `run2` or `run3`. Normalize a sample with the block of its era's run, so a Run 2 cross section never normalizes a Run 3 sample.
 
 A small example with one process:
 
@@ -55,9 +53,7 @@ Each model under `filterEfficiencies` holds:
 
 ## generatorSums.json
 
-`./kamui norm --write` writes this file, with one entry per sample name under `samples`. Every field of an entry is optional, because a sample keeps whatever `norm` has measured so far.
-
-Next to it, `norm --write` keeps an empty `generatorSums.json.lock`, which lets several runs write one after another. Leave it in place.
+`./kamui norm --write` writes this file, with one entry per sample name under `samples`.
 
 The top level holds:
 
@@ -73,7 +69,7 @@ Each sample under `samples` holds:
 | `sumGenWeight` (optional) | The sum of `genEventSumw`, the normalization denominator |
 | `sumGenWeight2` (optional) | The sum of `genEventSumw2`, for the statistical uncertainty |
 
-`norm` reads these numbers from the `Runs` tree of the sample's NanoAOD, where the NanoAOD `genWeightsTable` producer writes them. Any other file format would need its own reader.
+`norm` reads these numbers from the `Runs` tree of the sample's central NanoAOD.
 
 ## lumi.json
 
@@ -106,18 +102,11 @@ The flags and worked examples are in `python/kamui/README.md`.
 
 ## Caveats
 
-- Cross sections are stored before the generator filter, and the `filterEfficiencies` are applied separately.
-- The luminosity changes with the golden JSON and the normtag, which is why each Run 3 `source` records the exact brilcalc command. Rerun it against whichever golden JSON the data was filtered with.
+- Cross sections are stored before the generator filter, so apply the filter efficiency on top.
+- The luminosity depends on the golden JSON and the normtag. Each Run 3 `source` records its exact brilcalc command, so rerun it against the golden JSON your data was filtered with.
 
-The physics caveats of each model are kept here, so the configs stay readable.
-
-For the exotic Higgs model, `exoticHiggs.json`:
+### Exotic Higgs (`exoticHiggs.json`)
 
 - The cross sections are for Higgs production at MH = 125 GeV, assuming BR(H->SS) = 1.
-- The Run 2 VH samples are generated with leptonic decays only, so their cross sections are summed over the three lepton flavors.
-  - `WplusH`: three times the inclusive W+H cross section times BR(W -> lv) for one lepton flavor.
-  - `WminusH`: three times the inclusive W-H cross section times BR(W -> lv) for one lepton flavor.
-- `ZH` is the qq-initiated part, and the gg-initiated part is split off into `ggZH`.
-  - `ZH`: three times the ZH -> llH cross section for one lepton flavor, minus its gg-initiated part.
-  - `ggZH`: three times the inclusive ggZH cross section times BR(Z -> ll) for one lepton flavor.
-- The `filterEfficiencies` are keyed by scalar mass, but the filter itself cuts on gen-HT.
+- The Run 2 VH samples decay the W or Z to leptons only, so the `WplusH`, `WminusH`, `ZH` and `ggZH` cross sections include that leptonic branching ratio, summed over the three lepton flavors.
+- `ZH` is the qq-initiated part, and `ggZH` the gg-initiated part.

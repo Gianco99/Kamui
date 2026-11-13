@@ -24,8 +24,6 @@ A family lists a few samples one by one under `samples`, or generates them under
 | `grids` (optional) | Grids, as a list, each generating samples from templates and axes |
 | `overrides` (optional) | Fields to override on individual samples, keyed by sample name |
 
-A file must define at least one sample, through `samples` or `grids`. Kamui stops with an error naming the file when it defines none, or when a key at the top level, in a grid or on a sample is missing from these tables.
-
 ### Grid Level
 
 | Field | Meaning |
@@ -45,14 +43,16 @@ A grid may also carry any sample field from the table below, and applies it to e
 | **`dataset`** (required) | The full DAS dataset path |
 | **`era`** (required) | The data-taking period. It picks the content folder of the sample's preset, `run2/` or `run3/`, and its selection thresholds |
 | `dasInstance` (optional, default `prod/global`) | `prod/global` for central datasets, `prod/phys03` for USER-created ones |
-| **`isMC`** (required) | `true` for MC, `false` for data, without quotes. Kamui stops with an error when it disagrees with a central dataset's tier, `MINIAODSIM` for MC or `MINIAOD` for data |
+| **`isMC`** (required) | `true` for MC, `false` for data, without quotes |
 | `family` (optional) | The name for picking this sample with `--family`. Defaults to the file's `family` key, then the file name |
 | `content` (optional, default `dvBase`) | The content preset, which sets the branches written |
 | `tags` (optional, default `[]`) | Free-form labels, as a list, for picking samples with `--tag` |
 | `unitsPerJob` (optional) | Input files per job for this sample, a positive integer. `--filesPerJob` overrides it |
-| `lumiMask` (optional) | A lumi mask JSON, as a path or URL, such as the golden JSON, that limits processing to the lumi sections it lists. Data only. Both backends apply it |
+| `lumiMask` (optional) | A lumi mask JSON, as a path or URL, such as the golden JSON, that limits processing to the lumi sections it lists. Data only. Without it, jobs read every lumi section, certified or not |
 
 ## Writing a JSON Sample Family File
+
+Each family file sits in the folder of its run, `run2/` or `run3/`. Commands pick samples by name across both folders, so family and sample names carry their year or run.
 
 An example grid for two masses in one era:
 
@@ -92,11 +92,7 @@ A later layer replaces lists and single values outright, so a grid that names `t
 | `run2/run2Validation.json` | Run 2 UL points for reproducing JMTucker results. Central |
 | `run2/tutorial/zhLeptonTriggered.json` | The sample used in the tutorial slides. Central |
 
-- Run 3 has no ggZH H->SS samples, so the ZH samples cover only the qq-initiated part.
-- Run 3 has no RPV gluino to tbs samples, official or private.
-- RPV stop->bb exists in Summer24 only, so 2022 and 2023 need a sample request.
-
-Each family file sits in the folder of its run, and Kamui stops with an error if a sample's era belongs to the other run. Family and sample names carry their year or run anyway, because commands pick samples by name across every folder.
+Run 3 has no ggZH H->SS samples, so the ZH samples cover only the qq-initiated part.
 
 ## Relevant Commands
 
@@ -109,26 +105,15 @@ The flags and worked examples are in `python/kamui/README.md`.
 
 ## Caveats
 
-The physics caveats for each family live here, so the configs stay readable.
+- `isMC` picks the global tag and the MC-only collections, and decides whether a blind selection may run on the sample. Kamui checks it against the dataset tier only for a central dataset, so get it right for a USER dataset.
 
 ### Exotic Higgs (`exoticHiggs4b*`, `exoticHiggs4d*` and `exoticHiggs4tau*` Families)
 
-- Run 3 ggH has no gen-HT filter. The Run 2 samples required gen-HT > 200 GeV.
+- Run 3 ggH has no gen-HT filter. The Run 2 ggH samples require gen-HT > 200 GeV.
 - The `ggHPTH80` samples in 2022 and 2022EE are filtered on pTH > 80 GeV, so normalizing them needs that filter efficiency on top of the ggH cross section.
 - ZH and WH decays are inclusive in Run 3, and exclusive to lepton decays in Run 2.
 - The Summer24 exclusive ZH-Zto2L, WplusH-WtoLNu and GluGluZH datasets named `Hto2S` decay the Higgs promptly to a strange-quark pair, so they hold no LLP.
 
 ### Compressed Stop (`compressedStop*` Families)
 
-- Each stop decays half the time to b W* LSP and half to c LSP. The LSP is only slightly lighter than the stop, so the decay products carry a few GeV and their tracks are soft.
 - A generator filter requires MET > 100 GeV and HT > 200 GeV, so normalizing needs that filter efficiency.
-- Sample names keep the DAS lifetime spelling, so both `ctau1p0mm` and `ctau20mm` appear.
-
-### Stealth SUSY (`stealthSusy2024`)
-
-- Each sample holds a single (mStop, mSo, ctau) point.
-- In Run 2, one sample mixes many signal points, and filtering on `randPar`, a parameter built into the samples themselves, picks out one point.
-
-### Run 2 Validation (`run2Validation`)
-
-- The dataset paths are copied from JMTucker's `Tools/python/Samples.py`.

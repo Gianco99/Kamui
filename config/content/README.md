@@ -30,7 +30,7 @@ Two rules hold across these files:
 | **`type`** (required) | What kind of object it is |
 | `src` (required for every type except `global`, `pileup` and `genWeight`) | The MiniAOD collection it reads |
 | `variables` (required for every type except `pileup`, `genWeight` and `vertexJet`) | The branches to write |
-| `doc` (optional, default `""`) | The title of the `n<Name>` count branch in the ROOT file. A collection with one object per event, such as a `global` or `beamSpot` collection or one with `singleton: true`, has no count branch, so its `doc` is never written |
+| `doc` (optional, default `""`) | The title of the `n<Name>` count branch in the ROOT file |
 | `cut` (optional, default `""`) | Only objects passing this are kept |
 | `maxLen` (optional) | The most objects to keep |
 | `singleton` (optional, default `false`) | One object per event |
@@ -40,13 +40,6 @@ Two rules hold across these files:
 | `jec` (required for `vertexJet`) | The JECs to re-apply |
 | `requirements` (required for `vertexJet`) | The jets to keep |
 | `vertexing` (required for `dv`) | The vertexer parameters |
-
-Four groups of types work differently from the rest:
-
-- `pileup` and `genWeight` have fixed content set by their CMSSW producer, so they ignore `variables` and `doc`. `pileup` reads its `src`, `slimmedAddPileupInfo` by default. `genWeight` records its `src` only for reference, since its producer picks its own input.
-- `global` rejects `cut`, `maxLen` and `singleton`, and its variables name EDM products, as described below.
-- `beamSpot` and `genEvent` always hold one object per event, so they ignore `singleton` and reject `cut` and `maxLen`.
-- `vertexJet` writes nothing to the ntuple, so it rejects `variables`, `cut`, `maxLen` and `singleton`. Every other type rejects `jec` and `requirements`.
 
 Each variable is a name and how to compute it:
 
@@ -77,18 +70,18 @@ A `seedTrack` collection writes the DV seed tracks, with `variables` that are me
   - A curve is a `form` in the track pT `x`, one of `p0`, `p0-p2*exp(-p1*x)`, `p0-exp(-p1*x+p2)` and `p0-p2*exp(-p1*x)+p3*x`, with its parameters in `p`.
 - The optional `trackDrop`, MC only, drops each track with probability `coefficient`*min(|dxy to the beamspot|, `absDxyBsCap`)^2, where `coefficient` is a number or an object keyed by era.
 
-A `vertexJet` collection makes the jets that the vertexer's `sharedJets` step reads.
+A `vertexJet` collection makes the jets that the vertexer's `sharedJets` step reads, and writes no branches.
 
 - `jec` names the payload, the primary vertices and the correction levels.
 - `requirements` picks the jets by the `Jet` collection's variables, in the selection syntax of `config/selections/README.md`, and may name a definition from `config/definitions/`.
 
-A `dv` collection fits the DVs. Its `src` and its `vertexing.jets` name the collections it reads, and it takes no `cut`, `maxLen` or `singleton`.
+A `dv` collection fits the DVs. Its `src` and its `vertexing.jets` name the collections it reads.
 
 - `kalman` holds the vertex fitter's settings, and `maxChi2PerDof` applies to every fit.
 - `sharedTracks`, `zRefit`, `mergeNearby` and `sharedJets` hold the thresholds of the four steps after seeding, which `vertexing/README.md` explains.
 - `beampipe` decides `DV_insideBeampipe`: a circle of `radius` around `dataCenter` in data, which moves by era, and around `mcCenter` in MC.
 
-A `dvTrack` collection writes the tracks of every DV that the `dv` collection in its `src` keeps, one row per track with the index of its DV. It takes no `cut`, `maxLen` or `singleton`, and its `variables` are methods of `reco::Track`.
+A `dvTrack` collection writes the tracks of every DV that the `dv` collection in its `src` keeps, one row per track with the index of its DV. Its `variables` are methods of `reco::Track`.
 
 ## Presets
 
@@ -98,8 +91,6 @@ A `dvTrack` collection writes the tracks of every DV that the `dv` collection in
 | `collections` (optional) | Its own collections, which override anything from the includes |
 | `skim` (optional) | Keeps only the events that fire a trigger channel |
 | `triggerBits` (optional) | Which HLT decision branches to write out |
-
-A preset must end up with at least one collection, from `include` or its own `collections`.
 
 ### The `skim` Block
 
@@ -115,8 +106,6 @@ A preset must end up with at least one collection, from `include` or its own `co
 |---|---|
 | **`processes`** (required) | The processes to keep decisions from, as a list: `HLT` for the triggers, and `PAT` or `RECO` for the `Flag_*` MET filters that selections read |
 
-`triggerBits` takes no other key.
-
 ## What Is Here Now
 
 ### Collection Files
@@ -131,9 +120,8 @@ A preset must end up with at least one collection, from `include` or its own `co
 | `gen` | Generator particles, generator MET, weights and pileup, all `mcOnly` |
 | `vertexing` | DV seed tracks, the jets the `sharedJets` step reads, the DVs, and the tracks of each DV (Run 2 only) |
 
-- The Run 3 `vertexing` has no `beampipe` block yet, so it does not resolve. `check` skips it, the Run 3 `dvFull` leaves it out, and `./kamui content vertexing` at a Run 3 era says it is parked.
-- The `trackErrScale` and `trackDrop` numbers come from the Run 2 analysis, which measured both by comparing data with MC. Run 3 has no such measurement yet, so its seeding applies neither.
-- Run 3 has no definitions yet, so the Run 3 `VertexJet` uses only the pT and eta cuts of `analysisJet`, without its jet ID, `tightLepVeto`.
+- The `trackErrScale` and `trackDrop` numbers are Run 2 measurements, made by comparing data with MC. Run 3 has no such measurement, so its seeding applies neither.
+- Run 3 has no definitions, so the Run 3 `VertexJet` takes the pT and eta cuts of `analysisJet` without its jet ID, `tightLepVeto`.
 
 ### Preset Files
 
@@ -155,9 +143,7 @@ The flags and worked examples are in `python/kamui/README.md`.
 
 ## Caveats
 
-- `collections/` and `presets/` are searched together, so a collection and a preset can't share a name.
-- `expr` is C++ evaluated when the job runs, so `check` can't catch a typo in it.
-- Use `precision: -1` for anything a selection threshold compares against, including `vx`, `vy`, `vz` and the `PV` positions that impact parameters are recomputed from, since rounding can land a pT on a threshold and flip whether an object passes.
-- Keep a `dvTrack` collection's variables at full precision, because a revertexer rebuilds each DV from all of its rows.
-- Don't give `GenPart` a `cut` or `PV` a `maxLen`, since `genPartIdxMother` and `Track_pvIdx` point into them by position.
+- CMSSW evaluates `expr` and `cut` when the job runs, so `check` can't catch a typo in them.
+- Keep full precision, `precision: -1`, on any variable a selection cuts on or computes from, such as `vx`, `vy`, `vz` and the `PV` positions, since rounding can move a value across a threshold and flip whether an object passes. Every `dvTrack` variable needs full precision too, since a revertexer rebuilds each DV from them.
+- Don't give `GenPart` or `PV` a `cut` or `maxLen`, since `genPartIdxMother` and `Track_pvIdx` point into them by position.
 - `maxLen` keeps the first objects in `src` order without sorting. Jets arrive in pT order, and `SV` objects do not.

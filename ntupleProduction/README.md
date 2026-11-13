@@ -83,9 +83,3 @@ Everything below sits in `jobs/<task>/`.
 - Before writing a preset for a new campaign, run `tools/inspectMiniAOD.py` to see what its MiniAOD files carry.
 
 The flags and worked examples are in `python/kamui/README.md`.
-
-## Caveats
-
-- The job finds the gen-weight table by its key. Any collection whose key contains `genweight`, in any capitalization, runs outside the skim so that it sees every event.
-- Condor jobs set up the CMSSW release named in `config/sites.json`. Don't bump it without checking. CRAB ignores it and uses the release you submit from.
-- LPC has several schedds, the servers that hold the condor job queue, and each submission lands on one of them. A bare `condor_q` asks only the default schedd, so a task sitting on another schedd shows no jobs there and looks finished. That is why Kamui records in `task.json` the schedd of the first submission and of each retry, and asks each schedd about its own cluster. A `task.json` with no `schedd` key falls back to the default schedd.

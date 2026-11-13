@@ -48,7 +48,7 @@ Commas apply the selections in order, in one pass with one cutflow. The ntuples 
 | **`cuts`** (required) | The cuts, applied in order |
 | `eras` (optional) | The eras this file is meant for, as a list |
 | `include` (optional) | Selections to build on, as a list. Writing your own `cuts` replaces theirs |
-| `blind` (optional, default `false`) | `true` keeps `select` from running this on data, alone or in a comma list. Any selection that asks for the signal region, as `SIGNAL_REGION` in `python/kamui/configReaders/selections.py` defines it, must set it, or Kamui stops with an error |
+| `blind` (optional, default `false`) | `true` keeps `select` from running this on data, alone or in a comma list |
 
 Any threshold, trigger list or flag list can be one value, or an object keyed by era such as `{"2017": <value2017>, "2018": <value2018>}`. Only the era you run needs to be there.
 
@@ -61,8 +61,6 @@ Any threshold, trigger list or flag list can be one value, or an object keyed by
 | `doc` (optional, default `""`) | A note, printed in the cutflow |
 | `invert` (optional, default `false`) | `true` keeps the events the cut would drop |
 
-A cut takes only these keys and the fields its type lists below. Any other key is an error.
-
 ### Cut Types
 
 | `type` | Keeps an event when | Fields |
@@ -73,9 +71,9 @@ A cut takes only these keys and the fields its type lists below. Any other key i
 | `object` | Enough objects of one collection pass every requirement, and no more than `max` if it is set | See Object Cuts |
 | `anyOf` | At least one alternative passes all its cuts | `anyOf`, a list of alternatives |
 
-- `triggers` is the name of a trigger file in `config/triggers/` whose `mode` is `any`, a list of path patterns, or an object keyed by era holding either. A pattern ending in `_v*` loses that suffix and is matched against the branch names, so `HLT_IsoMu24_v*` matches the branch `HLT_IsoMu24`.
+- `triggers` is the name of a trigger file in `config/triggers/`, a list of path patterns, or an object keyed by era holding either. A pattern ending in `_v*` loses that suffix and is matched against the branch names, so `HLT_IsoMu24_v*` matches the branch `HLT_IsoMu24`.
 - A condition bounds its `quantity` with the same bounds a requirement uses (see Object Cuts). A `quantity` is an event branch such as `MET_pt`, or a count or sum over a collection. `{"collection": "Jet", "requirements": [...]}` counts the jets that pass the requirements, or all jets without them. Add `"sum": "pt"` to sum their pT instead.
-- An `anyOf` alternative needs only `cuts`. It can also have a `name` (default `alternative <n>`), a `doc`, and `eras` to use it only in some eras. Any other key is an error.
+- An `anyOf` alternative needs only `cuts`. It can also have a `name` (default `alternative <n>`), a `doc`, and `eras` to use it only in some eras.
 - To keep two channels apart, put the other channel's alternatives in an `anyOf` with `invert`. That is how `displaced.json` drops lepton-channel events.
 
 ### Object Cuts
@@ -85,7 +83,7 @@ A cut takes only these keys and the fields its type lists below. Any other key i
 | **`collection`** (required) | Branch prefix, such as `Jet` |
 | **`requirements`** (required) | Cuts each object must pass |
 | `min` (optional, default `1`) | How many objects must pass, a whole number of at least 1. With `orderedMinPt`, the default is its length. With `max`, it only applies if you write it |
-| `max` (optional) | The most objects that may pass, a whole number. `0` vetoes any event that has one. It can't be combined with `orderedMinPt` or `pairRequirements`, and the cutflow shows the cut as a `quantity` count |
+| `max` (optional) | The most objects that may pass, a whole number. `0` vetoes any event that has one |
 | `orderedMinPt` (optional) | pT thresholds for the leading passing objects, highest first, such as `[<leadingPtMin>, <secondPtMin>]`. The k-th highest-pT passing object needs a pT at or above the k-th threshold |
 | `pairRequirements` (optional) | Cuts on how far apart two passing objects are |
 
@@ -105,14 +103,11 @@ The flags and worked examples are in `python/kamui/README.md`.
 
 ## Caveats
 
-- A flag that no input file has stops the pass, and so does a `trigger` cut whose paths are missing from every file. When only some of a sample's files have a path or flag, as happens when the files come from different HLT menus, it counts as not fired in the events of the files without it. On condor, each job looks only at its own files, so a job whose files all lack a `trigger` cut's paths stops even when other jobs' files have them.
-- Inside an `anyOf` alternative, a path the ntuple doesn't have counts as not fired, because part of an era can run without it. A misspelled path there therefore doesn't stop the pass. That alternative keeps nothing, so watch the paths-present note in the cutflow. The pass only stops if every alternative is missing its paths. In an inverted `anyOf` like `leptonVeto`, the veto stops vetoing without any error.
 - An `anyOf` inside `requirements` lets each object pass a different group, and they all count toward `min`. An `anyOf` cut whose alternatives each hold one object cut needs `min` objects passing a single alternative. The two agree only when `min` is 1.
-- Kamui keeps every DV it finds, even one outside the beampipe or one that JMTucker drops for a NaN uncertainty. Start your own DV cuts from `tightDV`, or give them both an `insideBeampipe` requirement and a `dBVErr` bound, or they count DVs JMTucker never had.
-- The two-DV regions copy JMTucker's quirks:
-  - They can overlap: tight DVs of 5, 6 and 4 tracks put an event in both `dv4x5` and `dv5x5`.
-  - `dv3x5` drops events that also hold a tight DV with 4 tracks, so it never shares an event with `dv4x5`.
-  - `dv3x5` and `dv4x5` only count DVs with exactly 5 tracks, so an event whose tight DVs have 3 and 6 tracks, or 4 and 6, lands in no two-DV region (`Bugs/jmtucker/adapted/fiveTrackCappedAtFive.md`).
+- The `DV` collection holds every DV the vertexer finds, even ones outside the beampipe or with a NaN `dBVErr`, which JMTucker never counts. Build your own DV cuts on `tightDV`, or give them an `insideBeampipe` requirement and a `dBVErr` bound.
+- The two-DV regions follow JMTucker's definitions:
+  - They can overlap: tight DVs of 4, 5 and 6 tracks put an event in both `dv4x5` and `dv5x5`.
+  - `dv3x5` drops events that also hold a tight 4-track DV, so it never shares an event with `dv4x5`.
+  - `dv3x5` and `dv4x5` count only DVs with exactly 5 tracks, so an event whose tight DVs have 3 and 6 tracks, or 4 and 6, lands in no two-DV region (`Bugs/jmtucker/adapted/fiveTrackCappedAtFive.md`).
 - The Run 2 selections have to keep matching JMTucker. After any change, check the yields against JMTucker again.
-- `displaced.json`'s `leptonVeto` is `lepton.json`'s `leptonPlateau` inverted. They share the lepton definitions, but each file writes out its own trigger list, so keep those lists the same or the two channels overlap.
-- `lepton.json` has no veto of its own, as in JMTucker, which uses the veto only in the displacement-triggered channel.
+- `displaced.json`'s `leptonVeto` is `lepton.json`'s `leptonPlateau` inverted. Each file writes out its own trigger lists, so keep them the same, or events land in both channels or in neither.

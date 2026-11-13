@@ -41,8 +41,4 @@ python3 tools/inspectMiniAOD.py root://cmseos.fnal.gov//store/.../file.root
 
 ## Caveats
 
-- `triggerYields.py`
-    - The denominator is already skimmed. `--task` only counts samples whose content preset declares `skim.triggers`, so every event in the file already passed the channel's trigger, and `eff` comes out at essentially 100%. The number is a consistency check that the stored trigger bits agree with the skim the job applied. `--perPath` is the informative output: it shows which paths carry the channel and which are missing from the era's menu.
-    - Which paths exist is read from the first file of the sample, so with `mode: "all"` a path missing from that file's menu is left out of the AND. Check `--perPath` for paths marked `not in menu`.
-- `inspectMiniAOD.py`
-    - A collection is reported from the first event that has it. A signal sample can easily have no electrons in event 1, so a report from event 1 alone would look like "these IDs are not embedded".
+- `triggerYields.py --task` counts only samples whose content preset declares a trigger skim, so every event already passed the channel and `eff` comes out near 100%. Read it as a check that the stored trigger bits agree with the skim, and use `--perPath` to see which paths carry the channel and which are missing from the era's menu.
